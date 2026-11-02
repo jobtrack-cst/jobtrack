@@ -359,9 +359,9 @@ services/<service>/
 2. Create a branch named with the Jira key: `git checkout -b JT-21-team-a-contracts`
 3. Commit small, with the Jira key first: `git commit -m "JT-21: add application-status proto"`
 4. Push: `git push -u origin JT-21-team-a-contracts`
-5. Open a pull request into `main`. Title starts with the Jira key. Fill in the PR template.
-6. Your pair partner reviews. Cross-team changes (contracts, shared `pkg/`, this file) need one reviewer from the other team.
-7. CI must pass. Squash and merge. Delete the branch.
+5. All changes to `main` require a pull request. Title starts with the Jira key. Fill in the PR template.
+6. Peer reviews are encouraged, especially for shared contracts, shared `pkg/`, and `AGENTS.md`, including cross-team review, but approval is not mandatory for merging.
+7. Applicable CI checks must pass before merging, once JT-28 provides the checks. Squash and merge. Delete the branch.
 
 Rules:
 
@@ -390,7 +390,7 @@ A task or story is Done only when:
 2. Code follows this file's conventions and is formatted.
 3. Unit tests are written and pass; integration tests where the task involves a database or events.
 4. CI is green.
-5. The PR is reviewed and approved by the required reviewer.
+5. A pull request is used for all changes to `main`; peer review is encouraged, but approval is not mandatory for merging.
 6. It is merged to `main` and runs in Docker Compose.
 7. Related documentation (this file, docs folder, test cases) is updated.
 8. Time is logged in Jira.
@@ -445,6 +445,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 2 Nov 2026 | Use Phuntsho's laptop as the cluster host; verify at least 16 GB RAM | Select the host while keeping hardware readiness pending verification |
 | 2 Nov 2026 | Daily stand-up: Flexible, coordinated by the team each day (15 minutes). | Allow daily coordination around team availability |
 | 3 Nov 2026 | Transfer the jobtrack repository to the shared GitHub organization jobtrack-cst | Shared team ownership, consistent future Go import path, and enable GitHub for Jira integration |
+| 3 Nov 2026 | All four members agreed to remove mandatory PR approvals while retaining mandatory PRs, protected main, encouraged peer and cross-team reviews, and applicable CI requirements | Avoid blocking the short Sprint 0; applicable CI checks must pass once JT-28 provides them |
 
 ---
 
