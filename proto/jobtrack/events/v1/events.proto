@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package jobtrack.events.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1;eventsv1";
+
+// EventEnvelope contains metadata and one typed domain event.
+// The type matches the RabbitMQ routing key.
+message EventEnvelope {
+  string event_id = 1;
+  string type = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+  string producer = 4;
+  google.protobuf.Any data = 5;
+}
+
+// JobPublished corresponds to job.published.
+message JobPublished {
+  string job_id = 1;
+  string employer_id = 2;
+  string title = 3;
+  string category_id = 4;
+  repeated string tag_ids = 5;
+  string location = 6;
+  google.protobuf.Timestamp deadline = 7;
+}
+
+// ApplicationSubmitted corresponds to application.submitted.
+message ApplicationSubmitted {
+  string application_id = 1;
+  string applicant_id = 2;
+  string job_id = 3;
+  string resume_id = 4;
+  string employer_id = 5;
+}
+
+// StatusChanged corresponds to application.status_changed.
+message StatusChanged {
+  string application_id = 1;
+  string applicant_id = 2;
+  string previous_status = 3;
+  string new_status = 4;
+}
+
+// ResumeUploaded corresponds to resume.uploaded.
+message ResumeUploaded {
+  string resume_id = 1;
+  string applicant_id = 2;
+}
+
+// UserRegistered corresponds to user.registered.
+message UserRegistered {
+  string user_id = 1;
+}
+
+// EmployerVerified corresponds to employer.verified.
+message EmployerVerified {
+  string employer_id = 1;
+}
+
+// EmployerVerificationRejected corresponds to employer.verification_rejected.
+message EmployerVerificationRejected {
+  string employer_id = 1;
+  string reason = 2;
+}
+
+// ModerationJobRemoved corresponds to moderation.job_removed.
+message ModerationJobRemoved {
+  string job_id = 1;
+  string reason = 2;
+}
+
+// JobUpdated corresponds to job.updated.
+message JobUpdated {
+  string job_id = 1;
+  string employer_id = 2;
+  string title = 3;
+  string category_id = 4;
+  repeated string tag_ids = 5;
+  string location = 6;
+  google.protobuf.Timestamp deadline = 7;
+}
+
+// JobClosed corresponds to job.closed.
+message JobClosed {
+  string job_id = 1;
+}
+
+// ResumeValidated corresponds to resume.validated.
+message ResumeValidated {
+  string resume_id = 1;
+  string applicant_id = 2;
+}
+
+// ResumeRejected corresponds to resume.rejected.
+message ResumeRejected {
+  string resume_id = 1;
+  string applicant_id = 2;
+  string reason = 3;
+}
+
+// ApplicationWithdrawn corresponds to application.withdrawn.
+message ApplicationWithdrawn {
+  string application_id = 1;
+  string applicant_id = 2;
+  string job_id = 3;
+}
+
+// ReviewCompleted corresponds to review.completed.
+message ReviewCompleted {
+  string application_id = 1;
+  string decision = 2;
+}
+
+// InterviewScheduled corresponds to interview.scheduled.
+message InterviewScheduled {
+  string interview_id = 1;
+  string application_id = 2;
+  google.protobuf.Timestamp scheduled_at = 3;
+}
+
+// OfferMade corresponds to offer.made.
+message OfferMade {
+  string offer_id = 1;
+  string application_id = 2;
+  string applicant_id = 3;
+}
+
+// OfferAccepted corresponds to offer.accepted.
+message OfferAccepted {
+  string offer_id = 1;
+  string application_id = 2;
+  string applicant_id = 3;
+}
+
+// OfferDeclined corresponds to offer.declined.
+message OfferDeclined {
+  string offer_id = 1;
+  string application_id = 2;
+  string applicant_id = 3;
+}
+
+// MessageSent corresponds to message.sent.
+message MessageSent {
+  string message_id = 1;
+  string application_id = 2;
+  string recipient_id = 3;
+}
+
+// JobAlertMatched corresponds to job_alert.matched.
+message JobAlertMatched {
+  string job_id = 1;
+  string applicant_id = 2;
+}
+
+// DeadlineReminder corresponds to deadline.reminder.
+message DeadlineReminder {
+  string job_id = 1;
+  string applicant_id = 2;
+  google.protobuf.Timestamp deadline = 3;
+}
