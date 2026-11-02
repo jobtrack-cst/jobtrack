@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 2 Nov 2026 (Sprint 0 started)
+- Last updated: 3 Nov 2026 (Sprint 0 started)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -444,6 +444,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 2 Nov 2026 | Sprint 0 started on 2 Nov 2026 | Begin the agreed development foundation work on schedule |
 | 2 Nov 2026 | Use Phuntsho's laptop as the cluster host; verify at least 16 GB RAM | Select the host while keeping hardware readiness pending verification |
 | 2 Nov 2026 | Daily stand-up: Flexible, coordinated by the team each day (15 minutes). | Allow daily coordination around team availability |
+| 3 Nov 2026 | Transfer the jobtrack repository to the shared GitHub organization jobtrack-cst | Shared team ownership, consistent future Go import path, and enable GitHub for Jira integration |
 
 ---
 
