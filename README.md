@@ -2,9 +2,14 @@
 
 JobTrack is a job and internship application portal for students, employers and placement coordinators at the College of Science and Technology, Royal University of Bhutan. It is a shared final project for WEB303, SWE302 and SWE303.
 
-The project is being scaffolded and is not yet runnable. This repository currently contains project documentation and empty directory placeholders. Implementations, contracts, configuration and tests will be added in their assigned Jira tasks.
+JobTrack is under development; the complete application is not finished. This branch includes shared contracts, Go infrastructure helpers and a runnable golden service template with tests, a Dockerfile, reference Kubernetes manifests and a service generator. Many production service directories remain placeholders.
+
+The golden template at `services/service-template/` is a reference implementation, not a 21st production microservice. It demonstrates gRPC Health/Check, PostgreSQL startup migrations, RabbitMQ publisher initialization, JSON logging, `/healthz` and `/metrics`.
 
 See [AGENTS.md](AGENTS.md) for the authoritative architecture, service ownership, conventions, testing requirements and team workflow.
+
+- [Golden service build, configuration and generation guide](docs/deployment/jt-19-golden-service.md)
+- [JT-19 test cases and verification evidence](docs/testing/jt-19-test-cases.md)
 
 ## Agreed technology stack
 
@@ -22,11 +27,12 @@ See [AGENTS.md](AGENTS.md) for the authoritative architecture, service ownership
 ```text
 jobtrack/
   AGENTS.md                 authoritative project context
-  README.md                 project introduction and scaffold status
+  README.md                 project introduction and development status
+  go.mod, go.sum            single Go module and dependency checksums
   proto/jobtrack/           common, event and per-service v1 contract directories
   gen/go/                   generated Go code
   pkg/                      grpcclient, events, authctx, logging, db
-  services/                 one directory for each of the 20 microservices
+  services/                 20 production service directories plus the reference template
   functions/                one directory for each of the five Knative functions
   gateway/                  API gateway
   frontend/                 React web app
@@ -48,4 +54,4 @@ jobtrack/
     workflows/              CI workflows
 ```
 
-Empty directories are tracked with `.gitkeep` files. The Go module, buf configuration, proto files, service code, deployment configuration, scripts, GitHub templates and CI workflows described in AGENTS.md are deferred to their assigned tasks.
+Empty directories are tracked with `.gitkeep` files. The template has been verified in an isolated Docker Compose environment. Integration with the official JT-27 Compose configuration and GitHub Actions CI under JT-28 remains pending; Kubernetes cluster deployment has not been tested. See the JT-19 verification document for the scope and limitations of each check.
