@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package jobtrack.employer.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/employer/v1;employerv1";
+
+// EmployerService manages company profiles. One profile per employer account,
+// keyed by the employer's user ID from auth.
+service EmployerService {
+  // CreateCompanyProfile creates the caller's profile. Employer role only.
+  // A second profile for the same employer is ALREADY_EXISTS.
+  rpc CreateCompanyProfile(CreateCompanyProfileRequest) returns (CreateCompanyProfileResponse) {
+    option (google.api.http) = {
+      post: "/v1/employer/profile"
+      body: "*"
+    };
+  }
+
+  // GetMyCompanyProfile returns the caller's own profile.
+  rpc GetMyCompanyProfile(GetMyCompanyProfileRequest) returns (GetMyCompanyProfileResponse) {
+    option (google.api.http) = {get: "/v1/employer/profile"};
+  }
+
+  // UpdateCompanyProfile replaces the editable fields of the caller's profile.
+  // It never changes verification_status (only events do that).
+  rpc UpdateCompanyProfile(UpdateCompanyProfileRequest) returns (UpdateCompanyProfileResponse) {
+    option (google.api.http) = {
+      put: "/v1/employer/profile"
+      body: "*"
+    };
+  }
+
+  // GetCompanyProfile returns any employer's profile. Also used by
+  // job-posting for the verified check (NOT_FOUND counts as not verified).
+  rpc GetCompanyProfile(GetCompanyProfileRequest) returns (GetCompanyProfileResponse) {
+    option (google.api.http) = {get: "/v1/companies/{employer_id}"};
+  }
+}
+
+// VerificationStatus is set only by employer.verified and
+// employer.verification_rejected events.
+enum VerificationStatus {
+  VERIFICATION_STATUS_UNSPECIFIED = 0;
+  VERIFICATION_STATUS_UNVERIFIED = 1;
+  VERIFICATION_STATUS_VERIFIED = 2;
+  VERIFICATION_STATUS_REJECTED = 3;
+}
+
+message CompanyProfile {
+  // The employer's user ID from auth.
+  string employer_id = 1;
+  string company_name = 2;
+  string description = 3;
+  string website = 4;
+  string location = 5;
+  VerificationStatus verification_status = 6;
+  // Filled only when verification_status is REJECTED, and returned only to
+  // the owning employer or an admin. Empty for everyone else.
+  string rejection_reason = 7;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 8;
+}
+
+message CreateCompanyProfileRequest {
+  // Required. Empty is INVALID_ARGUMENT.
+  string company_name = 1;
+  string description = 2;
+  string website = 3;
+  string location = 4;
+}
+
+message CreateCompanyProfileResponse {
+  CompanyProfile profile = 1;
+}
+
+message GetMyCompanyProfileRequest {}
+
+message GetMyCompanyProfileResponse {
+  CompanyProfile profile = 1;
+}
+
+message UpdateCompanyProfileRequest {
+  string company_name = 1;
+  string description = 2;
+  string website = 3;
+  string location = 4;
+}
+
+message UpdateCompanyProfileResponse {
+  CompanyProfile profile = 1;
+}
+
+message GetCompanyProfileRequest {
+  string employer_id = 1;
+}
+
+message GetCompanyProfileResponse {
+  CompanyProfile profile = 1;
+}
