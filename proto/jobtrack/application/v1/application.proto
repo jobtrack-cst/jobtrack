@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package jobtrack.application.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/application/v1;applicationv1";
+
+// ApplicationService submits, withdraws and reads applications.
+// Runtime handlers enforce role and ownership using authenticated metadata.
+// These proposed HTTP bindings remain subject to final cross-team review.
+service ApplicationService {
+  // SubmitApplication derives the applicant ID from authenticated metadata.
+  // At runtime, call JobPostingService.GetJob and ResumeService.GetResume with
+  // forwarded identity. The job must be PUBLISHED and before its deadline;
+  // the resume must belong to the applicant and be VALIDATED. The employer ID
+  // comes from the trusted Job Posting response. Publish application.submitted.
+  rpc SubmitApplication(SubmitApplicationRequest) returns (SubmitApplicationResponse) {
+    option (google.api.http) = {
+      post: "/v1/applications"
+      body: "*"
+    };
+  }
+
+  // WithdrawApplication publishes application.withdrawn at runtime.
+  // Repeat withdrawals and final-state eligibility remain team decisions.
+  rpc WithdrawApplication(WithdrawApplicationRequest) returns (WithdrawApplicationResponse) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/withdraw"
+      body: "*"
+    };
+  }
+
+  // GetApplication returns an application subject to runtime authorization.
+  rpc GetApplication(GetApplicationRequest) returns (GetApplicationResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}"};
+  }
+
+  // ListApplications lists applications subject to runtime authorization.
+  rpc ListApplications(ListApplicationsRequest) returns (ListApplicationsResponse) {
+    option (google.api.http) = {get: "/v1/applications"};
+  }
+}
+
+// Application records submission and withdrawal, not lifecycle status.
+// Application Status owns the lifecycle state machine; no synchronous lookup
+// is introduced here. Duplicate submissions and event-to-transition mapping
+// remain unresolved team decisions. All IDs are UUID strings.
+message Application {
+  string application_id = 1;
+  string applicant_id = 2;
+  string job_id = 3;
+  string resume_id = 4;
+  string employer_id = 5;
+  bool withdrawn = 6;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 7;
+}
+
+message SubmitApplicationRequest {
+  string job_id = 1;
+  string resume_id = 2;
+}
+
+message SubmitApplicationResponse {
+  Application application = 1;
+}
+
+message WithdrawApplicationRequest {
+  string application_id = 1;
+}
+
+message WithdrawApplicationResponse {
+  Application application = 1;
+}
+
+message GetApplicationRequest {
+  string application_id = 1;
+}
+
+message GetApplicationResponse {
+  Application application = 1;
+}
+
+message ListApplicationsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+  // Optional filter; empty means no job ID filter.
+  string job_id = 2;
+}
+
+message ListApplicationsResponse {
+  repeated Application applications = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
