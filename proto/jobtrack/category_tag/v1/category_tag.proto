@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package jobtrack.category_tag.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/category_tag/v1;categorytagv1";
+
+// CategoryTagService provides the reference lists of job categories,
+// skill tags and locations. The lists are seeded by migration.
+// Every RPC here is public through the gateway.
+service CategoryTagService {
+  // ListCategories lists all job categories, sorted by name.
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse) {
+    option (google.api.http) = {get: "/v1/categories"};
+  }
+
+  // ListTags lists all skill tags, sorted by name.
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
+    option (google.api.http) = {get: "/v1/tags"};
+  }
+
+  // ListLocations lists all locations, sorted by name.
+  rpc ListLocations(ListLocationsRequest) returns (ListLocationsResponse) {
+    option (google.api.http) = {get: "/v1/locations"};
+  }
+}
+
+// CategoryTagInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token
+// from an allowed caller (see AGENTS.md Section 6).
+service CategoryTagInternalService {
+  // ResolveNames returns names for the given IDs in one call.
+  // Allowed caller: job-alert. Unknown IDs are left out of the response,
+  // not an error.
+  rpc ResolveNames(ResolveNamesRequest) returns (ResolveNamesResponse);
+}
+
+message Category {
+  string category_id = 1;
+  string name = 2;
+}
+
+message Tag {
+  string tag_id = 1;
+  string name = 2;
+}
+
+message Location {
+  string location_id = 1;
+  // Jobs store this name in their location field (see job.published).
+  string name = 2;
+}
+
+message ListCategoriesRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListCategoriesResponse {
+  repeated Category categories = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message ListTagsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListTagsResponse {
+  repeated Tag tags = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message ListLocationsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListLocationsResponse {
+  repeated Location locations = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message ResolveNamesRequest {
+  repeated string category_ids = 1;
+  repeated string tag_ids = 2;
+}
+
+message ResolveNamesResponse {
+  repeated Category categories = 1;
+  repeated Tag tags = 2;
+}

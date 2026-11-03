@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 3 Nov 2026 (Sprint 0 started)
+- Last updated: 3 Nov 2026 (JT-23 Team B contracts)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -116,6 +116,8 @@ Initial design. Exact RPCs and fields are defined in the `.proto` files (Sprint 
 
 ### Team B (Jigden and Sangay)
 
+Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.proto`.
+
 | # | Service (folder) | Owner | Responsibility | Publishes | Consumes |
 |---|---|---|---|---|---|
 | 1 | `auth` | Jigden | Register, login, issue JWT, user lookup (name, email, role) | `user.registered` | |
@@ -123,9 +125,9 @@ Initial design. Exact RPCs and fields are defined in the `.proto` files (Sprint 
 | 3 | `company-verification` | Jigden | Verification requests and admin decisions | `employer.verified`, `employer.verification_rejected` | |
 | 4 | `moderation` | Jigden | Reports on job postings, admin takedowns | `moderation.job_removed` | |
 | 5 | `audit-log` | Jigden | Records key actions from all events (admin view) | | all events |
-| 6 | `analytics` | Jigden | Outcome statistics built from events | | job, application, status and offer events |
-| 7 | `job-posting` | Sangay | Create, edit, publish and close vacancies | `job.published`, `job.updated`, `job.closed` | `moderation.job_removed` |
-| 8 | `category-tag` | Sangay | Categories, skill tags, locations | | |
+| 6 | `analytics` | Jigden | Outcome statistics built from events | | `job.published`, `job.closed`, `application.submitted`, `application.withdrawn`, `application.status_changed`, `offer.made`, `offer.accepted`, `offer.declined` |
+| 7 | `job-posting` | Sangay | Create, edit, publish and close vacancies | `job.published`, `job.updated`, `job.closed` (also on moderation removal) | `moderation.job_removed` |
+| 8 | `category-tag` | Sangay | Categories, skill tags, locations (seeded, read-only) | | |
 | 9 | `job-search` | Sangay | Search read model built from job events | | `job.published`, `job.updated`, `job.closed` |
 | 10 | `saved-jobs` | Sangay | Bookmarks | | `job.closed` |
 | 11 | `notification-inbox` | Sangay | Stores and lists in-app notifications, mark as read | | (written by Notification Dispatcher via gRPC) |
@@ -147,8 +149,24 @@ Initial design. Exact RPCs and fields are defined in the `.proto` files (Sprint 
 ### API Gateway (not counted in the 20)
 
 - Folder: `gateway`. Owner: Jigden. Backup: Sangay.
-- Built with grpc-gateway from the HTTP annotations in each service's `.proto`.
+- Built with grpc-gateway from the HTTP annotations in each service's `.proto`. It registers only public services, never `*InternalService`.
 - Verifies the JWT on every request (except register and login), then forwards `x-user-id` and `x-user-role` as gRPC metadata.
+
+### JWT claims format
+
+- Issued by `auth` on login and signed with HS256 using `JWT_SECRET`. Lifetime 1 hour. There are no refresh tokens; the user logs in again.
+
+| Claim | Meaning | Example |
+|---|---|---|
+| `sub` | User ID (UUID from `auth`) | `3f2b8c1e-...` |
+| `role` | `applicant`, `employer` or `admin` | `employer` |
+| `iss` | Always `jobtrack-auth` | `jobtrack-auth` |
+| `iat` | Issued at, Unix seconds | `1793700000` |
+| `exp` | Expires at, Unix seconds (`iat` + 3600) | `1793703600` |
+
+- The gateway rejects a token with a bad signature, any algorithm other than HS256, a wrong `iss`, an expired `exp` or an unknown `role` with `UNAUTHENTICATED` (HTTP 401).
+- The gateway first removes any `x-user-*`, `x-internal-*` and `x-caller-*` metadata sent by the client (for example `Grpc-Metadata-X-User-Role` headers), then sets `x-user-id` = `sub` and `x-user-role` = `role`. Clients can never set their own identity.
+- `role` values map to the `jobtrack.auth.v1.Role` enum: `applicant` = `ROLE_APPLICANT`, `employer` = `ROLE_EMPLOYER`, `admin` = `ROLE_ADMIN`.
 
 ---
 
@@ -158,7 +176,7 @@ Initial design. Exact RPCs and fields are defined in the `.proto` files (Sprint 
 |---|---|---|---|
 | `notification-dispatcher` | Sangay | Events: `application.submitted`, `application.status_changed`, `interview.scheduled`, `offer.made`, `message.sent`, `job_alert.matched`, `employer.verified`, `deadline.reminder` | Decides who is notified and how. Writes to Notification Inbox (gRPC) and calls Email Sender for emails. Gets user emails from Auth. |
 | `email-sender` | Sangay | HTTP call from other functions | Sends email through SMTP to Mailpit |
-| `weekly-summary` | Jigden | Weekly schedule (PingSource) | Gets statistics from Analytics and emails a summary to admins |
+| `weekly-summary` | Jigden | Weekly schedule (PingSource) | Gets statistics from Analytics and admin emails from Auth, then emails a summary to admins. |
 | `resume-validator` | Phuntsho | Event: `resume.uploaded` | Fetches the file from Resume, checks type (PDF only), size (max 2 MB) and content signature. Publishes `resume.validated` or `resume.rejected`. |
 | `deadline-reminder` | Kinley | Daily schedule (PingSource) | Finds jobs closing within 48 hours (Job Posting) and who saved them (Saved Jobs). Publishes `deadline.reminder` events. |
 
@@ -193,19 +211,36 @@ Any other transition must be rejected with `FAILED_PRECONDITION`. Every transiti
 
 ### Allowed synchronous gRPC calls
 
-| Caller | Calls | Why | Cross-team |
-|---|---|---|---|
-| `gateway` | all services | Frontend requests | Yes |
-| `application` | `job-posting` | Job open check | Yes |
-| `application` | `resume` | Resume validated check | No |
-| `job-posting` | `employer` | Employer verified check | No |
-| `job-alert` | `category-tag` | Category and tag names | Yes |
-| `notification-dispatcher` | `notification-inbox`, `auth` | Write notification, get email | No |
-| `weekly-summary` | `analytics` | Statistics | No |
-| `deadline-reminder` | `job-posting`, `saved-jobs` | Closing jobs and who saved them | Yes |
-| `resume-validator` | `resume` | Fetch file | No |
+| Caller | Calls | RPC | Why | Cross-team |
+|---|---|---|---|---|
+| `gateway` | all services | Public services only (RPCs with HTTP annotations) | Frontend requests | Yes |
+| `application` | `job-posting` | `JobPostingService.GetJob` (forwards user identity) | Job open check | Yes |
+| `application` | `resume` | (defined in JT-21) | Resume validated check | No |
+| `job-posting` | `employer` | `EmployerService.GetCompanyProfile` (forwards user identity) | Employer verified check | No |
+| `job-alert` | `category-tag` | `CategoryTagInternalService.ResolveNames` | Category and tag names | Yes |
+| `notification-dispatcher` | `notification-inbox`, `auth` | `NotificationInboxInternalService.CreateNotification`, `AuthInternalService.GetUser` | Write notification, get email | No |
+| `weekly-summary` | `analytics` | `AnalyticsInternalService.GetInternalSummary` | Statistics | No |
+| `weekly-summary` | `auth` | `AuthInternalService.ListUsersByRole` | Admin emails | No |
+| `deadline-reminder` | `job-posting`, `saved-jobs` | `JobPostingInternalService.ListJobsClosingBetween`, `SavedJobsInternalService.ListJobSavers` | Closing jobs and who saved them | Yes |
+| `resume-validator` | `resume` | (defined in JT-21) | Fetch file | No |
 
 Any new synchronous call must be agreed by both teams and added here.
+
+### Public and internal RPCs
+
+- Public RPCs live in `<Name>Service` and have HTTP annotations. The gateway exposes them, and they always check the caller's role and ownership through `pkg/authctx`.
+- Internal RPCs live in a separate `<Name>InternalService` with no HTTP annotations. The gateway never registers them. They do not check a user role, because they are called by functions and event consumers where no user is involved.
+- When a service calls a public RPC of another service while handling a user request (for example `job-posting` calling `EmployerService.GetCompanyProfile` during `PublishJob`), `pkg/grpcclient` forwards the incoming `x-user-id` and `x-user-role` metadata.
+
+Internal RPCs are restricted to their intended callers in three layers:
+
+1. Contract: internal RPCs are only in `*InternalService`, so they can never get an HTTP route, and servers can apply a stricter interceptor to them.
+2. Application: every `*InternalService` call must carry `x-internal-token` equal to `INTERNAL_TOKEN` (constant-time compare) and `x-caller-service` set to the caller's service name. The server rejects a missing or wrong token with `UNAUTHENTICATED`, and a caller not allowed for that RPC (the table above) with `PERMISSION_DENIED`. `pkg/grpcclient` adds both headers. The gateway never has `INTERNAL_TOKEN`.
+3. Network: in k3d, a Kubernetes NetworkPolicy per service allows ingress on port 9090 only from its callers in the table above. In Docker Compose, port 9090 is never published to the host.
+
+`x-caller-service` is not proof of identity on its own; any holder of `INTERNAL_TOKEN` could set it. Layers 2 and 3 together limit misuse to compromised internal services. Full per-service identity would need mTLS, which is out of scope (Section 16).
+
+Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and agreed by all four members in PR #6, but they are not implemented yet. Until the internal interceptor, `pkg/grpcclient` headers, gateway filtering and NetworkPolicies are built (Section 16), internal RPCs are protected only by not being exposed through the gateway.
 
 ---
 
@@ -240,14 +275,14 @@ jobtrack/
   AGENTS.md                      this file
   README.md
   go.mod
-  buf.yaml, buf.gen.yaml
+  buf.yaml, buf.gen.yaml, buf.lock
   proto/jobtrack/
     common/v1/common.proto       shared types
     events/v1/events.proto       all domain events
-    <service>/v1/<service>.proto one per service
+    <service_snake>/v1/<service_snake>.proto   one per service (snake_case, see Section 9)
   gen/go/                        generated code (committed; CI checks it is up to date)
   pkg/                           shared Go libraries
-    grpcclient/                  timeout, retry, circuit breaker
+    grpcclient/                  timeout, retry, circuit breaker, forwards user identity, adds internal headers
     events/                      RabbitMQ publisher and consumer helpers, event envelope
     authctx/                     read x-user-id and x-user-role from gRPC metadata
     logging/                     JSON logger setup
@@ -258,7 +293,7 @@ jobtrack/
   frontend/
   deploy/
     compose/                     docker-compose.yml, Postgres init script
-    k8s/                         Kustomize base per service
+    k8s/                         Kustomize base per service (including NetworkPolicy)
     knative/                     function and event source manifests
   tests/
     e2e/                         Cypress
@@ -298,16 +333,22 @@ services/<service>/
 
 - Folder and service names: kebab-case (`application-status`). Same name in Compose, Kubernetes and Docker images.
 - Proto package: `jobtrack.<service_snake>.v1` (for example `jobtrack.application_status.v1`).
+- Proto folders and file names use the same snake_case name as the package (for example `proto/jobtrack/application_status/v1/application_status.proto`), because buf STANDARD lint requires the folder to match the package.
+- Proto naming follows buf STANDARD lint: service names end in `Service`, each RPC has its own `<Rpc>Request` and `<Rpc>Response`, and enum zero values end in `_UNSPECIFIED`.
+- Internal RPCs go in a separate `<Name>InternalService` in the same file, with no HTTP annotations. Each internal RPC's comment names its allowed callers.
 - Database and DB user: service name in snake_case (`application_status`).
 - Ports inside containers: gRPC on 9090, HTTP (health and metrics) on 8080. Gateway is exposed on host port 8000. Frontend dev server on 5173.
 - Configuration only through environment variables: `SERVICE_NAME`, `DATABASE_URL`, `RABBITMQ_URL`, `GRPC_PORT`, `HTTP_PORT`, plus `<SERVICE>_ADDR` for each service it calls. `JWT_SECRET` only in `auth` and `gateway`.
+- `INTERNAL_TOKEN` in every service and function that serves or calls an `*InternalService` RPC. Never in `gateway` or `frontend`.
+- `ADMIN_EMAIL` and `ADMIN_PASSWORD` only in `auth`. At startup, `auth` creates one admin from them if no admin exists and never updates an existing admin. It stores only a password hash, never logs the values, and refuses to start if `ADMIN_PASSWORD` is missing, equals the `.env.example` placeholder, or is shorter than 12 characters.
 - No secrets committed. Use `.env.example` files with placeholder values.
 
 ### Data and API rules
 
-- IDs: UUID strings. Timestamps: `google.protobuf.Timestamp`, stored in UTC.
-- Authorisation: services read the caller from `pkg/authctx` and check role and ownership themselves (for example only the owning employer can update a job).
-- Errors: use gRPC status codes. `INVALID_ARGUMENT` for bad input, `NOT_FOUND`, `PERMISSION_DENIED` for wrong role or owner, `FAILED_PRECONDITION` for business rule violations (closed job, invalid status transition), `ALREADY_EXISTS`, `INTERNAL` only for unexpected errors.
+- IDs: UUID strings (plain `string` fields, as in `events.proto`). Timestamps: `google.protobuf.Timestamp`, stored in UTC.
+- `employer_id` everywhere (events and contracts) is the employer's user ID from `auth`. Each employer account has at most one company profile.
+- Authorisation: services read the caller from `pkg/authctx` and check role and ownership themselves (for example only the owning employer can update a job). See Section 6 for internal RPCs.
+- Errors: use gRPC status codes. `INVALID_ARGUMENT` for bad input, `UNAUTHENTICATED` for a missing or invalid JWT, a missing or wrong internal token, and failed login (same message for wrong email and wrong password), `NOT_FOUND`, `PERMISSION_DENIED` for wrong role, owner or internal caller, `FAILED_PRECONDITION` for business rule violations (closed job, invalid status transition), `ALREADY_EXISTS`, `INTERNAL` only for unexpected errors.
 - List RPCs use the shared pagination messages from `common.proto`.
 
 ### Events
@@ -446,6 +487,14 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 2 Nov 2026 | Daily stand-up: Flexible, coordinated by the team each day (15 minutes). | Allow daily coordination around team availability |
 | 3 Nov 2026 | Transfer the jobtrack repository to the shared GitHub organization jobtrack-cst | Shared team ownership, consistent future Go import path, and enable GitHub for Jira integration |
 | 3 Nov 2026 | All four members agreed to remove mandatory PR approvals while retaining mandatory PRs, protected main, encouraged peer and cross-team reviews, and applicable CI requirements | Avoid blocking the short Sprint 0; applicable CI checks must pass once JT-28 provides them |
+| 3 Nov 2026 | Proto folders and file names use snake_case matching the package; service folders stay kebab-case (agreed by Phuntsho in PR #6) | buf STANDARD lint requires the folder to match the package |
+| 3 Nov 2026 | `buf.yaml` depends on `buf.build/googleapis/googleapis`; `buf.gen.yaml` adds the grpc-gateway plugin; `buf.lock` committed (agreed by Phuntsho in PR #6) | Needed for HTTP annotations and generated gateway code |
+| 3 Nov 2026 | `employer_id` is the employer's user ID from `auth`; one company profile per employer (agreed by Phuntsho in PR #6) | Notification Dispatcher and ownership checks only know user IDs |
+| 3 Nov 2026 | Internal RPCs live in separate `*InternalService` definitions, protected by a shared `INTERNAL_TOKEN`, a per-RPC caller allowlist and NetworkPolicy; user requests forward `x-user-id` and `x-user-role`. Residual risk without mTLS accepted (agreed by all four members in PR #6) | The gateway cannot reach internal services, and direct calls are limited to known callers without new tools |
+| 3 Nov 2026 | `weekly-summary` gets admin emails from `AuthInternalService.ListUsersByRole` (agreed by all four members in PR #6) | `auth` stays the single source of truth for users |
+| 3 Nov 2026 | Admin accounts are seeded by `auth` at startup from `ADMIN_EMAIL` and `ADMIN_PASSWORD` | Admins cannot self-register and no password is committed |
+| 3 Nov 2026 | Categories, tags and locations are seeded by migration and read-only | Admin management is not in scope |
+| 3 Nov 2026 | Moderation removal sets the job to REMOVED and `job-posting` publishes `job.closed` | `job-search` and `saved-jobs` only consume `job.closed` |
 
 ---
 
@@ -454,3 +503,10 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Verify that Phuntsho's laptop, the chosen cluster host, has at least 16 GB RAM.
 - RabbitMQ to Knative connection method pending the JT-29 spike.
 - Final presentation and submission dates not yet announced (likely to be postponed).
+- Deferred until the shared event contracts are coordinated: `actor_id` in `EventEnvelope` (for `audit-log`) and `description` in `job.published` and `job.updated` (for `job-search`).
+- Internal-call protection still to build (not active yet): the internal interceptor in `pkg/`, internal headers in `pkg/grpcclient`, header stripping in `gateway`, and NetworkPolicy manifests in `deploy/k8s` (check they work with Knative function pods during JT-29). These need Jira tasks.
+- Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
+- Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
+- The `buf` CLI version is not pinned; the team should agree on one version.
+- Password hashing library for `auth` to be agreed (suggestion: bcrypt from `golang.org/x/crypto`).
+- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests.

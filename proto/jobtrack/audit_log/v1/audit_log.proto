@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package jobtrack.audit_log.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/audit_log/v1;auditlogv1";
+
+// AuditLogService lists the record of all domain events for admins.
+// Entries are written only by consuming events, never through an RPC.
+service AuditLogService {
+  // ListAuditEntries lists entries, newest first. Admin role only.
+  // If both times are set, start_time must be before end_time,
+  // otherwise INVALID_ARGUMENT.
+  rpc ListAuditEntries(ListAuditEntriesRequest) returns (ListAuditEntriesResponse) {
+    option (google.api.http) = {get: "/v1/audit/entries"};
+  }
+}
+
+message AuditEntry {
+  // Same as the envelope event_id, which also makes the consumer idempotent.
+  string event_id = 1;
+  // Routing key, for example "application.submitted".
+  string event_type = 2;
+  // Service that published the event.
+  string producer = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+  // The event's data as protojson, shown as-is in the admin view.
+  string data_json = 5;
+}
+
+message ListAuditEntriesRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+  // Optional filter. Empty means all event types.
+  string event_type = 2;
+  // Optional filters on occurred_at. start inclusive, end exclusive.
+  google.protobuf.Timestamp start_time = 3;
+  google.protobuf.Timestamp end_time = 4;
+}
+
+message ListAuditEntriesResponse {
+  repeated AuditEntry entries = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}

@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package jobtrack.notification_inbox.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/notification_inbox/v1;notificationinboxv1";
+
+// NotificationInboxService lets users read their in-app notifications.
+// Every RPC here is public through the gateway.
+service NotificationInboxService {
+  // ListMyNotifications lists the caller's notifications, newest first.
+  // With unread_only, pagination.total_count gives the unread badge count.
+  rpc ListMyNotifications(ListMyNotificationsRequest) returns (ListMyNotificationsResponse) {
+    option (google.api.http) = {get: "/v1/notifications"};
+  }
+
+  // MarkNotificationRead marks one notification as read. Already read is
+  // not an error. Not the recipient: PERMISSION_DENIED.
+  rpc MarkNotificationRead(MarkNotificationReadRequest) returns (MarkNotificationReadResponse) {
+    option (google.api.http) = {
+      post: "/v1/notifications/{notification_id}/read"
+      body: "*"
+    };
+  }
+}
+
+// NotificationInboxInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token from
+// an allowed caller (see AGENTS.md Section 6).
+service NotificationInboxInternalService {
+  // CreateNotification stores one notification. Allowed caller:
+  // notification-dispatcher. Idempotent: the same recipient_id and
+  // source_event_id returns the existing notification, not an error,
+  // so dispatcher retries are safe.
+  rpc CreateNotification(CreateNotificationRequest) returns (CreateNotificationResponse);
+}
+
+message Notification {
+  string notification_id = 1;
+  // User ID of the person notified.
+  string recipient_id = 2;
+  // Event type that caused it, for example "offer.made".
+  string type = 3;
+  string title = 4;
+  string body = 5;
+  // ID of the related job, application or offer, so the frontend can link to it.
+  string related_id = 6;
+  bool read = 7;
+  // event_id of the event that caused it.
+  string source_event_id = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message CreateNotificationRequest {
+  string recipient_id = 1;
+  string type = 2;
+  string title = 3;
+  string body = 4;
+  string related_id = 5;
+  string source_event_id = 6;
+}
+
+message CreateNotificationResponse {
+  Notification notification = 1;
+}
+
+message ListMyNotificationsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+  bool unread_only = 2;
+}
+
+message ListMyNotificationsResponse {
+  repeated Notification notifications = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message MarkNotificationReadRequest {
+  string notification_id = 1;
+}
+
+message MarkNotificationReadResponse {
+  Notification notification = 1;
+}

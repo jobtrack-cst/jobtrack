@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package jobtrack.job_search.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_search/v1;jobsearchv1";
+
+// JobSearchService searches open jobs. Its read model is built only from
+// job.published, job.updated and job.closed events.
+service JobSearchService {
+  // SearchJobs returns open jobs (not closed, deadline after now), sorted by
+  // deadline, soonest first. All filters are optional and combined with AND.
+  rpc SearchJobs(SearchJobsRequest) returns (SearchJobsResponse) {
+    option (google.api.http) = {get: "/v1/search/jobs"};
+  }
+}
+
+// JobSummary holds only the fields carried by the job events.
+message JobSummary {
+  string job_id = 1;
+  string employer_id = 2;
+  string title = 3;
+  string category_id = 4;
+  repeated string tag_ids = 5;
+  string location = 6;
+  google.protobuf.Timestamp deadline = 7;
+}
+
+message SearchJobsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+  // Case-insensitive match on title.
+  string query = 2;
+  string category_id = 3;
+  // Matches jobs that have at least one of these tags.
+  repeated string tag_ids = 4;
+  // Exact location name.
+  string location = 5;
+}
+
+message SearchJobsResponse {
+  repeated JobSummary jobs = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
