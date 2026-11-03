@@ -10,6 +10,7 @@ option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/saved_jobs
 
 // SavedJobsService stores applicants' job bookmarks. On job.closed it deletes
 // all bookmarks for that job and remembers the job ID as closed.
+// Every RPC here is public through the gateway.
 service SavedJobsService {
   // SaveJob bookmarks a job for the caller. Applicant role only.
   // Already saved: ALREADY_EXISTS. Job known to be closed: FAILED_PRECONDITION.
@@ -29,9 +30,14 @@ service SavedJobsService {
   rpc ListMySavedJobs(ListMySavedJobsRequest) returns (ListMySavedJobsResponse) {
     option (google.api.http) = {get: "/v1/saved-jobs"};
   }
+}
 
-  // ListJobSavers lists the applicants who saved a job. Internal only,
-  // used by deadline-reminder.
+// SavedJobsInternalService is for other services only. It has no HTTP routes,
+// and the server only accepts calls with a valid x-internal-token from an
+// allowed caller (see AGENTS.md Section 6).
+service SavedJobsInternalService {
+  // ListJobSavers lists the applicants who saved a job.
+  // Allowed caller: deadline-reminder.
   rpc ListJobSavers(ListJobSaversRequest) returns (ListJobSaversResponse);
 }
 

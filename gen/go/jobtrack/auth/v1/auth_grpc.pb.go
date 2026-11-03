@@ -19,18 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Register_FullMethodName        = "/jobtrack.auth.v1.AuthService/Register"
-	AuthService_Login_FullMethodName           = "/jobtrack.auth.v1.AuthService/Login"
-	AuthService_GetCurrentUser_FullMethodName  = "/jobtrack.auth.v1.AuthService/GetCurrentUser"
-	AuthService_GetUser_FullMethodName         = "/jobtrack.auth.v1.AuthService/GetUser"
-	AuthService_ListUsersByRole_FullMethodName = "/jobtrack.auth.v1.AuthService/ListUsersByRole"
+	AuthService_Register_FullMethodName       = "/jobtrack.auth.v1.AuthService/Register"
+	AuthService_Login_FullMethodName          = "/jobtrack.auth.v1.AuthService/Login"
+	AuthService_GetCurrentUser_FullMethodName = "/jobtrack.auth.v1.AuthService/GetCurrentUser"
 )
 
 // AuthServiceClient is the client API for AuthService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// AuthService registers users, logs them in and looks up user details.
+// AuthService registers users, logs them in and returns the caller's account.
+// Every RPC here is public through the gateway.
 type AuthServiceClient interface {
 	// Register creates an applicant or employer account. Public, no JWT needed.
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
@@ -40,12 +39,6 @@ type AuthServiceClient interface {
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	// GetCurrentUser returns the caller's own account (from x-user-id).
 	GetCurrentUser(ctx context.Context, in *GetCurrentUserRequest, opts ...grpc.CallOption) (*GetCurrentUserResponse, error)
-	// GetUser is internal only (used by notification-dispatcher to get an email).
-	// It has no HTTP route so emails are not exposed through the gateway.
-	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
-	// ListUsersByRole lists users with one role. Internal only, used by
-	// weekly-summary to get admin emails.
-	ListUsersByRole(ctx context.Context, in *ListUsersByRoleRequest, opts ...grpc.CallOption) (*ListUsersByRoleResponse, error)
 }
 
 type authServiceClient struct {
@@ -86,31 +79,12 @@ func (c *authServiceClient) GetCurrentUser(ctx context.Context, in *GetCurrentUs
 	return out, nil
 }
 
-func (c *authServiceClient) GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetUserResponse)
-	err := c.cc.Invoke(ctx, AuthService_GetUser_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *authServiceClient) ListUsersByRole(ctx context.Context, in *ListUsersByRoleRequest, opts ...grpc.CallOption) (*ListUsersByRoleResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListUsersByRoleResponse)
-	err := c.cc.Invoke(ctx, AuthService_ListUsersByRole_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
 //
-// AuthService registers users, logs them in and looks up user details.
+// AuthService registers users, logs them in and returns the caller's account.
+// Every RPC here is public through the gateway.
 type AuthServiceServer interface {
 	// Register creates an applicant or employer account. Public, no JWT needed.
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
@@ -120,12 +94,6 @@ type AuthServiceServer interface {
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	// GetCurrentUser returns the caller's own account (from x-user-id).
 	GetCurrentUser(context.Context, *GetCurrentUserRequest) (*GetCurrentUserResponse, error)
-	// GetUser is internal only (used by notification-dispatcher to get an email).
-	// It has no HTTP route so emails are not exposed through the gateway.
-	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
-	// ListUsersByRole lists users with one role. Internal only, used by
-	// weekly-summary to get admin emails.
-	ListUsersByRole(context.Context, *ListUsersByRoleRequest) (*ListUsersByRoleResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -144,12 +112,6 @@ func (UnimplementedAuthServiceServer) Login(context.Context, *LoginRequest) (*Lo
 }
 func (UnimplementedAuthServiceServer) GetCurrentUser(context.Context, *GetCurrentUserRequest) (*GetCurrentUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCurrentUser not implemented")
-}
-func (UnimplementedAuthServiceServer) GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUser not implemented")
-}
-func (UnimplementedAuthServiceServer) ListUsersByRole(context.Context, *ListUsersByRoleRequest) (*ListUsersByRoleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListUsersByRole not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -226,42 +188,6 @@ func _AuthService_GetCurrentUser_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AuthService_GetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetUserRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthServiceServer).GetUser(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AuthService_GetUser_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServiceServer).GetUser(ctx, req.(*GetUserRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AuthService_ListUsersByRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListUsersByRoleRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthServiceServer).ListUsersByRole(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AuthService_ListUsersByRole_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServiceServer).ListUsersByRole(ctx, req.(*ListUsersByRoleRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -281,13 +207,159 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetCurrentUser",
 			Handler:    _AuthService_GetCurrentUser_Handler,
 		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "jobtrack/auth/v1/auth.proto",
+}
+
+const (
+	AuthInternalService_GetUser_FullMethodName         = "/jobtrack.auth.v1.AuthInternalService/GetUser"
+	AuthInternalService_ListUsersByRole_FullMethodName = "/jobtrack.auth.v1.AuthInternalService/ListUsersByRole"
+)
+
+// AuthInternalServiceClient is the client API for AuthInternalService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// AuthInternalService is for other services only. It has no HTTP routes, and
+// the server only accepts calls with a valid x-internal-token from an allowed
+// caller (see AGENTS.md Section 6).
+type AuthInternalServiceClient interface {
+	// GetUser returns one user's details. Allowed caller: notification-dispatcher.
+	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
+	// ListUsersByRole lists users with one role. Allowed caller: weekly-summary
+	// (admin emails). Pending confirmation by both teams.
+	ListUsersByRole(ctx context.Context, in *ListUsersByRoleRequest, opts ...grpc.CallOption) (*ListUsersByRoleResponse, error)
+}
+
+type authInternalServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAuthInternalServiceClient(cc grpc.ClientConnInterface) AuthInternalServiceClient {
+	return &authInternalServiceClient{cc}
+}
+
+func (c *authInternalServiceClient) GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserResponse)
+	err := c.cc.Invoke(ctx, AuthInternalService_GetUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authInternalServiceClient) ListUsersByRole(ctx context.Context, in *ListUsersByRoleRequest, opts ...grpc.CallOption) (*ListUsersByRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListUsersByRoleResponse)
+	err := c.cc.Invoke(ctx, AuthInternalService_ListUsersByRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AuthInternalServiceServer is the server API for AuthInternalService service.
+// All implementations must embed UnimplementedAuthInternalServiceServer
+// for forward compatibility.
+//
+// AuthInternalService is for other services only. It has no HTTP routes, and
+// the server only accepts calls with a valid x-internal-token from an allowed
+// caller (see AGENTS.md Section 6).
+type AuthInternalServiceServer interface {
+	// GetUser returns one user's details. Allowed caller: notification-dispatcher.
+	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
+	// ListUsersByRole lists users with one role. Allowed caller: weekly-summary
+	// (admin emails). Pending confirmation by both teams.
+	ListUsersByRole(context.Context, *ListUsersByRoleRequest) (*ListUsersByRoleResponse, error)
+	mustEmbedUnimplementedAuthInternalServiceServer()
+}
+
+// UnimplementedAuthInternalServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAuthInternalServiceServer struct{}
+
+func (UnimplementedAuthInternalServiceServer) GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUser not implemented")
+}
+func (UnimplementedAuthInternalServiceServer) ListUsersByRole(context.Context, *ListUsersByRoleRequest) (*ListUsersByRoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUsersByRole not implemented")
+}
+func (UnimplementedAuthInternalServiceServer) mustEmbedUnimplementedAuthInternalServiceServer() {}
+func (UnimplementedAuthInternalServiceServer) testEmbeddedByValue()                             {}
+
+// UnsafeAuthInternalServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AuthInternalServiceServer will
+// result in compilation errors.
+type UnsafeAuthInternalServiceServer interface {
+	mustEmbedUnimplementedAuthInternalServiceServer()
+}
+
+func RegisterAuthInternalServiceServer(s grpc.ServiceRegistrar, srv AuthInternalServiceServer) {
+	// If the following call pancis, it indicates UnimplementedAuthInternalServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AuthInternalService_ServiceDesc, srv)
+}
+
+func _AuthInternalService_GetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthInternalServiceServer).GetUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthInternalService_GetUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthInternalServiceServer).GetUser(ctx, req.(*GetUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthInternalService_ListUsersByRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUsersByRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthInternalServiceServer).ListUsersByRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthInternalService_ListUsersByRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthInternalServiceServer).ListUsersByRole(ctx, req.(*ListUsersByRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AuthInternalService_ServiceDesc is the grpc.ServiceDesc for AuthInternalService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AuthInternalService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "jobtrack.auth.v1.AuthInternalService",
+	HandlerType: (*AuthInternalServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetUser",
-			Handler:    _AuthService_GetUser_Handler,
+			Handler:    _AuthInternalService_GetUser_Handler,
 		},
 		{
 			MethodName: "ListUsersByRole",
-			Handler:    _AuthService_ListUsersByRole_Handler,
+			Handler:    _AuthInternalService_ListUsersByRole_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -624,12 +624,13 @@ const file_jobtrack_category_tag_v1_category_tag_proto_rawDesc = "" +
 	"\n" +
 	"categories\x18\x01 \x03(\v2\".jobtrack.category_tag.v1.CategoryR\n" +
 	"categories\x121\n" +
-	"\x04tags\x18\x02 \x03(\v2\x1d.jobtrack.category_tag.v1.TagR\x04tags2\x90\x04\n" +
+	"\x04tags\x18\x02 \x03(\v2\x1d.jobtrack.category_tag.v1.TagR\x04tags2\xa1\x03\n" +
 	"\x12CategoryTagService\x12\x8b\x01\n" +
 	"\x0eListCategories\x12/.jobtrack.category_tag.v1.ListCategoriesRequest\x1a0.jobtrack.category_tag.v1.ListCategoriesResponse\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/categories\x12s\n" +
 	"\bListTags\x12).jobtrack.category_tag.v1.ListTagsRequest\x1a*.jobtrack.category_tag.v1.ListTagsResponse\"\x10\x82\xd3\xe4\x93\x02\n" +
 	"\x12\b/v1/tags\x12\x87\x01\n" +
-	"\rListLocations\x12..jobtrack.category_tag.v1.ListLocationsRequest\x1a/.jobtrack.category_tag.v1.ListLocationsResponse\"\x15\x82\xd3\xe4\x93\x02\x0f\x12\r/v1/locations\x12m\n" +
+	"\rListLocations\x12..jobtrack.category_tag.v1.ListLocationsRequest\x1a/.jobtrack.category_tag.v1.ListLocationsResponse\"\x15\x82\xd3\xe4\x93\x02\x0f\x12\r/v1/locations2\x8b\x01\n" +
+	"\x1aCategoryTagInternalService\x12m\n" +
 	"\fResolveNames\x12-.jobtrack.category_tag.v1.ResolveNamesRequest\x1a..jobtrack.category_tag.v1.ResolveNamesResponseBPZNgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/category_tag/v1;categorytagv1b\x06proto3"
 
 var (
@@ -675,11 +676,11 @@ var file_jobtrack_category_tag_v1_category_tag_proto_depIdxs = []int32{
 	3,  // 11: jobtrack.category_tag.v1.CategoryTagService.ListCategories:input_type -> jobtrack.category_tag.v1.ListCategoriesRequest
 	5,  // 12: jobtrack.category_tag.v1.CategoryTagService.ListTags:input_type -> jobtrack.category_tag.v1.ListTagsRequest
 	7,  // 13: jobtrack.category_tag.v1.CategoryTagService.ListLocations:input_type -> jobtrack.category_tag.v1.ListLocationsRequest
-	9,  // 14: jobtrack.category_tag.v1.CategoryTagService.ResolveNames:input_type -> jobtrack.category_tag.v1.ResolveNamesRequest
+	9,  // 14: jobtrack.category_tag.v1.CategoryTagInternalService.ResolveNames:input_type -> jobtrack.category_tag.v1.ResolveNamesRequest
 	4,  // 15: jobtrack.category_tag.v1.CategoryTagService.ListCategories:output_type -> jobtrack.category_tag.v1.ListCategoriesResponse
 	6,  // 16: jobtrack.category_tag.v1.CategoryTagService.ListTags:output_type -> jobtrack.category_tag.v1.ListTagsResponse
 	8,  // 17: jobtrack.category_tag.v1.CategoryTagService.ListLocations:output_type -> jobtrack.category_tag.v1.ListLocationsResponse
-	10, // 18: jobtrack.category_tag.v1.CategoryTagService.ResolveNames:output_type -> jobtrack.category_tag.v1.ResolveNamesResponse
+	10, // 18: jobtrack.category_tag.v1.CategoryTagInternalService.ResolveNames:output_type -> jobtrack.category_tag.v1.ResolveNamesResponse
 	15, // [15:19] is the sub-list for method output_type
 	11, // [11:15] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
@@ -700,7 +701,7 @@ func file_jobtrack_category_tag_v1_category_tag_proto_init() {
 			NumEnums:      0,
 			NumMessages:   11,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_jobtrack_category_tag_v1_category_tag_proto_goTypes,
 		DependencyIndexes: file_jobtrack_category_tag_v1_category_tag_proto_depIdxs,

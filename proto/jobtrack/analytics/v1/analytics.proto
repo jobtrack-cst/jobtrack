@@ -8,15 +8,21 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/analytics/v1;analyticsv1";
 
 // AnalyticsService reports outcome statistics built from consumed events.
+// Every RPC here is public through the gateway.
 service AnalyticsService {
   // GetSummary returns event counts for a time period. Admin role only.
   // start_time must be before end_time, otherwise INVALID_ARGUMENT.
   rpc GetSummary(GetSummaryRequest) returns (GetSummaryResponse) {
     option (google.api.http) = {get: "/v1/analytics/summary"};
   }
+}
 
-  // GetInternalSummary returns the same counts with no role check.
-  // Internal only (no HTTP route), used by weekly-summary.
+// AnalyticsInternalService is for other services only. It has no HTTP routes,
+// and the server only accepts calls with a valid x-internal-token from an
+// allowed caller (see AGENTS.md Section 6).
+service AnalyticsInternalService {
+  // GetInternalSummary returns the same counts as GetSummary.
+  // Allowed caller: weekly-summary.
   rpc GetInternalSummary(GetInternalSummaryRequest) returns (GetInternalSummaryResponse);
 }
 

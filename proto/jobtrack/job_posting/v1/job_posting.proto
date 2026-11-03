@@ -11,6 +11,7 @@ option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_postin
 // JobPostingService creates, edits, publishes and closes vacancies.
 // Status flow: DRAFT -> PUBLISHED -> CLOSED. REMOVED is set only by the
 // moderation.job_removed event, which also publishes job.closed.
+// Every RPC here is public through the gateway.
 service JobPostingService {
   // CreateJob creates a DRAFT job for the caller. Employer role only.
   // Deadline not in the future: INVALID_ARGUMENT.
@@ -62,9 +63,14 @@ service JobPostingService {
   rpc ListMyJobs(ListMyJobsRequest) returns (ListMyJobsResponse) {
     option (google.api.http) = {get: "/v1/employer/jobs"};
   }
+}
 
+// JobPostingInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token
+// from an allowed caller (see AGENTS.md Section 6).
+service JobPostingInternalService {
   // ListJobsClosingBetween lists PUBLISHED jobs whose deadline falls in
-  // [start_time, end_time). Internal only, used by deadline-reminder.
+  // [start_time, end_time). Allowed caller: deadline-reminder.
   rpc ListJobsClosingBetween(ListJobsClosingBetweenRequest) returns (ListJobsClosingBetweenResponse);
 }
 

@@ -19,7 +19,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NotificationInboxService_CreateNotification_FullMethodName   = "/jobtrack.notification_inbox.v1.NotificationInboxService/CreateNotification"
 	NotificationInboxService_ListMyNotifications_FullMethodName  = "/jobtrack.notification_inbox.v1.NotificationInboxService/ListMyNotifications"
 	NotificationInboxService_MarkNotificationRead_FullMethodName = "/jobtrack.notification_inbox.v1.NotificationInboxService/MarkNotificationRead"
 )
@@ -28,14 +27,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// NotificationInboxService stores in-app notifications and lets users read
-// them. Notifications are written only by notification-dispatcher.
+// NotificationInboxService lets users read their in-app notifications.
+// Every RPC here is public through the gateway.
 type NotificationInboxServiceClient interface {
-	// CreateNotification stores one notification. Internal only, called by
-	// notification-dispatcher. Idempotent: the same recipient_id and
-	// source_event_id returns the existing notification, not an error,
-	// so dispatcher retries are safe.
-	CreateNotification(ctx context.Context, in *CreateNotificationRequest, opts ...grpc.CallOption) (*CreateNotificationResponse, error)
 	// ListMyNotifications lists the caller's notifications, newest first.
 	// With unread_only, pagination.total_count gives the unread badge count.
 	ListMyNotifications(ctx context.Context, in *ListMyNotificationsRequest, opts ...grpc.CallOption) (*ListMyNotificationsResponse, error)
@@ -50,16 +44,6 @@ type notificationInboxServiceClient struct {
 
 func NewNotificationInboxServiceClient(cc grpc.ClientConnInterface) NotificationInboxServiceClient {
 	return &notificationInboxServiceClient{cc}
-}
-
-func (c *notificationInboxServiceClient) CreateNotification(ctx context.Context, in *CreateNotificationRequest, opts ...grpc.CallOption) (*CreateNotificationResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateNotificationResponse)
-	err := c.cc.Invoke(ctx, NotificationInboxService_CreateNotification_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *notificationInboxServiceClient) ListMyNotifications(ctx context.Context, in *ListMyNotificationsRequest, opts ...grpc.CallOption) (*ListMyNotificationsResponse, error) {
@@ -86,14 +70,9 @@ func (c *notificationInboxServiceClient) MarkNotificationRead(ctx context.Contex
 // All implementations must embed UnimplementedNotificationInboxServiceServer
 // for forward compatibility.
 //
-// NotificationInboxService stores in-app notifications and lets users read
-// them. Notifications are written only by notification-dispatcher.
+// NotificationInboxService lets users read their in-app notifications.
+// Every RPC here is public through the gateway.
 type NotificationInboxServiceServer interface {
-	// CreateNotification stores one notification. Internal only, called by
-	// notification-dispatcher. Idempotent: the same recipient_id and
-	// source_event_id returns the existing notification, not an error,
-	// so dispatcher retries are safe.
-	CreateNotification(context.Context, *CreateNotificationRequest) (*CreateNotificationResponse, error)
 	// ListMyNotifications lists the caller's notifications, newest first.
 	// With unread_only, pagination.total_count gives the unread badge count.
 	ListMyNotifications(context.Context, *ListMyNotificationsRequest) (*ListMyNotificationsResponse, error)
@@ -110,9 +89,6 @@ type NotificationInboxServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedNotificationInboxServiceServer struct{}
 
-func (UnimplementedNotificationInboxServiceServer) CreateNotification(context.Context, *CreateNotificationRequest) (*CreateNotificationResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateNotification not implemented")
-}
 func (UnimplementedNotificationInboxServiceServer) ListMyNotifications(context.Context, *ListMyNotificationsRequest) (*ListMyNotificationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMyNotifications not implemented")
 }
@@ -139,24 +115,6 @@ func RegisterNotificationInboxServiceServer(s grpc.ServiceRegistrar, srv Notific
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&NotificationInboxService_ServiceDesc, srv)
-}
-
-func _NotificationInboxService_CreateNotification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateNotificationRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(NotificationInboxServiceServer).CreateNotification(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: NotificationInboxService_CreateNotification_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NotificationInboxServiceServer).CreateNotification(ctx, req.(*CreateNotificationRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _NotificationInboxService_ListMyNotifications_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -203,16 +161,131 @@ var NotificationInboxService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*NotificationInboxServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateNotification",
-			Handler:    _NotificationInboxService_CreateNotification_Handler,
-		},
-		{
 			MethodName: "ListMyNotifications",
 			Handler:    _NotificationInboxService_ListMyNotifications_Handler,
 		},
 		{
 			MethodName: "MarkNotificationRead",
 			Handler:    _NotificationInboxService_MarkNotificationRead_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "jobtrack/notification_inbox/v1/notification_inbox.proto",
+}
+
+const (
+	NotificationInboxInternalService_CreateNotification_FullMethodName = "/jobtrack.notification_inbox.v1.NotificationInboxInternalService/CreateNotification"
+)
+
+// NotificationInboxInternalServiceClient is the client API for NotificationInboxInternalService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// NotificationInboxInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token from
+// an allowed caller (see AGENTS.md Section 6).
+type NotificationInboxInternalServiceClient interface {
+	// CreateNotification stores one notification. Allowed caller:
+	// notification-dispatcher. Idempotent: the same recipient_id and
+	// source_event_id returns the existing notification, not an error,
+	// so dispatcher retries are safe.
+	CreateNotification(ctx context.Context, in *CreateNotificationRequest, opts ...grpc.CallOption) (*CreateNotificationResponse, error)
+}
+
+type notificationInboxInternalServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewNotificationInboxInternalServiceClient(cc grpc.ClientConnInterface) NotificationInboxInternalServiceClient {
+	return &notificationInboxInternalServiceClient{cc}
+}
+
+func (c *notificationInboxInternalServiceClient) CreateNotification(ctx context.Context, in *CreateNotificationRequest, opts ...grpc.CallOption) (*CreateNotificationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateNotificationResponse)
+	err := c.cc.Invoke(ctx, NotificationInboxInternalService_CreateNotification_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// NotificationInboxInternalServiceServer is the server API for NotificationInboxInternalService service.
+// All implementations must embed UnimplementedNotificationInboxInternalServiceServer
+// for forward compatibility.
+//
+// NotificationInboxInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token from
+// an allowed caller (see AGENTS.md Section 6).
+type NotificationInboxInternalServiceServer interface {
+	// CreateNotification stores one notification. Allowed caller:
+	// notification-dispatcher. Idempotent: the same recipient_id and
+	// source_event_id returns the existing notification, not an error,
+	// so dispatcher retries are safe.
+	CreateNotification(context.Context, *CreateNotificationRequest) (*CreateNotificationResponse, error)
+	mustEmbedUnimplementedNotificationInboxInternalServiceServer()
+}
+
+// UnimplementedNotificationInboxInternalServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedNotificationInboxInternalServiceServer struct{}
+
+func (UnimplementedNotificationInboxInternalServiceServer) CreateNotification(context.Context, *CreateNotificationRequest) (*CreateNotificationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateNotification not implemented")
+}
+func (UnimplementedNotificationInboxInternalServiceServer) mustEmbedUnimplementedNotificationInboxInternalServiceServer() {
+}
+func (UnimplementedNotificationInboxInternalServiceServer) testEmbeddedByValue() {}
+
+// UnsafeNotificationInboxInternalServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to NotificationInboxInternalServiceServer will
+// result in compilation errors.
+type UnsafeNotificationInboxInternalServiceServer interface {
+	mustEmbedUnimplementedNotificationInboxInternalServiceServer()
+}
+
+func RegisterNotificationInboxInternalServiceServer(s grpc.ServiceRegistrar, srv NotificationInboxInternalServiceServer) {
+	// If the following call pancis, it indicates UnimplementedNotificationInboxInternalServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&NotificationInboxInternalService_ServiceDesc, srv)
+}
+
+func _NotificationInboxInternalService_CreateNotification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateNotificationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationInboxInternalServiceServer).CreateNotification(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationInboxInternalService_CreateNotification_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationInboxInternalServiceServer).CreateNotification(ctx, req.(*CreateNotificationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// NotificationInboxInternalService_ServiceDesc is the grpc.ServiceDesc for NotificationInboxInternalService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var NotificationInboxInternalService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "jobtrack.notification_inbox.v1.NotificationInboxInternalService",
+	HandlerType: (*NotificationInboxInternalServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateNotification",
+			Handler:    _NotificationInboxInternalService_CreateNotification_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

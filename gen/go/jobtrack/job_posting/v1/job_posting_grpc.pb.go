@@ -19,13 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	JobPostingService_CreateJob_FullMethodName              = "/jobtrack.job_posting.v1.JobPostingService/CreateJob"
-	JobPostingService_UpdateJob_FullMethodName              = "/jobtrack.job_posting.v1.JobPostingService/UpdateJob"
-	JobPostingService_PublishJob_FullMethodName             = "/jobtrack.job_posting.v1.JobPostingService/PublishJob"
-	JobPostingService_CloseJob_FullMethodName               = "/jobtrack.job_posting.v1.JobPostingService/CloseJob"
-	JobPostingService_GetJob_FullMethodName                 = "/jobtrack.job_posting.v1.JobPostingService/GetJob"
-	JobPostingService_ListMyJobs_FullMethodName             = "/jobtrack.job_posting.v1.JobPostingService/ListMyJobs"
-	JobPostingService_ListJobsClosingBetween_FullMethodName = "/jobtrack.job_posting.v1.JobPostingService/ListJobsClosingBetween"
+	JobPostingService_CreateJob_FullMethodName  = "/jobtrack.job_posting.v1.JobPostingService/CreateJob"
+	JobPostingService_UpdateJob_FullMethodName  = "/jobtrack.job_posting.v1.JobPostingService/UpdateJob"
+	JobPostingService_PublishJob_FullMethodName = "/jobtrack.job_posting.v1.JobPostingService/PublishJob"
+	JobPostingService_CloseJob_FullMethodName   = "/jobtrack.job_posting.v1.JobPostingService/CloseJob"
+	JobPostingService_GetJob_FullMethodName     = "/jobtrack.job_posting.v1.JobPostingService/GetJob"
+	JobPostingService_ListMyJobs_FullMethodName = "/jobtrack.job_posting.v1.JobPostingService/ListMyJobs"
 )
 
 // JobPostingServiceClient is the client API for JobPostingService service.
@@ -35,6 +34,7 @@ const (
 // JobPostingService creates, edits, publishes and closes vacancies.
 // Status flow: DRAFT -> PUBLISHED -> CLOSED. REMOVED is set only by the
 // moderation.job_removed event, which also publishes job.closed.
+// Every RPC here is public through the gateway.
 type JobPostingServiceClient interface {
 	// CreateJob creates a DRAFT job for the caller. Employer role only.
 	// Deadline not in the future: INVALID_ARGUMENT.
@@ -57,9 +57,6 @@ type JobPostingServiceClient interface {
 	GetJob(ctx context.Context, in *GetJobRequest, opts ...grpc.CallOption) (*GetJobResponse, error)
 	// ListMyJobs lists the caller's jobs, newest first. Employer role only.
 	ListMyJobs(ctx context.Context, in *ListMyJobsRequest, opts ...grpc.CallOption) (*ListMyJobsResponse, error)
-	// ListJobsClosingBetween lists PUBLISHED jobs whose deadline falls in
-	// [start_time, end_time). Internal only, used by deadline-reminder.
-	ListJobsClosingBetween(ctx context.Context, in *ListJobsClosingBetweenRequest, opts ...grpc.CallOption) (*ListJobsClosingBetweenResponse, error)
 }
 
 type jobPostingServiceClient struct {
@@ -130,16 +127,6 @@ func (c *jobPostingServiceClient) ListMyJobs(ctx context.Context, in *ListMyJobs
 	return out, nil
 }
 
-func (c *jobPostingServiceClient) ListJobsClosingBetween(ctx context.Context, in *ListJobsClosingBetweenRequest, opts ...grpc.CallOption) (*ListJobsClosingBetweenResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListJobsClosingBetweenResponse)
-	err := c.cc.Invoke(ctx, JobPostingService_ListJobsClosingBetween_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // JobPostingServiceServer is the server API for JobPostingService service.
 // All implementations must embed UnimplementedJobPostingServiceServer
 // for forward compatibility.
@@ -147,6 +134,7 @@ func (c *jobPostingServiceClient) ListJobsClosingBetween(ctx context.Context, in
 // JobPostingService creates, edits, publishes and closes vacancies.
 // Status flow: DRAFT -> PUBLISHED -> CLOSED. REMOVED is set only by the
 // moderation.job_removed event, which also publishes job.closed.
+// Every RPC here is public through the gateway.
 type JobPostingServiceServer interface {
 	// CreateJob creates a DRAFT job for the caller. Employer role only.
 	// Deadline not in the future: INVALID_ARGUMENT.
@@ -169,9 +157,6 @@ type JobPostingServiceServer interface {
 	GetJob(context.Context, *GetJobRequest) (*GetJobResponse, error)
 	// ListMyJobs lists the caller's jobs, newest first. Employer role only.
 	ListMyJobs(context.Context, *ListMyJobsRequest) (*ListMyJobsResponse, error)
-	// ListJobsClosingBetween lists PUBLISHED jobs whose deadline falls in
-	// [start_time, end_time). Internal only, used by deadline-reminder.
-	ListJobsClosingBetween(context.Context, *ListJobsClosingBetweenRequest) (*ListJobsClosingBetweenResponse, error)
 	mustEmbedUnimplementedJobPostingServiceServer()
 }
 
@@ -199,9 +184,6 @@ func (UnimplementedJobPostingServiceServer) GetJob(context.Context, *GetJobReque
 }
 func (UnimplementedJobPostingServiceServer) ListMyJobs(context.Context, *ListMyJobsRequest) (*ListMyJobsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMyJobs not implemented")
-}
-func (UnimplementedJobPostingServiceServer) ListJobsClosingBetween(context.Context, *ListJobsClosingBetweenRequest) (*ListJobsClosingBetweenResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListJobsClosingBetween not implemented")
 }
 func (UnimplementedJobPostingServiceServer) mustEmbedUnimplementedJobPostingServiceServer() {}
 func (UnimplementedJobPostingServiceServer) testEmbeddedByValue()                           {}
@@ -332,24 +314,6 @@ func _JobPostingService_ListMyJobs_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _JobPostingService_ListJobsClosingBetween_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListJobsClosingBetweenRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(JobPostingServiceServer).ListJobsClosingBetween(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: JobPostingService_ListJobsClosingBetween_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(JobPostingServiceServer).ListJobsClosingBetween(ctx, req.(*ListJobsClosingBetweenRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // JobPostingService_ServiceDesc is the grpc.ServiceDesc for JobPostingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -381,9 +345,120 @@ var JobPostingService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "ListMyJobs",
 			Handler:    _JobPostingService_ListMyJobs_Handler,
 		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "jobtrack/job_posting/v1/job_posting.proto",
+}
+
+const (
+	JobPostingInternalService_ListJobsClosingBetween_FullMethodName = "/jobtrack.job_posting.v1.JobPostingInternalService/ListJobsClosingBetween"
+)
+
+// JobPostingInternalServiceClient is the client API for JobPostingInternalService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// JobPostingInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token
+// from an allowed caller (see AGENTS.md Section 6).
+type JobPostingInternalServiceClient interface {
+	// ListJobsClosingBetween lists PUBLISHED jobs whose deadline falls in
+	// [start_time, end_time). Allowed caller: deadline-reminder.
+	ListJobsClosingBetween(ctx context.Context, in *ListJobsClosingBetweenRequest, opts ...grpc.CallOption) (*ListJobsClosingBetweenResponse, error)
+}
+
+type jobPostingInternalServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewJobPostingInternalServiceClient(cc grpc.ClientConnInterface) JobPostingInternalServiceClient {
+	return &jobPostingInternalServiceClient{cc}
+}
+
+func (c *jobPostingInternalServiceClient) ListJobsClosingBetween(ctx context.Context, in *ListJobsClosingBetweenRequest, opts ...grpc.CallOption) (*ListJobsClosingBetweenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListJobsClosingBetweenResponse)
+	err := c.cc.Invoke(ctx, JobPostingInternalService_ListJobsClosingBetween_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// JobPostingInternalServiceServer is the server API for JobPostingInternalService service.
+// All implementations must embed UnimplementedJobPostingInternalServiceServer
+// for forward compatibility.
+//
+// JobPostingInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token
+// from an allowed caller (see AGENTS.md Section 6).
+type JobPostingInternalServiceServer interface {
+	// ListJobsClosingBetween lists PUBLISHED jobs whose deadline falls in
+	// [start_time, end_time). Allowed caller: deadline-reminder.
+	ListJobsClosingBetween(context.Context, *ListJobsClosingBetweenRequest) (*ListJobsClosingBetweenResponse, error)
+	mustEmbedUnimplementedJobPostingInternalServiceServer()
+}
+
+// UnimplementedJobPostingInternalServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedJobPostingInternalServiceServer struct{}
+
+func (UnimplementedJobPostingInternalServiceServer) ListJobsClosingBetween(context.Context, *ListJobsClosingBetweenRequest) (*ListJobsClosingBetweenResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListJobsClosingBetween not implemented")
+}
+func (UnimplementedJobPostingInternalServiceServer) mustEmbedUnimplementedJobPostingInternalServiceServer() {
+}
+func (UnimplementedJobPostingInternalServiceServer) testEmbeddedByValue() {}
+
+// UnsafeJobPostingInternalServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to JobPostingInternalServiceServer will
+// result in compilation errors.
+type UnsafeJobPostingInternalServiceServer interface {
+	mustEmbedUnimplementedJobPostingInternalServiceServer()
+}
+
+func RegisterJobPostingInternalServiceServer(s grpc.ServiceRegistrar, srv JobPostingInternalServiceServer) {
+	// If the following call pancis, it indicates UnimplementedJobPostingInternalServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&JobPostingInternalService_ServiceDesc, srv)
+}
+
+func _JobPostingInternalService_ListJobsClosingBetween_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListJobsClosingBetweenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobPostingInternalServiceServer).ListJobsClosingBetween(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobPostingInternalService_ListJobsClosingBetween_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobPostingInternalServiceServer).ListJobsClosingBetween(ctx, req.(*ListJobsClosingBetweenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// JobPostingInternalService_ServiceDesc is the grpc.ServiceDesc for JobPostingInternalService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var JobPostingInternalService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "jobtrack.job_posting.v1.JobPostingInternalService",
+	HandlerType: (*JobPostingInternalServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "ListJobsClosingBetween",
-			Handler:    _JobPostingService_ListJobsClosingBetween_Handler,
+			Handler:    _JobPostingInternalService_ListJobsClosingBetween_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

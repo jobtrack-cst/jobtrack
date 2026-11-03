@@ -8,15 +8,9 @@ import "jobtrack/common/v1/common.proto";
 
 option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/notification_inbox/v1;notificationinboxv1";
 
-// NotificationInboxService stores in-app notifications and lets users read
-// them. Notifications are written only by notification-dispatcher.
+// NotificationInboxService lets users read their in-app notifications.
+// Every RPC here is public through the gateway.
 service NotificationInboxService {
-  // CreateNotification stores one notification. Internal only, called by
-  // notification-dispatcher. Idempotent: the same recipient_id and
-  // source_event_id returns the existing notification, not an error,
-  // so dispatcher retries are safe.
-  rpc CreateNotification(CreateNotificationRequest) returns (CreateNotificationResponse);
-
   // ListMyNotifications lists the caller's notifications, newest first.
   // With unread_only, pagination.total_count gives the unread badge count.
   rpc ListMyNotifications(ListMyNotificationsRequest) returns (ListMyNotificationsResponse) {
@@ -31,6 +25,17 @@ service NotificationInboxService {
       body: "*"
     };
   }
+}
+
+// NotificationInboxInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token from
+// an allowed caller (see AGENTS.md Section 6).
+service NotificationInboxInternalService {
+  // CreateNotification stores one notification. Allowed caller:
+  // notification-dispatcher. Idempotent: the same recipient_id and
+  // source_event_id returns the existing notification, not an error,
+  // so dispatcher retries are safe.
+  rpc CreateNotification(CreateNotificationRequest) returns (CreateNotificationResponse);
 }
 
 message Notification {

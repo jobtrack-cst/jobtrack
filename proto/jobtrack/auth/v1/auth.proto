@@ -8,7 +8,8 @@ import "jobtrack/common/v1/common.proto";
 
 option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/auth/v1;authv1";
 
-// AuthService registers users, logs them in and looks up user details.
+// AuthService registers users, logs them in and returns the caller's account.
+// Every RPC here is public through the gateway.
 service AuthService {
   // Register creates an applicant or employer account. Public, no JWT needed.
   rpc Register(RegisterRequest) returns (RegisterResponse) {
@@ -32,13 +33,17 @@ service AuthService {
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {
     option (google.api.http) = {get: "/v1/auth/me"};
   }
+}
 
-  // GetUser is internal only (used by notification-dispatcher to get an email).
-  // It has no HTTP route so emails are not exposed through the gateway.
+// AuthInternalService is for other services only. It has no HTTP routes, and
+// the server only accepts calls with a valid x-internal-token from an allowed
+// caller (see AGENTS.md Section 6).
+service AuthInternalService {
+  // GetUser returns one user's details. Allowed caller: notification-dispatcher.
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
 
-  // ListUsersByRole lists users with one role. Internal only, used by
-  // weekly-summary to get admin emails.
+  // ListUsersByRole lists users with one role. Allowed caller: weekly-summary
+  // (admin emails). Pending confirmation by both teams.
   rpc ListUsersByRole(ListUsersByRoleRequest) returns (ListUsersByRoleResponse);
 }
 

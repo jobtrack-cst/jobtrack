@@ -19,8 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AnalyticsService_GetSummary_FullMethodName         = "/jobtrack.analytics.v1.AnalyticsService/GetSummary"
-	AnalyticsService_GetInternalSummary_FullMethodName = "/jobtrack.analytics.v1.AnalyticsService/GetInternalSummary"
+	AnalyticsService_GetSummary_FullMethodName = "/jobtrack.analytics.v1.AnalyticsService/GetSummary"
 )
 
 // AnalyticsServiceClient is the client API for AnalyticsService service.
@@ -28,13 +27,11 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // AnalyticsService reports outcome statistics built from consumed events.
+// Every RPC here is public through the gateway.
 type AnalyticsServiceClient interface {
 	// GetSummary returns event counts for a time period. Admin role only.
 	// start_time must be before end_time, otherwise INVALID_ARGUMENT.
 	GetSummary(ctx context.Context, in *GetSummaryRequest, opts ...grpc.CallOption) (*GetSummaryResponse, error)
-	// GetInternalSummary returns the same counts with no role check.
-	// Internal only (no HTTP route), used by weekly-summary.
-	GetInternalSummary(ctx context.Context, in *GetInternalSummaryRequest, opts ...grpc.CallOption) (*GetInternalSummaryResponse, error)
 }
 
 type analyticsServiceClient struct {
@@ -55,28 +52,16 @@ func (c *analyticsServiceClient) GetSummary(ctx context.Context, in *GetSummaryR
 	return out, nil
 }
 
-func (c *analyticsServiceClient) GetInternalSummary(ctx context.Context, in *GetInternalSummaryRequest, opts ...grpc.CallOption) (*GetInternalSummaryResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetInternalSummaryResponse)
-	err := c.cc.Invoke(ctx, AnalyticsService_GetInternalSummary_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // AnalyticsServiceServer is the server API for AnalyticsService service.
 // All implementations must embed UnimplementedAnalyticsServiceServer
 // for forward compatibility.
 //
 // AnalyticsService reports outcome statistics built from consumed events.
+// Every RPC here is public through the gateway.
 type AnalyticsServiceServer interface {
 	// GetSummary returns event counts for a time period. Admin role only.
 	// start_time must be before end_time, otherwise INVALID_ARGUMENT.
 	GetSummary(context.Context, *GetSummaryRequest) (*GetSummaryResponse, error)
-	// GetInternalSummary returns the same counts with no role check.
-	// Internal only (no HTTP route), used by weekly-summary.
-	GetInternalSummary(context.Context, *GetInternalSummaryRequest) (*GetInternalSummaryResponse, error)
 	mustEmbedUnimplementedAnalyticsServiceServer()
 }
 
@@ -89,9 +74,6 @@ type UnimplementedAnalyticsServiceServer struct{}
 
 func (UnimplementedAnalyticsServiceServer) GetSummary(context.Context, *GetSummaryRequest) (*GetSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSummary not implemented")
-}
-func (UnimplementedAnalyticsServiceServer) GetInternalSummary(context.Context, *GetInternalSummaryRequest) (*GetInternalSummaryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetInternalSummary not implemented")
 }
 func (UnimplementedAnalyticsServiceServer) mustEmbedUnimplementedAnalyticsServiceServer() {}
 func (UnimplementedAnalyticsServiceServer) testEmbeddedByValue()                          {}
@@ -132,24 +114,6 @@ func _AnalyticsService_GetSummary_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AnalyticsService_GetInternalSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetInternalSummaryRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AnalyticsServiceServer).GetInternalSummary(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AnalyticsService_GetInternalSummary_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AnalyticsServiceServer).GetInternalSummary(ctx, req.(*GetInternalSummaryRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // AnalyticsService_ServiceDesc is the grpc.ServiceDesc for AnalyticsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -161,9 +125,120 @@ var AnalyticsService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetSummary",
 			Handler:    _AnalyticsService_GetSummary_Handler,
 		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "jobtrack/analytics/v1/analytics.proto",
+}
+
+const (
+	AnalyticsInternalService_GetInternalSummary_FullMethodName = "/jobtrack.analytics.v1.AnalyticsInternalService/GetInternalSummary"
+)
+
+// AnalyticsInternalServiceClient is the client API for AnalyticsInternalService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// AnalyticsInternalService is for other services only. It has no HTTP routes,
+// and the server only accepts calls with a valid x-internal-token from an
+// allowed caller (see AGENTS.md Section 6).
+type AnalyticsInternalServiceClient interface {
+	// GetInternalSummary returns the same counts as GetSummary.
+	// Allowed caller: weekly-summary.
+	GetInternalSummary(ctx context.Context, in *GetInternalSummaryRequest, opts ...grpc.CallOption) (*GetInternalSummaryResponse, error)
+}
+
+type analyticsInternalServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAnalyticsInternalServiceClient(cc grpc.ClientConnInterface) AnalyticsInternalServiceClient {
+	return &analyticsInternalServiceClient{cc}
+}
+
+func (c *analyticsInternalServiceClient) GetInternalSummary(ctx context.Context, in *GetInternalSummaryRequest, opts ...grpc.CallOption) (*GetInternalSummaryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetInternalSummaryResponse)
+	err := c.cc.Invoke(ctx, AnalyticsInternalService_GetInternalSummary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AnalyticsInternalServiceServer is the server API for AnalyticsInternalService service.
+// All implementations must embed UnimplementedAnalyticsInternalServiceServer
+// for forward compatibility.
+//
+// AnalyticsInternalService is for other services only. It has no HTTP routes,
+// and the server only accepts calls with a valid x-internal-token from an
+// allowed caller (see AGENTS.md Section 6).
+type AnalyticsInternalServiceServer interface {
+	// GetInternalSummary returns the same counts as GetSummary.
+	// Allowed caller: weekly-summary.
+	GetInternalSummary(context.Context, *GetInternalSummaryRequest) (*GetInternalSummaryResponse, error)
+	mustEmbedUnimplementedAnalyticsInternalServiceServer()
+}
+
+// UnimplementedAnalyticsInternalServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAnalyticsInternalServiceServer struct{}
+
+func (UnimplementedAnalyticsInternalServiceServer) GetInternalSummary(context.Context, *GetInternalSummaryRequest) (*GetInternalSummaryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInternalSummary not implemented")
+}
+func (UnimplementedAnalyticsInternalServiceServer) mustEmbedUnimplementedAnalyticsInternalServiceServer() {
+}
+func (UnimplementedAnalyticsInternalServiceServer) testEmbeddedByValue() {}
+
+// UnsafeAnalyticsInternalServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AnalyticsInternalServiceServer will
+// result in compilation errors.
+type UnsafeAnalyticsInternalServiceServer interface {
+	mustEmbedUnimplementedAnalyticsInternalServiceServer()
+}
+
+func RegisterAnalyticsInternalServiceServer(s grpc.ServiceRegistrar, srv AnalyticsInternalServiceServer) {
+	// If the following call pancis, it indicates UnimplementedAnalyticsInternalServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AnalyticsInternalService_ServiceDesc, srv)
+}
+
+func _AnalyticsInternalService_GetInternalSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInternalSummaryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnalyticsInternalServiceServer).GetInternalSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnalyticsInternalService_GetInternalSummary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnalyticsInternalServiceServer).GetInternalSummary(ctx, req.(*GetInternalSummaryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AnalyticsInternalService_ServiceDesc is the grpc.ServiceDesc for AnalyticsInternalService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AnalyticsInternalService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "jobtrack.analytics.v1.AnalyticsInternalService",
+	HandlerType: (*AnalyticsInternalServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetInternalSummary",
-			Handler:    _AnalyticsService_GetInternalSummary_Handler,
+			Handler:    _AnalyticsInternalService_GetInternalSummary_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

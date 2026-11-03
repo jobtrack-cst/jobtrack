@@ -497,11 +497,12 @@ const file_jobtrack_notification_inbox_v1_notification_inbox_proto_rawDesc = "" 
 	"\x1bMarkNotificationReadRequest\x12'\n" +
 	"\x0fnotification_id\x18\x01 \x01(\tR\x0enotificationId\"p\n" +
 	"\x1cMarkNotificationReadResponse\x12P\n" +
-	"\fnotification\x18\x01 \x01(\v2,.jobtrack.notification_inbox.v1.NotificationR\fnotification2\x9d\x04\n" +
-	"\x18NotificationInboxService\x12\x8b\x01\n" +
-	"\x12CreateNotification\x129.jobtrack.notification_inbox.v1.CreateNotificationRequest\x1a:.jobtrack.notification_inbox.v1.CreateNotificationResponse\x12\xa9\x01\n" +
+	"\fnotification\x18\x01 \x01(\v2,.jobtrack.notification_inbox.v1.NotificationR\fnotification2\x8f\x03\n" +
+	"\x18NotificationInboxService\x12\xa9\x01\n" +
 	"\x13ListMyNotifications\x12:.jobtrack.notification_inbox.v1.ListMyNotificationsRequest\x1a;.jobtrack.notification_inbox.v1.ListMyNotificationsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/notifications\x12\xc6\x01\n" +
-	"\x14MarkNotificationRead\x12;.jobtrack.notification_inbox.v1.MarkNotificationReadRequest\x1a<.jobtrack.notification_inbox.v1.MarkNotificationReadResponse\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/notifications/{notification_id}/readB\\ZZgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/notification_inbox/v1;notificationinboxv1b\x06proto3"
+	"\x14MarkNotificationRead\x12;.jobtrack.notification_inbox.v1.MarkNotificationReadRequest\x1a<.jobtrack.notification_inbox.v1.MarkNotificationReadResponse\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/notifications/{notification_id}/read2\xb0\x01\n" +
+	" NotificationInboxInternalService\x12\x8b\x01\n" +
+	"\x12CreateNotification\x129.jobtrack.notification_inbox.v1.CreateNotificationRequest\x1a:.jobtrack.notification_inbox.v1.CreateNotificationResponseB\\ZZgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/notification_inbox/v1;notificationinboxv1b\x06proto3"
 
 var (
 	file_jobtrack_notification_inbox_v1_notification_inbox_proto_rawDescOnce sync.Once
@@ -535,12 +536,12 @@ var file_jobtrack_notification_inbox_v1_notification_inbox_proto_depIdxs = []int
 	0, // 3: jobtrack.notification_inbox.v1.ListMyNotificationsResponse.notifications:type_name -> jobtrack.notification_inbox.v1.Notification
 	9, // 4: jobtrack.notification_inbox.v1.ListMyNotificationsResponse.pagination:type_name -> jobtrack.common.v1.PaginationResponse
 	0, // 5: jobtrack.notification_inbox.v1.MarkNotificationReadResponse.notification:type_name -> jobtrack.notification_inbox.v1.Notification
-	1, // 6: jobtrack.notification_inbox.v1.NotificationInboxService.CreateNotification:input_type -> jobtrack.notification_inbox.v1.CreateNotificationRequest
-	3, // 7: jobtrack.notification_inbox.v1.NotificationInboxService.ListMyNotifications:input_type -> jobtrack.notification_inbox.v1.ListMyNotificationsRequest
-	5, // 8: jobtrack.notification_inbox.v1.NotificationInboxService.MarkNotificationRead:input_type -> jobtrack.notification_inbox.v1.MarkNotificationReadRequest
-	2, // 9: jobtrack.notification_inbox.v1.NotificationInboxService.CreateNotification:output_type -> jobtrack.notification_inbox.v1.CreateNotificationResponse
-	4, // 10: jobtrack.notification_inbox.v1.NotificationInboxService.ListMyNotifications:output_type -> jobtrack.notification_inbox.v1.ListMyNotificationsResponse
-	6, // 11: jobtrack.notification_inbox.v1.NotificationInboxService.MarkNotificationRead:output_type -> jobtrack.notification_inbox.v1.MarkNotificationReadResponse
+	3, // 6: jobtrack.notification_inbox.v1.NotificationInboxService.ListMyNotifications:input_type -> jobtrack.notification_inbox.v1.ListMyNotificationsRequest
+	5, // 7: jobtrack.notification_inbox.v1.NotificationInboxService.MarkNotificationRead:input_type -> jobtrack.notification_inbox.v1.MarkNotificationReadRequest
+	1, // 8: jobtrack.notification_inbox.v1.NotificationInboxInternalService.CreateNotification:input_type -> jobtrack.notification_inbox.v1.CreateNotificationRequest
+	4, // 9: jobtrack.notification_inbox.v1.NotificationInboxService.ListMyNotifications:output_type -> jobtrack.notification_inbox.v1.ListMyNotificationsResponse
+	6, // 10: jobtrack.notification_inbox.v1.NotificationInboxService.MarkNotificationRead:output_type -> jobtrack.notification_inbox.v1.MarkNotificationReadResponse
+	2, // 11: jobtrack.notification_inbox.v1.NotificationInboxInternalService.CreateNotification:output_type -> jobtrack.notification_inbox.v1.CreateNotificationResponse
 	9, // [9:12] is the sub-list for method output_type
 	6, // [6:9] is the sub-list for method input_type
 	6, // [6:6] is the sub-list for extension type_name
@@ -561,7 +562,7 @@ func file_jobtrack_notification_inbox_v1_notification_inbox_proto_init() {
 			NumEnums:      0,
 			NumMessages:   7,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_jobtrack_notification_inbox_v1_notification_inbox_proto_goTypes,
 		DependencyIndexes: file_jobtrack_notification_inbox_v1_notification_inbox_proto_depIdxs,

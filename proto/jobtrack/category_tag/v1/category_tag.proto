@@ -9,6 +9,7 @@ option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/category_t
 
 // CategoryTagService provides the reference lists of job categories,
 // skill tags and locations. The lists are seeded by migration.
+// Every RPC here is public through the gateway.
 service CategoryTagService {
   // ListCategories lists all job categories, sorted by name.
   rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse) {
@@ -24,9 +25,15 @@ service CategoryTagService {
   rpc ListLocations(ListLocationsRequest) returns (ListLocationsResponse) {
     option (google.api.http) = {get: "/v1/locations"};
   }
+}
 
-  // ResolveNames returns names for the given IDs in one call. Internal only,
-  // used by job-alert. Unknown IDs are left out of the response, not an error.
+// CategoryTagInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token
+// from an allowed caller (see AGENTS.md Section 6).
+service CategoryTagInternalService {
+  // ResolveNames returns names for the given IDs in one call.
+  // Allowed caller: job-alert. Unknown IDs are left out of the response,
+  // not an error.
   rpc ResolveNames(ResolveNamesRequest) returns (ResolveNamesResponse);
 }
 

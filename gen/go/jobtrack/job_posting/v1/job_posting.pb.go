@@ -1024,7 +1024,7 @@ const file_jobtrack_job_posting_v1_job_posting_proto_rawDesc = "" +
 	"\x10JOB_STATUS_DRAFT\x10\x01\x12\x18\n" +
 	"\x14JOB_STATUS_PUBLISHED\x10\x02\x12\x15\n" +
 	"\x11JOB_STATUS_CLOSED\x10\x03\x12\x16\n" +
-	"\x12JOB_STATUS_REMOVED\x10\x042\xa8\a\n" +
+	"\x12JOB_STATUS_REMOVED\x10\x042\x9c\x06\n" +
 	"\x11JobPostingService\x12w\n" +
 	"\tCreateJob\x12).jobtrack.job_posting.v1.CreateJobRequest\x1a*.jobtrack.job_posting.v1.CreateJobResponse\"\x13\x82\xd3\xe4\x93\x02\r:\x01*\"\b/v1/jobs\x12\x80\x01\n" +
 	"\tUpdateJob\x12).jobtrack.job_posting.v1.UpdateJobRequest\x1a*.jobtrack.job_posting.v1.UpdateJobResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\x1a\x11/v1/jobs/{job_id}\x12\x8b\x01\n" +
@@ -1033,7 +1033,8 @@ const file_jobtrack_job_posting_v1_job_posting_proto_rawDesc = "" +
 	"\bCloseJob\x12(.jobtrack.job_posting.v1.CloseJobRequest\x1a).jobtrack.job_posting.v1.CloseJobResponse\"\"\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/jobs/{job_id}/close\x12t\n" +
 	"\x06GetJob\x12&.jobtrack.job_posting.v1.GetJobRequest\x1a'.jobtrack.job_posting.v1.GetJobResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/jobs/{job_id}\x12\x80\x01\n" +
 	"\n" +
-	"ListMyJobs\x12*.jobtrack.job_posting.v1.ListMyJobsRequest\x1a+.jobtrack.job_posting.v1.ListMyJobsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/employer/jobs\x12\x89\x01\n" +
+	"ListMyJobs\x12*.jobtrack.job_posting.v1.ListMyJobsRequest\x1a+.jobtrack.job_posting.v1.ListMyJobsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/employer/jobs2\xa7\x01\n" +
+	"\x19JobPostingInternalService\x12\x89\x01\n" +
 	"\x16ListJobsClosingBetween\x126.jobtrack.job_posting.v1.ListJobsClosingBetweenRequest\x1a7.jobtrack.job_posting.v1.ListJobsClosingBetweenResponseBNZLgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1;jobpostingv1b\x06proto3"
 
 var (
@@ -1098,14 +1099,14 @@ var file_jobtrack_job_posting_v1_job_posting_proto_depIdxs = []int32{
 	8,  // 22: jobtrack.job_posting.v1.JobPostingService.CloseJob:input_type -> jobtrack.job_posting.v1.CloseJobRequest
 	10, // 23: jobtrack.job_posting.v1.JobPostingService.GetJob:input_type -> jobtrack.job_posting.v1.GetJobRequest
 	12, // 24: jobtrack.job_posting.v1.JobPostingService.ListMyJobs:input_type -> jobtrack.job_posting.v1.ListMyJobsRequest
-	14, // 25: jobtrack.job_posting.v1.JobPostingService.ListJobsClosingBetween:input_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenRequest
+	14, // 25: jobtrack.job_posting.v1.JobPostingInternalService.ListJobsClosingBetween:input_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenRequest
 	3,  // 26: jobtrack.job_posting.v1.JobPostingService.CreateJob:output_type -> jobtrack.job_posting.v1.CreateJobResponse
 	5,  // 27: jobtrack.job_posting.v1.JobPostingService.UpdateJob:output_type -> jobtrack.job_posting.v1.UpdateJobResponse
 	7,  // 28: jobtrack.job_posting.v1.JobPostingService.PublishJob:output_type -> jobtrack.job_posting.v1.PublishJobResponse
 	9,  // 29: jobtrack.job_posting.v1.JobPostingService.CloseJob:output_type -> jobtrack.job_posting.v1.CloseJobResponse
 	11, // 30: jobtrack.job_posting.v1.JobPostingService.GetJob:output_type -> jobtrack.job_posting.v1.GetJobResponse
 	13, // 31: jobtrack.job_posting.v1.JobPostingService.ListMyJobs:output_type -> jobtrack.job_posting.v1.ListMyJobsResponse
-	15, // 32: jobtrack.job_posting.v1.JobPostingService.ListJobsClosingBetween:output_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenResponse
+	15, // 32: jobtrack.job_posting.v1.JobPostingInternalService.ListJobsClosingBetween:output_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenResponse
 	26, // [26:33] is the sub-list for method output_type
 	19, // [19:26] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
@@ -1126,7 +1127,7 @@ func file_jobtrack_job_posting_v1_job_posting_proto_init() {
 			NumEnums:      1,
 			NumMessages:   15,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_jobtrack_job_posting_v1_job_posting_proto_goTypes,
 		DependencyIndexes: file_jobtrack_job_posting_v1_job_posting_proto_depIdxs,

@@ -22,7 +22,6 @@ const (
 	SavedJobsService_SaveJob_FullMethodName         = "/jobtrack.saved_jobs.v1.SavedJobsService/SaveJob"
 	SavedJobsService_UnsaveJob_FullMethodName       = "/jobtrack.saved_jobs.v1.SavedJobsService/UnsaveJob"
 	SavedJobsService_ListMySavedJobs_FullMethodName = "/jobtrack.saved_jobs.v1.SavedJobsService/ListMySavedJobs"
-	SavedJobsService_ListJobSavers_FullMethodName   = "/jobtrack.saved_jobs.v1.SavedJobsService/ListJobSavers"
 )
 
 // SavedJobsServiceClient is the client API for SavedJobsService service.
@@ -31,6 +30,7 @@ const (
 //
 // SavedJobsService stores applicants' job bookmarks. On job.closed it deletes
 // all bookmarks for that job and remembers the job ID as closed.
+// Every RPC here is public through the gateway.
 type SavedJobsServiceClient interface {
 	// SaveJob bookmarks a job for the caller. Applicant role only.
 	// Already saved: ALREADY_EXISTS. Job known to be closed: FAILED_PRECONDITION.
@@ -39,9 +39,6 @@ type SavedJobsServiceClient interface {
 	UnsaveJob(ctx context.Context, in *UnsaveJobRequest, opts ...grpc.CallOption) (*UnsaveJobResponse, error)
 	// ListMySavedJobs lists the caller's bookmarks, newest first.
 	ListMySavedJobs(ctx context.Context, in *ListMySavedJobsRequest, opts ...grpc.CallOption) (*ListMySavedJobsResponse, error)
-	// ListJobSavers lists the applicants who saved a job. Internal only,
-	// used by deadline-reminder.
-	ListJobSavers(ctx context.Context, in *ListJobSaversRequest, opts ...grpc.CallOption) (*ListJobSaversResponse, error)
 }
 
 type savedJobsServiceClient struct {
@@ -82,22 +79,13 @@ func (c *savedJobsServiceClient) ListMySavedJobs(ctx context.Context, in *ListMy
 	return out, nil
 }
 
-func (c *savedJobsServiceClient) ListJobSavers(ctx context.Context, in *ListJobSaversRequest, opts ...grpc.CallOption) (*ListJobSaversResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListJobSaversResponse)
-	err := c.cc.Invoke(ctx, SavedJobsService_ListJobSavers_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // SavedJobsServiceServer is the server API for SavedJobsService service.
 // All implementations must embed UnimplementedSavedJobsServiceServer
 // for forward compatibility.
 //
 // SavedJobsService stores applicants' job bookmarks. On job.closed it deletes
 // all bookmarks for that job and remembers the job ID as closed.
+// Every RPC here is public through the gateway.
 type SavedJobsServiceServer interface {
 	// SaveJob bookmarks a job for the caller. Applicant role only.
 	// Already saved: ALREADY_EXISTS. Job known to be closed: FAILED_PRECONDITION.
@@ -106,9 +94,6 @@ type SavedJobsServiceServer interface {
 	UnsaveJob(context.Context, *UnsaveJobRequest) (*UnsaveJobResponse, error)
 	// ListMySavedJobs lists the caller's bookmarks, newest first.
 	ListMySavedJobs(context.Context, *ListMySavedJobsRequest) (*ListMySavedJobsResponse, error)
-	// ListJobSavers lists the applicants who saved a job. Internal only,
-	// used by deadline-reminder.
-	ListJobSavers(context.Context, *ListJobSaversRequest) (*ListJobSaversResponse, error)
 	mustEmbedUnimplementedSavedJobsServiceServer()
 }
 
@@ -127,9 +112,6 @@ func (UnimplementedSavedJobsServiceServer) UnsaveJob(context.Context, *UnsaveJob
 }
 func (UnimplementedSavedJobsServiceServer) ListMySavedJobs(context.Context, *ListMySavedJobsRequest) (*ListMySavedJobsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMySavedJobs not implemented")
-}
-func (UnimplementedSavedJobsServiceServer) ListJobSavers(context.Context, *ListJobSaversRequest) (*ListJobSaversResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListJobSavers not implemented")
 }
 func (UnimplementedSavedJobsServiceServer) mustEmbedUnimplementedSavedJobsServiceServer() {}
 func (UnimplementedSavedJobsServiceServer) testEmbeddedByValue()                          {}
@@ -206,24 +188,6 @@ func _SavedJobsService_ListMySavedJobs_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SavedJobsService_ListJobSavers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListJobSaversRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SavedJobsServiceServer).ListJobSavers(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SavedJobsService_ListJobSavers_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SavedJobsServiceServer).ListJobSavers(ctx, req.(*ListJobSaversRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // SavedJobsService_ServiceDesc is the grpc.ServiceDesc for SavedJobsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -243,9 +207,120 @@ var SavedJobsService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "ListMySavedJobs",
 			Handler:    _SavedJobsService_ListMySavedJobs_Handler,
 		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "jobtrack/saved_jobs/v1/saved_jobs.proto",
+}
+
+const (
+	SavedJobsInternalService_ListJobSavers_FullMethodName = "/jobtrack.saved_jobs.v1.SavedJobsInternalService/ListJobSavers"
+)
+
+// SavedJobsInternalServiceClient is the client API for SavedJobsInternalService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// SavedJobsInternalService is for other services only. It has no HTTP routes,
+// and the server only accepts calls with a valid x-internal-token from an
+// allowed caller (see AGENTS.md Section 6).
+type SavedJobsInternalServiceClient interface {
+	// ListJobSavers lists the applicants who saved a job.
+	// Allowed caller: deadline-reminder.
+	ListJobSavers(ctx context.Context, in *ListJobSaversRequest, opts ...grpc.CallOption) (*ListJobSaversResponse, error)
+}
+
+type savedJobsInternalServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSavedJobsInternalServiceClient(cc grpc.ClientConnInterface) SavedJobsInternalServiceClient {
+	return &savedJobsInternalServiceClient{cc}
+}
+
+func (c *savedJobsInternalServiceClient) ListJobSavers(ctx context.Context, in *ListJobSaversRequest, opts ...grpc.CallOption) (*ListJobSaversResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListJobSaversResponse)
+	err := c.cc.Invoke(ctx, SavedJobsInternalService_ListJobSavers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SavedJobsInternalServiceServer is the server API for SavedJobsInternalService service.
+// All implementations must embed UnimplementedSavedJobsInternalServiceServer
+// for forward compatibility.
+//
+// SavedJobsInternalService is for other services only. It has no HTTP routes,
+// and the server only accepts calls with a valid x-internal-token from an
+// allowed caller (see AGENTS.md Section 6).
+type SavedJobsInternalServiceServer interface {
+	// ListJobSavers lists the applicants who saved a job.
+	// Allowed caller: deadline-reminder.
+	ListJobSavers(context.Context, *ListJobSaversRequest) (*ListJobSaversResponse, error)
+	mustEmbedUnimplementedSavedJobsInternalServiceServer()
+}
+
+// UnimplementedSavedJobsInternalServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSavedJobsInternalServiceServer struct{}
+
+func (UnimplementedSavedJobsInternalServiceServer) ListJobSavers(context.Context, *ListJobSaversRequest) (*ListJobSaversResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListJobSavers not implemented")
+}
+func (UnimplementedSavedJobsInternalServiceServer) mustEmbedUnimplementedSavedJobsInternalServiceServer() {
+}
+func (UnimplementedSavedJobsInternalServiceServer) testEmbeddedByValue() {}
+
+// UnsafeSavedJobsInternalServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SavedJobsInternalServiceServer will
+// result in compilation errors.
+type UnsafeSavedJobsInternalServiceServer interface {
+	mustEmbedUnimplementedSavedJobsInternalServiceServer()
+}
+
+func RegisterSavedJobsInternalServiceServer(s grpc.ServiceRegistrar, srv SavedJobsInternalServiceServer) {
+	// If the following call pancis, it indicates UnimplementedSavedJobsInternalServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SavedJobsInternalService_ServiceDesc, srv)
+}
+
+func _SavedJobsInternalService_ListJobSavers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListJobSaversRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SavedJobsInternalServiceServer).ListJobSavers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SavedJobsInternalService_ListJobSavers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SavedJobsInternalServiceServer).ListJobSavers(ctx, req.(*ListJobSaversRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SavedJobsInternalService_ServiceDesc is the grpc.ServiceDesc for SavedJobsInternalService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SavedJobsInternalService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "jobtrack.saved_jobs.v1.SavedJobsInternalService",
+	HandlerType: (*SavedJobsInternalServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "ListJobSavers",
-			Handler:    _SavedJobsService_ListJobSavers_Handler,
+			Handler:    _SavedJobsInternalService_ListJobSavers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -487,11 +487,12 @@ const file_jobtrack_saved_jobs_v1_saved_jobs_proto_rawDesc = "" +
 	"\rapplicant_ids\x18\x01 \x03(\tR\fapplicantIds\x12F\n" +
 	"\n" +
 	"pagination\x18\x02 \x01(\v2&.jobtrack.common.v1.PaginationResponseR\n" +
-	"pagination2\x88\x04\n" +
+	"pagination2\x9a\x03\n" +
 	"\x10SavedJobsService\x12u\n" +
 	"\aSaveJob\x12&.jobtrack.saved_jobs.v1.SaveJobRequest\x1a'.jobtrack.saved_jobs.v1.SaveJobResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/saved-jobs\x12\x81\x01\n" +
 	"\tUnsaveJob\x12(.jobtrack.saved_jobs.v1.UnsaveJobRequest\x1a).jobtrack.saved_jobs.v1.UnsaveJobResponse\"\x1f\x82\xd3\xe4\x93\x02\x19*\x17/v1/saved-jobs/{job_id}\x12\x8a\x01\n" +
-	"\x0fListMySavedJobs\x12..jobtrack.saved_jobs.v1.ListMySavedJobsRequest\x1a/.jobtrack.saved_jobs.v1.ListMySavedJobsResponse\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/saved-jobs\x12l\n" +
+	"\x0fListMySavedJobs\x12..jobtrack.saved_jobs.v1.ListMySavedJobsRequest\x1a/.jobtrack.saved_jobs.v1.ListMySavedJobsResponse\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/saved-jobs2\x88\x01\n" +
+	"\x18SavedJobsInternalService\x12l\n" +
 	"\rListJobSavers\x12,.jobtrack.saved_jobs.v1.ListJobSaversRequest\x1a-.jobtrack.saved_jobs.v1.ListJobSaversResponseBLZJgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/saved_jobs/v1;savedjobsv1b\x06proto3"
 
 var (
@@ -532,11 +533,11 @@ var file_jobtrack_saved_jobs_v1_saved_jobs_proto_depIdxs = []int32{
 	1,  // 7: jobtrack.saved_jobs.v1.SavedJobsService.SaveJob:input_type -> jobtrack.saved_jobs.v1.SaveJobRequest
 	3,  // 8: jobtrack.saved_jobs.v1.SavedJobsService.UnsaveJob:input_type -> jobtrack.saved_jobs.v1.UnsaveJobRequest
 	5,  // 9: jobtrack.saved_jobs.v1.SavedJobsService.ListMySavedJobs:input_type -> jobtrack.saved_jobs.v1.ListMySavedJobsRequest
-	7,  // 10: jobtrack.saved_jobs.v1.SavedJobsService.ListJobSavers:input_type -> jobtrack.saved_jobs.v1.ListJobSaversRequest
+	7,  // 10: jobtrack.saved_jobs.v1.SavedJobsInternalService.ListJobSavers:input_type -> jobtrack.saved_jobs.v1.ListJobSaversRequest
 	2,  // 11: jobtrack.saved_jobs.v1.SavedJobsService.SaveJob:output_type -> jobtrack.saved_jobs.v1.SaveJobResponse
 	4,  // 12: jobtrack.saved_jobs.v1.SavedJobsService.UnsaveJob:output_type -> jobtrack.saved_jobs.v1.UnsaveJobResponse
 	6,  // 13: jobtrack.saved_jobs.v1.SavedJobsService.ListMySavedJobs:output_type -> jobtrack.saved_jobs.v1.ListMySavedJobsResponse
-	8,  // 14: jobtrack.saved_jobs.v1.SavedJobsService.ListJobSavers:output_type -> jobtrack.saved_jobs.v1.ListJobSaversResponse
+	8,  // 14: jobtrack.saved_jobs.v1.SavedJobsInternalService.ListJobSavers:output_type -> jobtrack.saved_jobs.v1.ListJobSaversResponse
 	11, // [11:15] is the sub-list for method output_type
 	7,  // [7:11] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
@@ -557,7 +558,7 @@ func file_jobtrack_saved_jobs_v1_saved_jobs_proto_init() {
 			NumEnums:      0,
 			NumMessages:   9,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_jobtrack_saved_jobs_v1_saved_jobs_proto_goTypes,
 		DependencyIndexes: file_jobtrack_saved_jobs_v1_saved_jobs_proto_depIdxs,

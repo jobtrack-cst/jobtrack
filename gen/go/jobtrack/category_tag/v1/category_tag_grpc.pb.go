@@ -22,7 +22,6 @@ const (
 	CategoryTagService_ListCategories_FullMethodName = "/jobtrack.category_tag.v1.CategoryTagService/ListCategories"
 	CategoryTagService_ListTags_FullMethodName       = "/jobtrack.category_tag.v1.CategoryTagService/ListTags"
 	CategoryTagService_ListLocations_FullMethodName  = "/jobtrack.category_tag.v1.CategoryTagService/ListLocations"
-	CategoryTagService_ResolveNames_FullMethodName   = "/jobtrack.category_tag.v1.CategoryTagService/ResolveNames"
 )
 
 // CategoryTagServiceClient is the client API for CategoryTagService service.
@@ -31,6 +30,7 @@ const (
 //
 // CategoryTagService provides the reference lists of job categories,
 // skill tags and locations. The lists are seeded by migration.
+// Every RPC here is public through the gateway.
 type CategoryTagServiceClient interface {
 	// ListCategories lists all job categories, sorted by name.
 	ListCategories(ctx context.Context, in *ListCategoriesRequest, opts ...grpc.CallOption) (*ListCategoriesResponse, error)
@@ -38,9 +38,6 @@ type CategoryTagServiceClient interface {
 	ListTags(ctx context.Context, in *ListTagsRequest, opts ...grpc.CallOption) (*ListTagsResponse, error)
 	// ListLocations lists all locations, sorted by name.
 	ListLocations(ctx context.Context, in *ListLocationsRequest, opts ...grpc.CallOption) (*ListLocationsResponse, error)
-	// ResolveNames returns names for the given IDs in one call. Internal only,
-	// used by job-alert. Unknown IDs are left out of the response, not an error.
-	ResolveNames(ctx context.Context, in *ResolveNamesRequest, opts ...grpc.CallOption) (*ResolveNamesResponse, error)
 }
 
 type categoryTagServiceClient struct {
@@ -81,22 +78,13 @@ func (c *categoryTagServiceClient) ListLocations(ctx context.Context, in *ListLo
 	return out, nil
 }
 
-func (c *categoryTagServiceClient) ResolveNames(ctx context.Context, in *ResolveNamesRequest, opts ...grpc.CallOption) (*ResolveNamesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ResolveNamesResponse)
-	err := c.cc.Invoke(ctx, CategoryTagService_ResolveNames_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // CategoryTagServiceServer is the server API for CategoryTagService service.
 // All implementations must embed UnimplementedCategoryTagServiceServer
 // for forward compatibility.
 //
 // CategoryTagService provides the reference lists of job categories,
 // skill tags and locations. The lists are seeded by migration.
+// Every RPC here is public through the gateway.
 type CategoryTagServiceServer interface {
 	// ListCategories lists all job categories, sorted by name.
 	ListCategories(context.Context, *ListCategoriesRequest) (*ListCategoriesResponse, error)
@@ -104,9 +92,6 @@ type CategoryTagServiceServer interface {
 	ListTags(context.Context, *ListTagsRequest) (*ListTagsResponse, error)
 	// ListLocations lists all locations, sorted by name.
 	ListLocations(context.Context, *ListLocationsRequest) (*ListLocationsResponse, error)
-	// ResolveNames returns names for the given IDs in one call. Internal only,
-	// used by job-alert. Unknown IDs are left out of the response, not an error.
-	ResolveNames(context.Context, *ResolveNamesRequest) (*ResolveNamesResponse, error)
 	mustEmbedUnimplementedCategoryTagServiceServer()
 }
 
@@ -125,9 +110,6 @@ func (UnimplementedCategoryTagServiceServer) ListTags(context.Context, *ListTags
 }
 func (UnimplementedCategoryTagServiceServer) ListLocations(context.Context, *ListLocationsRequest) (*ListLocationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListLocations not implemented")
-}
-func (UnimplementedCategoryTagServiceServer) ResolveNames(context.Context, *ResolveNamesRequest) (*ResolveNamesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ResolveNames not implemented")
 }
 func (UnimplementedCategoryTagServiceServer) mustEmbedUnimplementedCategoryTagServiceServer() {}
 func (UnimplementedCategoryTagServiceServer) testEmbeddedByValue()                            {}
@@ -204,24 +186,6 @@ func _CategoryTagService_ListLocations_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CategoryTagService_ResolveNames_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResolveNamesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CategoryTagServiceServer).ResolveNames(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: CategoryTagService_ResolveNames_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CategoryTagServiceServer).ResolveNames(ctx, req.(*ResolveNamesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // CategoryTagService_ServiceDesc is the grpc.ServiceDesc for CategoryTagService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -241,9 +205,122 @@ var CategoryTagService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "ListLocations",
 			Handler:    _CategoryTagService_ListLocations_Handler,
 		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "jobtrack/category_tag/v1/category_tag.proto",
+}
+
+const (
+	CategoryTagInternalService_ResolveNames_FullMethodName = "/jobtrack.category_tag.v1.CategoryTagInternalService/ResolveNames"
+)
+
+// CategoryTagInternalServiceClient is the client API for CategoryTagInternalService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// CategoryTagInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token
+// from an allowed caller (see AGENTS.md Section 6).
+type CategoryTagInternalServiceClient interface {
+	// ResolveNames returns names for the given IDs in one call.
+	// Allowed caller: job-alert. Unknown IDs are left out of the response,
+	// not an error.
+	ResolveNames(ctx context.Context, in *ResolveNamesRequest, opts ...grpc.CallOption) (*ResolveNamesResponse, error)
+}
+
+type categoryTagInternalServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewCategoryTagInternalServiceClient(cc grpc.ClientConnInterface) CategoryTagInternalServiceClient {
+	return &categoryTagInternalServiceClient{cc}
+}
+
+func (c *categoryTagInternalServiceClient) ResolveNames(ctx context.Context, in *ResolveNamesRequest, opts ...grpc.CallOption) (*ResolveNamesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveNamesResponse)
+	err := c.cc.Invoke(ctx, CategoryTagInternalService_ResolveNames_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CategoryTagInternalServiceServer is the server API for CategoryTagInternalService service.
+// All implementations must embed UnimplementedCategoryTagInternalServiceServer
+// for forward compatibility.
+//
+// CategoryTagInternalService is for other services only. It has no HTTP
+// routes, and the server only accepts calls with a valid x-internal-token
+// from an allowed caller (see AGENTS.md Section 6).
+type CategoryTagInternalServiceServer interface {
+	// ResolveNames returns names for the given IDs in one call.
+	// Allowed caller: job-alert. Unknown IDs are left out of the response,
+	// not an error.
+	ResolveNames(context.Context, *ResolveNamesRequest) (*ResolveNamesResponse, error)
+	mustEmbedUnimplementedCategoryTagInternalServiceServer()
+}
+
+// UnimplementedCategoryTagInternalServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedCategoryTagInternalServiceServer struct{}
+
+func (UnimplementedCategoryTagInternalServiceServer) ResolveNames(context.Context, *ResolveNamesRequest) (*ResolveNamesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResolveNames not implemented")
+}
+func (UnimplementedCategoryTagInternalServiceServer) mustEmbedUnimplementedCategoryTagInternalServiceServer() {
+}
+func (UnimplementedCategoryTagInternalServiceServer) testEmbeddedByValue() {}
+
+// UnsafeCategoryTagInternalServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CategoryTagInternalServiceServer will
+// result in compilation errors.
+type UnsafeCategoryTagInternalServiceServer interface {
+	mustEmbedUnimplementedCategoryTagInternalServiceServer()
+}
+
+func RegisterCategoryTagInternalServiceServer(s grpc.ServiceRegistrar, srv CategoryTagInternalServiceServer) {
+	// If the following call pancis, it indicates UnimplementedCategoryTagInternalServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&CategoryTagInternalService_ServiceDesc, srv)
+}
+
+func _CategoryTagInternalService_ResolveNames_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveNamesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CategoryTagInternalServiceServer).ResolveNames(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CategoryTagInternalService_ResolveNames_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CategoryTagInternalServiceServer).ResolveNames(ctx, req.(*ResolveNamesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// CategoryTagInternalService_ServiceDesc is the grpc.ServiceDesc for CategoryTagInternalService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var CategoryTagInternalService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "jobtrack.category_tag.v1.CategoryTagInternalService",
+	HandlerType: (*CategoryTagInternalServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "ResolveNames",
-			Handler:    _CategoryTagService_ResolveNames_Handler,
+			Handler:    _CategoryTagInternalService_ResolveNames_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -701,11 +701,12 @@ const file_jobtrack_auth_v1_auth_proto_rawDesc = "" +
 	"\x0eROLE_APPLICANT\x10\x01\x12\x11\n" +
 	"\rROLE_EMPLOYER\x10\x02\x12\x0e\n" +
 	"\n" +
-	"ROLE_ADMIN\x10\x032\x95\x04\n" +
+	"ROLE_ADMIN\x10\x032\xdd\x02\n" +
 	"\vAuthService\x12o\n" +
 	"\bRegister\x12!.jobtrack.auth.v1.RegisterRequest\x1a\".jobtrack.auth.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12c\n" +
 	"\x05Login\x12\x1e.jobtrack.auth.v1.LoginRequest\x1a\x1f.jobtrack.auth.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12x\n" +
-	"\x0eGetCurrentUser\x12'.jobtrack.auth.v1.GetCurrentUserRequest\x1a(.jobtrack.auth.v1.GetCurrentUserResponse\"\x13\x82\xd3\xe4\x93\x02\r\x12\v/v1/auth/me\x12N\n" +
+	"\x0eGetCurrentUser\x12'.jobtrack.auth.v1.GetCurrentUserRequest\x1a(.jobtrack.auth.v1.GetCurrentUserResponse\"\x13\x82\xd3\xe4\x93\x02\r\x12\v/v1/auth/me2\xcd\x01\n" +
+	"\x13AuthInternalService\x12N\n" +
 	"\aGetUser\x12 .jobtrack.auth.v1.GetUserRequest\x1a!.jobtrack.auth.v1.GetUserResponse\x12f\n" +
 	"\x0fListUsersByRole\x12(.jobtrack.auth.v1.ListUsersByRoleRequest\x1a).jobtrack.auth.v1.ListUsersByRoleResponseBAZ?github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/auth/v1;authv1b\x06proto3"
 
@@ -757,13 +758,13 @@ var file_jobtrack_auth_v1_auth_proto_depIdxs = []int32{
 	2,  // 12: jobtrack.auth.v1.AuthService.Register:input_type -> jobtrack.auth.v1.RegisterRequest
 	4,  // 13: jobtrack.auth.v1.AuthService.Login:input_type -> jobtrack.auth.v1.LoginRequest
 	6,  // 14: jobtrack.auth.v1.AuthService.GetCurrentUser:input_type -> jobtrack.auth.v1.GetCurrentUserRequest
-	8,  // 15: jobtrack.auth.v1.AuthService.GetUser:input_type -> jobtrack.auth.v1.GetUserRequest
-	10, // 16: jobtrack.auth.v1.AuthService.ListUsersByRole:input_type -> jobtrack.auth.v1.ListUsersByRoleRequest
+	8,  // 15: jobtrack.auth.v1.AuthInternalService.GetUser:input_type -> jobtrack.auth.v1.GetUserRequest
+	10, // 16: jobtrack.auth.v1.AuthInternalService.ListUsersByRole:input_type -> jobtrack.auth.v1.ListUsersByRoleRequest
 	3,  // 17: jobtrack.auth.v1.AuthService.Register:output_type -> jobtrack.auth.v1.RegisterResponse
 	5,  // 18: jobtrack.auth.v1.AuthService.Login:output_type -> jobtrack.auth.v1.LoginResponse
 	7,  // 19: jobtrack.auth.v1.AuthService.GetCurrentUser:output_type -> jobtrack.auth.v1.GetCurrentUserResponse
-	9,  // 20: jobtrack.auth.v1.AuthService.GetUser:output_type -> jobtrack.auth.v1.GetUserResponse
-	11, // 21: jobtrack.auth.v1.AuthService.ListUsersByRole:output_type -> jobtrack.auth.v1.ListUsersByRoleResponse
+	9,  // 20: jobtrack.auth.v1.AuthInternalService.GetUser:output_type -> jobtrack.auth.v1.GetUserResponse
+	11, // 21: jobtrack.auth.v1.AuthInternalService.ListUsersByRole:output_type -> jobtrack.auth.v1.ListUsersByRoleResponse
 	17, // [17:22] is the sub-list for method output_type
 	12, // [12:17] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name
@@ -784,7 +785,7 @@ func file_jobtrack_auth_v1_auth_proto_init() {
 			NumEnums:      1,
 			NumMessages:   11,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_jobtrack_auth_v1_auth_proto_goTypes,
 		DependencyIndexes: file_jobtrack_auth_v1_auth_proto_depIdxs,

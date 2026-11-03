@@ -421,10 +421,11 @@ const file_jobtrack_analytics_v1_analytics_proto_rawDesc = "" +
 	" \x03(\v2\".jobtrack.analytics.v1.StatusCountR\rstatusChanges\";\n" +
 	"\vStatusCount\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\x03R\x05count2\x90\x02\n" +
+	"\x05count\x18\x02 \x01(\x03R\x05count2\x95\x01\n" +
 	"\x10AnalyticsService\x12\x80\x01\n" +
 	"\n" +
-	"GetSummary\x12(.jobtrack.analytics.v1.GetSummaryRequest\x1a).jobtrack.analytics.v1.GetSummaryResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/analytics/summary\x12y\n" +
+	"GetSummary\x12(.jobtrack.analytics.v1.GetSummaryRequest\x1a).jobtrack.analytics.v1.GetSummaryResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/analytics/summary2\x95\x01\n" +
+	"\x18AnalyticsInternalService\x12y\n" +
 	"\x12GetInternalSummary\x120.jobtrack.analytics.v1.GetInternalSummaryRequest\x1a1.jobtrack.analytics.v1.GetInternalSummaryResponseBKZIgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/analytics/v1;analyticsv1b\x06proto3"
 
 var (
@@ -460,9 +461,9 @@ var file_jobtrack_analytics_v1_analytics_proto_depIdxs = []int32{
 	6,  // 7: jobtrack.analytics.v1.Summary.end_time:type_name -> google.protobuf.Timestamp
 	5,  // 8: jobtrack.analytics.v1.Summary.status_changes:type_name -> jobtrack.analytics.v1.StatusCount
 	0,  // 9: jobtrack.analytics.v1.AnalyticsService.GetSummary:input_type -> jobtrack.analytics.v1.GetSummaryRequest
-	2,  // 10: jobtrack.analytics.v1.AnalyticsService.GetInternalSummary:input_type -> jobtrack.analytics.v1.GetInternalSummaryRequest
+	2,  // 10: jobtrack.analytics.v1.AnalyticsInternalService.GetInternalSummary:input_type -> jobtrack.analytics.v1.GetInternalSummaryRequest
 	1,  // 11: jobtrack.analytics.v1.AnalyticsService.GetSummary:output_type -> jobtrack.analytics.v1.GetSummaryResponse
-	3,  // 12: jobtrack.analytics.v1.AnalyticsService.GetInternalSummary:output_type -> jobtrack.analytics.v1.GetInternalSummaryResponse
+	3,  // 12: jobtrack.analytics.v1.AnalyticsInternalService.GetInternalSummary:output_type -> jobtrack.analytics.v1.GetInternalSummaryResponse
 	11, // [11:13] is the sub-list for method output_type
 	9,  // [9:11] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
@@ -483,7 +484,7 @@ func file_jobtrack_analytics_v1_analytics_proto_init() {
 			NumEnums:      0,
 			NumMessages:   6,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_jobtrack_analytics_v1_analytics_proto_goTypes,
 		DependencyIndexes: file_jobtrack_analytics_v1_analytics_proto_depIdxs,
