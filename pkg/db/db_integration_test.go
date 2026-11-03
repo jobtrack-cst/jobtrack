@@ -51,13 +51,15 @@ func TestMigrate_AppliesSQLAndReleasesResources(t *testing.T) {
 	}
 	assertPoolUsable := func(t *testing.T) {
 		t.Helper()
-		if pool.Stat().AcquiredConns() != 0 {
-			t.Fatal("migration helper leaked an acquired connection")
-		}
+		// pgx destroys canceled connections asynchronously. With pool_max_conns=1,
+		// this bounded ping must wait for that slot to be released or destroyed.
 		pingCtx, pingCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer pingCancel()
 		if err := pool.Ping(pingCtx); err != nil {
 			t.Fatal("migration helper left caller's pool unusable")
+		}
+		if pool.Stat().AcquiredConns() != 0 {
+			t.Fatal("migration helper leaked an acquired connection")
 		}
 	}
 
@@ -104,12 +106,23 @@ func TestMigrate_AppliesSQLAndReleasesResources(t *testing.T) {
 
 	t.Run("cancellation releases resources", func(t *testing.T) {
 		slowDir := t.TempDir()
-		writeMigration(t, slowDir, "00002_slow.sql", "-- +goose Up\nSELECT pg_sleep(30);\n-- +goose Down\nSELECT 1;\n")
-		shortCtx, shortCancel := context.WithTimeout(ctx, 200*time.Millisecond)
-		defer shortCancel()
-		if err := db.Migrate(shortCtx, pool, slowDir); !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("expected migration deadline, got %v", err)
+		writeMigration(t, slowDir, "00002_slow.sql", "-- +goose Up\nCREATE TABLE cancellation_probe (id integer);\nSELECT pg_sleep(30);\n-- +goose Down\nDROP TABLE cancellation_probe;\n")
+		for range 3 {
+			shortCtx, shortCancel := context.WithTimeout(ctx, 200*time.Millisecond)
+			err := db.Migrate(shortCtx, pool, slowDir)
+			shortCancel()
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("expected migration deadline, got %v", err)
+			}
+			assertPoolUsable(t)
+			var rolledBack bool
+			if err := pool.QueryRow(ctx, "SELECT to_regclass('cancellation_probe') IS NULL").Scan(&rolledBack); err != nil || !rolledBack {
+				t.Fatal("canceled migration was not rolled back")
+			}
+			var applied int
+			if err := pool.QueryRow(ctx, "SELECT count(*) FROM goose_db_version WHERE version_id = 2 AND is_applied").Scan(&applied); err != nil || applied != 0 {
+				t.Fatal("canceled migration was recorded as applied")
+			}
 		}
-		assertPoolUsable(t)
 	})
 }
