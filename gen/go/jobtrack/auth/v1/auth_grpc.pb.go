@@ -228,7 +228,7 @@ type AuthInternalServiceClient interface {
 	// GetUser returns one user's details. Allowed caller: notification-dispatcher.
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
 	// ListUsersByRole lists users with one role. Allowed caller: weekly-summary
-	// (admin emails). Pending confirmation by both teams.
+	// (admin emails).
 	ListUsersByRole(ctx context.Context, in *ListUsersByRoleRequest, opts ...grpc.CallOption) (*ListUsersByRoleResponse, error)
 }
 
@@ -271,7 +271,7 @@ type AuthInternalServiceServer interface {
 	// GetUser returns one user's details. Allowed caller: notification-dispatcher.
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	// ListUsersByRole lists users with one role. Allowed caller: weekly-summary
-	// (admin emails). Pending confirmation by both teams.
+	// (admin emails).
 	ListUsersByRole(context.Context, *ListUsersByRoleRequest) (*ListUsersByRoleResponse, error)
 	mustEmbedUnimplementedAuthInternalServiceServer()
 }

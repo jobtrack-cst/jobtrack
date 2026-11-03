@@ -43,7 +43,7 @@ service AuthInternalService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
 
   // ListUsersByRole lists users with one role. Allowed caller: weekly-summary
-  // (admin emails). Pending confirmation by both teams.
+  // (admin emails).
   rpc ListUsersByRole(ListUsersByRoleRequest) returns (ListUsersByRoleResponse);
 }
 

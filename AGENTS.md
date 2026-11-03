@@ -176,7 +176,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 |---|---|---|---|
 | `notification-dispatcher` | Sangay | Events: `application.submitted`, `application.status_changed`, `interview.scheduled`, `offer.made`, `message.sent`, `job_alert.matched`, `employer.verified`, `deadline.reminder` | Decides who is notified and how. Writes to Notification Inbox (gRPC) and calls Email Sender for emails. Gets user emails from Auth. |
 | `email-sender` | Sangay | HTTP call from other functions | Sends email through SMTP to Mailpit |
-| `weekly-summary` | Jigden | Weekly schedule (PingSource) | Gets statistics from Analytics and emails a summary to admins. How it gets admin emails is pending (Section 16). |
+| `weekly-summary` | Jigden | Weekly schedule (PingSource) | Gets statistics from Analytics and admin emails from Auth, then emails a summary to admins. |
 | `resume-validator` | Phuntsho | Event: `resume.uploaded` | Fetches the file from Resume, checks type (PDF only), size (max 2 MB) and content signature. Publishes `resume.validated` or `resume.rejected`. |
 | `deadline-reminder` | Kinley | Daily schedule (PingSource) | Finds jobs closing within 48 hours (Job Posting) and who saved them (Saved Jobs). Publishes `deadline.reminder` events. |
 
@@ -220,6 +220,7 @@ Any other transition must be rejected with `FAILED_PRECONDITION`. Every transiti
 | `job-alert` | `category-tag` | `CategoryTagInternalService.ResolveNames` | Category and tag names | Yes |
 | `notification-dispatcher` | `notification-inbox`, `auth` | `NotificationInboxInternalService.CreateNotification`, `AuthInternalService.GetUser` | Write notification, get email | No |
 | `weekly-summary` | `analytics` | `AnalyticsInternalService.GetInternalSummary` | Statistics | No |
+| `weekly-summary` | `auth` | `AuthInternalService.ListUsersByRole` | Admin emails | No |
 | `deadline-reminder` | `job-posting`, `saved-jobs` | `JobPostingInternalService.ListJobsClosingBetween`, `SavedJobsInternalService.ListJobSavers` | Closing jobs and who saved them | Yes |
 | `resume-validator` | `resume` | (defined in JT-21) | Fetch file | No |
 
@@ -238,6 +239,8 @@ Internal RPCs are restricted to their intended callers in three layers:
 3. Network: in k3d, a Kubernetes NetworkPolicy per service allows ingress on port 9090 only from its callers in the table above. In Docker Compose, port 9090 is never published to the host.
 
 `x-caller-service` is not proof of identity on its own; any holder of `INTERNAL_TOKEN` could set it. Layers 2 and 3 together limit misuse to compromised internal services. Full per-service identity would need mTLS, which is out of scope (Section 16).
+
+Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and agreed by all four members in PR #6, but they are not implemented yet. Until the internal interceptor, `pkg/grpcclient` headers, gateway filtering and NetworkPolicies are built (Section 16), internal RPCs are protected only by not being exposed through the gateway.
 
 ---
 
@@ -487,7 +490,8 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 3 Nov 2026 | Proto folders and file names use snake_case matching the package; service folders stay kebab-case (agreed by Phuntsho in PR #6) | buf STANDARD lint requires the folder to match the package |
 | 3 Nov 2026 | `buf.yaml` depends on `buf.build/googleapis/googleapis`; `buf.gen.yaml` adds the grpc-gateway plugin; `buf.lock` committed (agreed by Phuntsho in PR #6) | Needed for HTTP annotations and generated gateway code |
 | 3 Nov 2026 | `employer_id` is the employer's user ID from `auth`; one company profile per employer (agreed by Phuntsho in PR #6) | Notification Dispatcher and ownership checks only know user IDs |
-| 3 Nov 2026 | Internal RPCs live in separate `*InternalService` definitions, protected by `INTERNAL_TOKEN`, a per-RPC caller allowlist and NetworkPolicy; user requests forward `x-user-id` and `x-user-role` | The gateway cannot reach internal services, and direct calls are limited to known callers without new tools |
+| 3 Nov 2026 | Internal RPCs live in separate `*InternalService` definitions, protected by a shared `INTERNAL_TOKEN`, a per-RPC caller allowlist and NetworkPolicy; user requests forward `x-user-id` and `x-user-role`. Residual risk without mTLS accepted (agreed by all four members in PR #6) | The gateway cannot reach internal services, and direct calls are limited to known callers without new tools |
+| 3 Nov 2026 | `weekly-summary` gets admin emails from `AuthInternalService.ListUsersByRole` (agreed by all four members in PR #6) | `auth` stays the single source of truth for users |
 | 3 Nov 2026 | Admin accounts are seeded by `auth` at startup from `ADMIN_EMAIL` and `ADMIN_PASSWORD` | Admins cannot self-register and no password is committed |
 | 3 Nov 2026 | Categories, tags and locations are seeded by migration and read-only | Admin management is not in scope |
 | 3 Nov 2026 | Moderation removal sets the job to REMOVED and `job-posting` publishes `job.closed` | `job-search` and `saved-jobs` only consume `job.closed` |
@@ -499,10 +503,9 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Verify that Phuntsho's laptop, the chosen cluster host, has at least 16 GB RAM.
 - RabbitMQ to Knative connection method pending the JT-29 spike.
 - Final presentation and submission dates not yet announced (likely to be postponed).
-- Pending confirmation by both teams: `weekly-summary` calling `AuthInternalService.ListUsersByRole` for admin emails. The RPC exists in `auth.proto`; once confirmed, add it to the Section 6 table and the decision log.
 - Deferred until the shared event contracts are coordinated: `actor_id` in `EventEnvelope` (for `audit-log`) and `description` in `job.published` and `job.updated` (for `job-search`).
-- Internal-call protection still to build: the internal interceptor in `pkg/`, internal headers in `pkg/grpcclient`, header stripping in `gateway`, and NetworkPolicy manifests in `deploy/k8s` (check they work with Knative function pods during JT-29).
-- Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted for this project.
+- Internal-call protection still to build (not active yet): the internal interceptor in `pkg/`, internal headers in `pkg/grpcclient`, header stripping in `gateway`, and NetworkPolicy manifests in `deploy/k8s` (check they work with Knative function pods during JT-29). These need Jira tasks.
+- Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
 - Password hashing library for `auth` to be agreed (suggestion: bcrypt from `golang.org/x/crypto`).
