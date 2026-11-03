@@ -237,3 +237,100 @@ func TestUnaryClientInterceptor_BusinessErrorsDoNotOpenCircuit(t *testing.T) {
 		t.Fatalf("business errors opened circuit or were retried: calls=%d", calls)
 	}
 }
+
+func TestUnaryClientInterceptor_ForwardsOnlyCompletePublicCallerIdentity(t *testing.T) {
+	const userID = "11111111-1111-4111-8111-111111111111"
+	const publicMethod = "/jobtrack.job_posting.v1.JobPostingService/GetJob"
+	identity := metadata.Pairs("x-user-id", userID, "x-user-role", "applicant")
+	tests := []struct {
+		name     string
+		method   string
+		incoming metadata.MD
+		forward  bool
+	}{
+		{"complete public identity", publicMethod, identity, true},
+		{"missing user ID", publicMethod, metadata.Pairs("x-user-role", "applicant"), false},
+		{"missing role", publicMethod, metadata.Pairs("x-user-id", userID), false},
+		{"empty user ID", publicMethod, metadata.Pairs("x-user-id", "", "x-user-role", "applicant"), false},
+		{"empty role", publicMethod, metadata.Pairs("x-user-id", userID, "x-user-role", ""), false},
+		{"blank user ID", publicMethod, metadata.Pairs("x-user-id", " \t", "x-user-role", "applicant"), false},
+		{"blank role", publicMethod, metadata.Pairs("x-user-id", userID, "x-user-role", " \t"), false},
+		{"no incoming metadata", publicMethod, nil, false},
+		{"internal service", "/jobtrack.auth.v1.AuthInternalService/GetUser", identity, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tt.incoming != nil {
+				ctx = metadata.NewIncomingContext(ctx, tt.incoming)
+			}
+			outgoing := metadata.Pairs("request-id", "request-123")
+			ctx = metadata.NewOutgoingContext(ctx, outgoing)
+			ctx = metadata.AppendToOutgoingContext(ctx, "trace-id", "trace-123")
+			original, _ := metadata.FromOutgoingContext(ctx)
+			want := original.Copy()
+			if tt.forward {
+				want.Set("x-user-id", userID)
+				want.Set("x-user-role", "applicant")
+			}
+			calls := 0
+			err := grpcclient.UnaryClientInterceptor()(ctx, tt.method, nil, nil, nil,
+				func(callCtx context.Context, _ string, _, _ any, _ *grpc.ClientConn, _ ...grpc.CallOption) error {
+					calls++
+					got, _ := metadata.FromOutgoingContext(callCtx)
+					if !reflect.DeepEqual(got, want) {
+						t.Errorf("outgoing metadata = %v, want %v", got, want)
+					}
+					return nil
+				})
+			if err != nil || calls != 1 {
+				t.Fatalf("calls=%d err=%v", calls, err)
+			}
+			got, _ := metadata.FromOutgoingContext(ctx)
+			if !reflect.DeepEqual(got, original) {
+				t.Error("call mutated caller outgoing metadata")
+			}
+		})
+	}
+}
+
+func TestUnaryClientInterceptor_DeduplicatesIdentityAcrossRetries(t *testing.T) {
+	type contextKey struct{}
+	ctx := context.WithValue(context.Background(), contextKey{}, "request-context")
+	incoming := metadata.Pairs(
+		"x-user-id", "11111111-1111-4111-8111-111111111111",
+		"x-user-role", "applicant",
+		"incoming-only", "private")
+	outgoing := metadata.Pairs("request-id", "request-123", "x-user-id", "old-id", "x-user-role", "old-role")
+	ctx = metadata.NewIncomingContext(ctx, incoming)
+	ctx = metadata.NewOutgoingContext(ctx, outgoing)
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-user-id", "duplicate-id", "x-user-role", "duplicate-role")
+	original, _ := metadata.FromOutgoingContext(ctx)
+	want := original.Copy()
+	want.Set("x-user-id", incoming.Get("x-user-id")...)
+	want.Set("x-user-role", incoming.Get("x-user-role")...)
+	calls := 0
+	err := grpcclient.UnaryClientInterceptor()(ctx, "/jobtrack.job_posting.v1.JobPostingService/GetJob", nil, nil, nil,
+		func(callCtx context.Context, _ string, _, _ any, _ *grpc.ClientConn, _ ...grpc.CallOption) error {
+			calls++
+			got, _ := metadata.FromOutgoingContext(callCtx)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("attempt %d metadata = %v, want %v", calls, got, want)
+			}
+			gotIncoming, _ := metadata.FromIncomingContext(callCtx)
+			if !reflect.DeepEqual(gotIncoming, incoming) || callCtx.Value(contextKey{}) != "request-context" {
+				t.Error("incoming metadata or caller context changed")
+			}
+			if calls < 4 {
+				return status.Error(codes.Unavailable, "retry")
+			}
+			return nil
+		})
+	if err != nil || calls != 4 {
+		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+	got, _ := metadata.FromOutgoingContext(ctx)
+	if !reflect.DeepEqual(got, original) {
+		t.Error("forwarding mutated caller outgoing metadata")
+	}
+}

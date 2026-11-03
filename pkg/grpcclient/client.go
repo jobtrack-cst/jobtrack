@@ -3,11 +3,14 @@ package grpcclient
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -37,6 +40,7 @@ func UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 		if err := ctx.Err(); err != nil {
 			return status.FromContextError(err).Err()
 		}
+		ctx = forwardUserIdentity(ctx, method)
 		_, err := breaker.Execute(func() (struct{}, error) {
 			return struct{}{}, invoke(ctx, method, req, reply, cc, invoker, opts...)
 		})
@@ -48,6 +52,27 @@ func UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 		}
 		return err
 	}
+}
+
+func forwardUserIdentity(ctx context.Context, method string) context.Context {
+	parts := strings.Split(method, "/")
+	if len(parts) != 3 || parts[0] != "" || parts[2] == "" ||
+		!strings.HasSuffix(parts[1], "Service") || strings.HasSuffix(parts[1], "InternalService") {
+		return ctx
+	}
+	identity, ok := authctx.FromContext(ctx)
+	if !ok {
+		return ctx
+	}
+	// Forward caller context; authentication remains the gateway's responsibility.
+	// FromOutgoingContext returns a copy, so Set cannot mutate the caller's metadata.
+	outgoing, _ := metadata.FromOutgoingContext(ctx)
+	if outgoing == nil {
+		outgoing = metadata.MD{}
+	}
+	outgoing.Set("x-user-id", identity.UserID)
+	outgoing.Set("x-user-role", identity.Role)
+	return metadata.NewOutgoingContext(ctx, outgoing)
 }
 
 func invoke(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
