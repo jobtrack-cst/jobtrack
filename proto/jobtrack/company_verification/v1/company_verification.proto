@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package jobtrack.company_verification.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/company_verification/v1;companyverificationv1";
+
+// CompanyVerificationService handles employer verification requests and
+// admin decisions.
+service CompanyVerificationService {
+  // SubmitVerificationRequest is sent by an employer. Employer role only.
+  // Already has a PENDING request: ALREADY_EXISTS.
+  // Already approved: FAILED_PRECONDITION.
+  // After a rejection the employer may submit a new request.
+  rpc SubmitVerificationRequest(SubmitVerificationRequestRequest) returns (SubmitVerificationRequestResponse) {
+    option (google.api.http) = {
+      post: "/v1/verification/requests"
+      body: "*"
+    };
+  }
+
+  // ListMyVerificationRequests lists the caller's own requests, newest first.
+  rpc ListMyVerificationRequests(ListMyVerificationRequestsRequest) returns (ListMyVerificationRequestsResponse) {
+    option (google.api.http) = {get: "/v1/verification/my-requests"};
+  }
+
+  // ListVerificationRequests lists all requests for the admin. Admin role only.
+  rpc ListVerificationRequests(ListVerificationRequestsRequest) returns (ListVerificationRequestsResponse) {
+    option (google.api.http) = {get: "/v1/verification/requests"};
+  }
+
+  // ApproveVerificationRequest approves a PENDING request and publishes
+  // employer.verified. Admin role only. Not PENDING: FAILED_PRECONDITION.
+  rpc ApproveVerificationRequest(ApproveVerificationRequestRequest) returns (ApproveVerificationRequestResponse) {
+    option (google.api.http) = {
+      post: "/v1/verification/requests/{request_id}/approve"
+      body: "*"
+    };
+  }
+
+  // RejectVerificationRequest rejects a PENDING request and publishes
+  // employer.verification_rejected. Admin role only.
+  // Not PENDING: FAILED_PRECONDITION. Empty reason: INVALID_ARGUMENT.
+  rpc RejectVerificationRequest(RejectVerificationRequestRequest) returns (RejectVerificationRequestResponse) {
+    option (google.api.http) = {
+      post: "/v1/verification/requests/{request_id}/reject"
+      body: "*"
+    };
+  }
+}
+
+enum RequestStatus {
+  REQUEST_STATUS_UNSPECIFIED = 0;
+  REQUEST_STATUS_PENDING = 1;
+  REQUEST_STATUS_APPROVED = 2;
+  REQUEST_STATUS_REJECTED = 3;
+}
+
+message VerificationRequest {
+  string request_id = 1;
+  // The employer's user ID (from x-user-id when submitted).
+  string employer_id = 2;
+  // Company registration or licence number given by the employer.
+  string registration_number = 3;
+  string notes = 4;
+  RequestStatus status = 5;
+  // Filled only when status is REJECTED.
+  string rejection_reason = 6;
+  // Admin user ID who decided. Empty while PENDING.
+  string reviewed_by = 7;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 8;
+}
+
+message SubmitVerificationRequestRequest {
+  // Required. Empty is INVALID_ARGUMENT.
+  string registration_number = 1;
+  string notes = 2;
+}
+
+message SubmitVerificationRequestResponse {
+  VerificationRequest request = 1;
+}
+
+message ListMyVerificationRequestsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListMyVerificationRequestsResponse {
+  repeated VerificationRequest requests = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message ListVerificationRequestsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+  // REQUEST_STATUS_UNSPECIFIED means all statuses.
+  RequestStatus status = 2;
+}
+
+message ListVerificationRequestsResponse {
+  repeated VerificationRequest requests = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message ApproveVerificationRequestRequest {
+  string request_id = 1;
+}
+
+message ApproveVerificationRequestResponse {
+  VerificationRequest request = 1;
+}
+
+message RejectVerificationRequestRequest {
+  string request_id = 1;
+  // Sent in employer.verification_rejected.
+  string reason = 2;
+}
+
+message RejectVerificationRequestResponse {
+  VerificationRequest request = 1;
+}

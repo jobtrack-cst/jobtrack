@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package jobtrack.analytics.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/analytics/v1;analyticsv1";
+
+// AnalyticsService reports outcome statistics built from consumed events.
+service AnalyticsService {
+  // GetSummary returns event counts for a time period. Admin role only.
+  // start_time must be before end_time, otherwise INVALID_ARGUMENT.
+  rpc GetSummary(GetSummaryRequest) returns (GetSummaryResponse) {
+    option (google.api.http) = {get: "/v1/analytics/summary"};
+  }
+
+  // GetInternalSummary returns the same counts with no role check.
+  // Internal only (no HTTP route), used by weekly-summary.
+  rpc GetInternalSummary(GetInternalSummaryRequest) returns (GetInternalSummaryResponse);
+}
+
+message GetSummaryRequest {
+  // Inclusive. Compared with the event envelope's occurred_at.
+  google.protobuf.Timestamp start_time = 1;
+  // Exclusive.
+  google.protobuf.Timestamp end_time = 2;
+}
+
+message GetSummaryResponse {
+  Summary summary = 1;
+}
+
+message GetInternalSummaryRequest {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+}
+
+message GetInternalSummaryResponse {
+  Summary summary = 1;
+}
+
+message Summary {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+  int64 jobs_published = 3;
+  int64 jobs_closed = 4;
+  int64 applications_submitted = 5;
+  int64 applications_withdrawn = 6;
+  int64 offers_made = 7;
+  int64 offers_accepted = 8;
+  int64 offers_declined = 9;
+  // Count of application.status_changed events per new_status.
+  repeated StatusCount status_changes = 10;
+}
+
+message StatusCount {
+  // Status name as sent in the event, for example "SHORTLISTED".
+  string status = 1;
+  int64 count = 2;
+}

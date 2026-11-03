@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package jobtrack.auth.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/auth/v1;authv1";
+
+// AuthService registers users, logs them in and looks up user details.
+service AuthService {
+  // Register creates an applicant or employer account. Public, no JWT needed.
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/register"
+      body: "*"
+    };
+  }
+
+  // Login checks the password and issues a JWT. Public, no JWT needed.
+  // Wrong email or wrong password both return UNAUTHENTICATED with the same
+  // message, so nobody can tell which emails are registered.
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  // GetCurrentUser returns the caller's own account (from x-user-id).
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {
+    option (google.api.http) = {get: "/v1/auth/me"};
+  }
+
+  // GetUser is internal only (used by notification-dispatcher to get an email).
+  // It has no HTTP route so emails are not exposed through the gateway.
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // ListUsersByRole lists users with one role. Internal only, used by
+  // weekly-summary to get admin emails.
+  rpc ListUsersByRole(ListUsersByRoleRequest) returns (ListUsersByRoleResponse);
+}
+
+// Role matches the "role" JWT claim and the x-user-role metadata value.
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_APPLICANT = 1;
+  ROLE_EMPLOYER = 2;
+  ROLE_ADMIN = 3;
+}
+
+message User {
+  string user_id = 1;
+  string email = 2;
+  string full_name = 3;
+  Role role = 4;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 5;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string full_name = 3;
+  // Only ROLE_APPLICANT or ROLE_EMPLOYER. Anything else is INVALID_ARGUMENT.
+  // Admins are created at startup from ADMIN_EMAIL and ADMIN_PASSWORD.
+  Role role = 4;
+}
+
+message RegisterResponse {
+  User user = 1;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  User user = 3;
+}
+
+message GetCurrentUserRequest {}
+
+message GetCurrentUserResponse {
+  User user = 1;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message ListUsersByRoleRequest {
+  Role role = 1;
+  jobtrack.common.v1.PaginationRequest pagination = 2;
+}
+
+message ListUsersByRoleResponse {
+  repeated User users = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}

@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package jobtrack.moderation.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/moderation/v1;moderationv1";
+
+// ModerationService handles reports on job postings and admin takedowns.
+service ModerationService {
+  // ReportJob lets any logged-in user report a job posting.
+  // Same user reporting the same job while a report is OPEN: ALREADY_EXISTS.
+  // Job already removed: FAILED_PRECONDITION.
+  rpc ReportJob(ReportJobRequest) returns (ReportJobResponse) {
+    option (google.api.http) = {
+      post: "/v1/jobs/{job_id}/reports"
+      body: "*"
+    };
+  }
+
+  // ListReports lists reports for the admin, newest first. Admin role only.
+  rpc ListReports(ListReportsRequest) returns (ListReportsResponse) {
+    option (google.api.http) = {get: "/v1/moderation/reports"};
+  }
+
+  // DismissReport closes a report with no action. Admin role only.
+  // Report not OPEN: FAILED_PRECONDITION.
+  rpc DismissReport(DismissReportRequest) returns (DismissReportResponse) {
+    option (google.api.http) = {
+      post: "/v1/moderation/reports/{report_id}/dismiss"
+      body: "*"
+    };
+  }
+
+  // RemoveJob takes a job down. Admin role only. Marks all OPEN reports for the
+  // job as ACTIONED and publishes moderation.job_removed (job-posting closes it).
+  // Job already removed: FAILED_PRECONDITION.
+  rpc RemoveJob(RemoveJobRequest) returns (RemoveJobResponse) {
+    option (google.api.http) = {
+      post: "/v1/moderation/jobs/{job_id}/remove"
+      body: "*"
+    };
+  }
+}
+
+enum ReportStatus {
+  REPORT_STATUS_UNSPECIFIED = 0;
+  REPORT_STATUS_OPEN = 1;
+  REPORT_STATUS_DISMISSED = 2;
+  REPORT_STATUS_ACTIONED = 3;
+}
+
+message Report {
+  string report_id = 1;
+  string job_id = 2;
+  // User ID of the person who reported (from x-user-id).
+  string reporter_id = 3;
+  string reason = 4;
+  ReportStatus status = 5;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 6;
+}
+
+message ReportJobRequest {
+  string job_id = 1;
+  // Required. Empty is INVALID_ARGUMENT.
+  string reason = 2;
+}
+
+message ReportJobResponse {
+  Report report = 1;
+}
+
+message ListReportsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+  // REPORT_STATUS_UNSPECIFIED means all statuses.
+  ReportStatus status = 2;
+}
+
+message ListReportsResponse {
+  repeated Report reports = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message DismissReportRequest {
+  string report_id = 1;
+}
+
+message DismissReportResponse {
+  Report report = 1;
+}
+
+message RemoveJobRequest {
+  string job_id = 1;
+  // Required. Sent in moderation.job_removed.
+  string reason = 2;
+}
+
+message RemoveJobResponse {
+  string job_id = 1;
+}

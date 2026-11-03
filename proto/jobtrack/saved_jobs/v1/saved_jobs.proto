@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package jobtrack.saved_jobs.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/saved_jobs/v1;savedjobsv1";
+
+// SavedJobsService stores applicants' job bookmarks. On job.closed it deletes
+// all bookmarks for that job and remembers the job ID as closed.
+service SavedJobsService {
+  // SaveJob bookmarks a job for the caller. Applicant role only.
+  // Already saved: ALREADY_EXISTS. Job known to be closed: FAILED_PRECONDITION.
+  rpc SaveJob(SaveJobRequest) returns (SaveJobResponse) {
+    option (google.api.http) = {
+      post: "/v1/saved-jobs"
+      body: "*"
+    };
+  }
+
+  // UnsaveJob removes the caller's bookmark. Not saved: NOT_FOUND.
+  rpc UnsaveJob(UnsaveJobRequest) returns (UnsaveJobResponse) {
+    option (google.api.http) = {delete: "/v1/saved-jobs/{job_id}"};
+  }
+
+  // ListMySavedJobs lists the caller's bookmarks, newest first.
+  rpc ListMySavedJobs(ListMySavedJobsRequest) returns (ListMySavedJobsResponse) {
+    option (google.api.http) = {get: "/v1/saved-jobs"};
+  }
+
+  // ListJobSavers lists the applicants who saved a job. Internal only,
+  // used by deadline-reminder.
+  rpc ListJobSavers(ListJobSaversRequest) returns (ListJobSaversResponse);
+}
+
+message SavedJob {
+  string job_id = 1;
+  string applicant_id = 2;
+  google.protobuf.Timestamp saved_at = 3;
+}
+
+message SaveJobRequest {
+  string job_id = 1;
+}
+
+message SaveJobResponse {
+  SavedJob saved_job = 1;
+}
+
+message UnsaveJobRequest {
+  string job_id = 1;
+}
+
+message UnsaveJobResponse {}
+
+message ListMySavedJobsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListMySavedJobsResponse {
+  repeated SavedJob saved_jobs = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message ListJobSaversRequest {
+  string job_id = 1;
+  jobtrack.common.v1.PaginationRequest pagination = 2;
+}
+
+message ListJobSaversResponse {
+  repeated string applicant_ids = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
