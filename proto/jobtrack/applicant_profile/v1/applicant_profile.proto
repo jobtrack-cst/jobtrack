@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package jobtrack.applicant_profile.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/applicant_profile/v1;applicantprofilev1";
+
+// ApplicantProfileService manages the caller's own applicant profile.
+// Runtime handlers must enforce role and ownership using authenticated metadata;
+// this schema does not enforce security. Education fields, profile semantics
+// and HTTP bindings are provisional pending consolidated team review.
+service ApplicantProfileService {
+  // CreateMyProfile derives applicant identity from authenticated metadata.
+  rpc CreateMyProfile(CreateMyProfileRequest) returns (CreateMyProfileResponse) {
+    option (google.api.http) = {
+      post: "/v1/applicant/profile"
+      body: "*"
+    };
+  }
+
+  // GetMyProfile returns the caller's profile.
+  rpc GetMyProfile(GetMyProfileRequest) returns (GetMyProfileResponse) {
+    option (google.api.http) = {get: "/v1/applicant/profile"};
+  }
+
+  // UpdateMyProfile accepts only editable profile fields.
+  rpc UpdateMyProfile(UpdateMyProfileRequest) returns (UpdateMyProfileResponse) {
+    option (google.api.http) = {
+      put: "/v1/applicant/profile"
+      body: "*"
+    };
+  }
+}
+
+message ApplicantProfile {
+  // Applicant user ID represented as a UUID string.
+  string applicant_id = 1;
+  string summary = 2;
+  repeated Education education = 3;
+  repeated string skills = 4;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 5;
+}
+
+message Education {
+  string institution = 1;
+  string qualification = 2;
+  int32 start_year = 3;
+  int32 end_year = 4;
+}
+
+message CreateMyProfileRequest {
+  string summary = 1;
+  repeated Education education = 2;
+  repeated string skills = 3;
+}
+
+message CreateMyProfileResponse {
+  ApplicantProfile profile = 1;
+}
+
+message GetMyProfileRequest {}
+
+message GetMyProfileResponse {
+  ApplicantProfile profile = 1;
+}
+
+message UpdateMyProfileRequest {
+  string summary = 1;
+  repeated Education education = 2;
+  repeated string skills = 3;
+}
+
+message UpdateMyProfileResponse {
+  ApplicantProfile profile = 1;
+}
