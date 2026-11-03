@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package jobtrack.review.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/review/v1;reviewv1";
+
+// ReviewService records employer scores and shortlist decisions.
+// The interface and runtime rules are provisional pending consolidated review;
+// protobuf does not enforce authorization or business rules.
+service ReviewService {
+  // CompleteReview is limited to an authorized employer, whose identity comes
+  // from authenticated metadata. How application ownership is verified is open.
+  // Runtime validation requires a score from 1 through 5 and a decision other
+  // than UNSPECIFIED. Scores do not automatically decide shortlisting.
+  // Permit one completed review per application; a second returns ALREADY_EXISTS.
+  // Publish the existing review.completed event: ReviewCompleted carries
+  // application_id and a string decision. Map SHORTLISTED to "SHORTLISTED" and
+  // REJECTED to "REJECTED" at runtime. Application Status owns the lifecycle.
+  rpc CompleteReview(CompleteReviewRequest) returns (CompleteReviewResponse) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/reviews"
+      body: "*"
+    };
+  }
+
+  // GetReview requires runtime role and ownership checks; further viewing
+  // permissions remain subject to team agreement.
+  rpc GetReview(GetReviewRequest) returns (GetReviewResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/review"};
+  }
+}
+
+enum ReviewDecision {
+  REVIEW_DECISION_UNSPECIFIED = 0;
+  REVIEW_DECISION_SHORTLISTED = 1;
+  REVIEW_DECISION_REJECTED = 2;
+}
+
+// Review uses UUID strings for all IDs.
+message Review {
+  string review_id = 1;
+  string application_id = 2;
+  string employer_id = 3;
+  int32 score = 4;
+  ReviewDecision decision = 5;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 6;
+}
+
+message CompleteReviewRequest {
+  string application_id = 1;
+  int32 score = 2;
+  ReviewDecision decision = 3;
+}
+
+message CompleteReviewResponse {
+  Review review = 1;
+}
+
+message GetReviewRequest {
+  string application_id = 1;
+}
+
+message GetReviewResponse {
+  Review review = 1;
+}
