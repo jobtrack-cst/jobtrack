@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package jobtrack.interview.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/interview/v1;interviewv1";
+
+// InterviewService exposes the provisional scheduling and reading interface.
+// Runtime handlers must enforce role and ownership using authenticated metadata;
+// this schema does not implement authorization or event publication.
+service InterviewService {
+  // ScheduleInterview is limited to an authorized employer. Caller identity
+  // comes from authenticated metadata, never request-body participant IDs.
+  // Scheduling publishes the existing interview.scheduled event, whose
+  // InterviewScheduled payload has interview_id, application_id and scheduled_at.
+  // Application Status owns lifecycle transitions. Ownership verification,
+  // scheduling-time rules, duplicate bookings and eligibility remain open.
+  rpc ScheduleInterview(ScheduleInterviewRequest) returns (ScheduleInterviewResponse) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/interviews"
+      body: "*"
+    };
+  }
+
+  // GetInterview requires runtime role and ownership checks; applicant and
+  // employer read permissions remain subject to consolidated team review.
+  rpc GetInterview(GetInterviewRequest) returns (GetInterviewResponse) {
+    option (google.api.http) = {get: "/v1/interviews/{interview_id}"};
+  }
+
+  // ListInterviews returns a page for an application, subject to runtime
+  // authorization and the same pending read-permission decisions.
+  rpc ListInterviews(ListInterviewsRequest) returns (ListInterviewsResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/interviews"};
+  }
+}
+
+// Interview uses UUID strings for all IDs and UTC timestamps.
+// Rescheduling, cancellation and outcome recording remain team decisions.
+message Interview {
+  string interview_id = 1;
+  string application_id = 2;
+  string employer_id = 3;
+  string applicant_id = 4;
+  google.protobuf.Timestamp scheduled_at = 5;
+  string details = 6;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 7;
+}
+
+message ScheduleInterviewRequest {
+  string application_id = 1;
+  google.protobuf.Timestamp scheduled_at = 2;
+  string details = 3;
+}
+
+message ScheduleInterviewResponse {
+  Interview interview = 1;
+}
+
+message GetInterviewRequest {
+  string interview_id = 1;
+}
+
+message GetInterviewResponse {
+  Interview interview = 1;
+}
+
+message ListInterviewsRequest {
+  string application_id = 1;
+  jobtrack.common.v1.PaginationRequest pagination = 2;
+}
+
+message ListInterviewsResponse {
+  repeated Interview interviews = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
