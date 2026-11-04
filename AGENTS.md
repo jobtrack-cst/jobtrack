@@ -252,7 +252,7 @@ Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and a
 | RPC | gRPC, Protocol Buffers, `buf` for linting and code generation |
 | Gateway | grpc-gateway |
 | Database | PostgreSQL (one server, one database and user per service), `pgx`, `goose` migrations run on startup |
-| Messaging | RabbitMQ, topic exchange `jobtrack.events` |
+| Messaging | RabbitMQ, topic exchange `jobtrack.events`, Go client `github.com/rabbitmq/amqp091-go` |
 | Serverless | Knative Serving and Eventing (PingSource for schedules) |
 | Frontend | React, TypeScript, Vite, MUI, React Router |
 | Local development | Docker Compose (Postgres, RabbitMQ, Mailpit, services) |
@@ -495,6 +495,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 3 Nov 2026 | Admin accounts are seeded by `auth` at startup from `ADMIN_EMAIL` and `ADMIN_PASSWORD` | Admins cannot self-register and no password is committed |
 | 3 Nov 2026 | Categories, tags and locations are seeded by migration and read-only | Admin management is not in scope |
 | 3 Nov 2026 | Moderation removal sets the job to REMOVED and `job-posting` publishes `job.closed` | `job-search` and `saved-jobs` only consume `job.closed` |
+| 3 Nov 2026 | All four members agreed to `github.com/rabbitmq/amqp091-go` as the RabbitMQ Go client | Use one shared client with publisher confirmations for broker-acknowledged event publishing |
 
 ---
 
