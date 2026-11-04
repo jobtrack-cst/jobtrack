@@ -39,7 +39,8 @@ service ResumeService {
 }
 
 // ResumeInternalService has no HTTP routes and does not require user identity.
-// Caller restrictions must be enforced by the runtime, not this schema.
+// Runtime handlers must verify x-internal-token and enforce caller restrictions
+// as specified in AGENTS.md Section 6; this schema does not enforce them.
 service ResumeInternalService {
   // GetResumeFile fetches the uploaded file. Permitted caller: resume-validator only.
   rpc GetResumeFile(GetResumeFileRequest) returns (GetResumeFileResponse);

@@ -16,6 +16,9 @@ service ApplicationService {
   // forwarded identity. The job must be PUBLISHED and before its deadline;
   // the resume must belong to the applicant and be VALIDATED. The employer ID
   // comes from the trusted Job Posting response. Publish application.submitted.
+  // Job not found: NOT_FOUND. Job closed or past deadline: FAILED_PRECONDITION.
+  // Resume not owned by the applicant: PERMISSION_DENIED.
+  // Resume not VALIDATED: FAILED_PRECONDITION.
   rpc SubmitApplication(SubmitApplicationRequest) returns (SubmitApplicationResponse) {
     option (google.api.http) = {
       post: "/v1/applications"

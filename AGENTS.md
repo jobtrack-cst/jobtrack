@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 3 Nov 2026 (JT-23 Team B contracts)
+- Last updated: 5 Nov 2026 (JT-21 confirmed cross-team contract decisions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -143,7 +143,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 | 16 | `interview` | Kinley | Schedule and record interviews | `interview.scheduled` | |
 | 17 | `application` | Phuntsho | Submit and withdraw applications, eligibility checks | `application.submitted`, `application.withdrawn` | |
 | 18 | `offer` | Phuntsho | Offers; applicant accepts or declines | `offer.made`, `offer.accepted`, `offer.declined` | |
-| 19 | `messaging` | Phuntsho | Message threads per application | `message.sent` | |
+| 19 | `messaging` | Phuntsho | Message threads per application | `message.sent` | `application.submitted` |
 | 20 | `job-alert` | Phuntsho | Applicant subscriptions; matches new jobs | `job_alert.matched` | `job.published` |
 
 ### API Gateway (not counted in the 20)
@@ -217,7 +217,7 @@ Any other transition must be rejected with `FAILED_PRECONDITION`. Every transiti
 | `application` | `job-posting` | `JobPostingService.GetJob` (forwards user identity) | Job open check | Yes |
 | `application` | `resume` | (defined in JT-21) | Resume validated check | No |
 | `job-posting` | `employer` | `EmployerService.GetCompanyProfile` (forwards user identity) | Employer verified check | No |
-| `job-alert` | `category-tag` | `CategoryTagInternalService.ResolveNames` | Category and tag names | Yes |
+| `job-alert` | `category-tag` | `CategoryTagInternalService.ResolveNames` | Validate category/tag IDs and resolve their names | Yes |
 | `notification-dispatcher` | `notification-inbox`, `auth` | `NotificationInboxInternalService.CreateNotification`, `AuthInternalService.GetUser` | Write notification, get email | No |
 | `weekly-summary` | `analytics` | `AnalyticsInternalService.GetInternalSummary` | Statistics | No |
 | `weekly-summary` | `auth` | `AuthInternalService.ListUsersByRole` | Admin emails | No |
@@ -496,6 +496,10 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 3 Nov 2026 | Categories, tags and locations are seeded by migration and read-only | Admin management is not in scope |
 | 3 Nov 2026 | Moderation removal sets the job to REMOVED and `job-posting` publishes `job.closed` | `job-search` and `saved-jobs` only consume `job.closed` |
 | 3 Nov 2026 | All four members agreed to `github.com/rabbitmq/amqp091-go` as the RabbitMQ Go client | Use one shared client with publisher confirmations for broker-acknowledged event publishing |
+| 5 Nov 2026 | Record Team A and Team B's confirmed PR #11 Messaging decisions: consume only `application.submitted` to maintain local applicant/employer participants; derive sender from trusted metadata and recipient as the other participant; reject non-participants with `PERMISSION_DENIED` and unknown or unprocessed applications with `NOT_FOUND`; list oldest first; trimmed content must be 1 to 2000 characters (`INVALID_ARGUMENT` otherwise) | Authorize application threads without client-supplied participants or a new synchronous call |
+| 5 Nov 2026 | Record Team A and Team B's confirmed PR #11 Job Alert decisions: category membership, any tag overlap and exact location name, combined with AND; empty individual filters are unrestricted, all-empty filters invalid; normalized category/tag sets identify duplicates; maximum 10 subscriptions per applicant and 20 IDs per filter list; validate IDs through `ResolveNames`; delete and recreate instead of editing | Define matching and validation within the existing Category Tag dependency; detailed error mappings are in the contract comments |
+| 5 Nov 2026 | Record Team A and Team B's confirmed PR #11 submission error mapping: missing job `NOT_FOUND`, closed or expired job and unvalidated resume `FAILED_PRECONDITION`, wrong resume owner `PERMISSION_DENIED` | Make existing Job Posting and Resume eligibility checks consistent without changing their calls |
+| 5 Nov 2026 | Reaffirm Team A and Team B's PR #11 Resume internal-call requirement: runtime `x-internal-token` verification, with `GetResumeFile` restricted to `resume-validator` and no HTTP route | Clarify the existing internal security design without changing signatures or public resume permissions |
 
 ---
 

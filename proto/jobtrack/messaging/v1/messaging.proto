@@ -9,12 +9,17 @@ option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/messaging/
 
 // MessagingService exposes provisional application-thread operations and routes.
 // Runtime services enforce role, ownership and application-participant access;
-// protobuf does not enforce authorization. How application participants are
-// verified remains an open architecture question; no synchronous call is approved.
+// protobuf does not enforce authorization. At runtime, application.submitted
+// maintains local application participants (applicant_id and employer_id).
+// No new synchronous dependency or application.withdrawn consumption is approved.
+// Unknown applications, including submitted events not yet processed: NOT_FOUND.
 service MessagingService {
   // SendMessage derives sender_id from authenticated x-user-id metadata at
   // runtime and publishes the existing message.sent event. The runtime determines
-  // the recipient from verified application participants, never client input.
+  // the recipient as the other verified application participant, never client input.
+  // A non-participant sender is rejected with PERMISSION_DENIED.
+  // Content must contain 1 to 2000 characters after trimming whitespace;
+  // otherwise the runtime returns INVALID_ARGUMENT.
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
     option (google.api.http) = {
       post: "/v1/applications/{application_id}/messages"
@@ -22,8 +27,8 @@ service MessagingService {
     };
   }
 
-  // ListMessages requires runtime authorization to read the application thread.
-  // Message ordering and content validation limits remain team decisions.
+  // ListMessages requires runtime authorization to read the application thread
+  // and returns messages oldest first.
   rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {
     option (google.api.http) = {get: "/v1/applications/{application_id}/messages"};
   }
