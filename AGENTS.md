@@ -215,14 +215,14 @@ Any other transition must be rejected with `FAILED_PRECONDITION`. Every transiti
 |---|---|---|---|---|
 | `gateway` | all services | Public services only (RPCs with HTTP annotations) | Frontend requests | Yes |
 | `application` | `job-posting` | `JobPostingService.GetJob` (forwards user identity) | Job open check | Yes |
-| `application` | `resume` | (defined in JT-21) | Resume validated check | No |
+| `application` | `resume` | `ResumeService.GetResume` (forwards user identity) | Resume validated check | No |
 | `job-posting` | `employer` | `EmployerService.GetCompanyProfile` (forwards user identity) | Employer verified check | No |
 | `job-alert` | `category-tag` | `CategoryTagInternalService.ResolveNames` | Validate category/tag IDs and resolve their names | Yes |
 | `notification-dispatcher` | `notification-inbox`, `auth` | `NotificationInboxInternalService.CreateNotification`, `AuthInternalService.GetUser` | Write notification, get email | No |
 | `weekly-summary` | `analytics` | `AnalyticsInternalService.GetInternalSummary` | Statistics | No |
 | `weekly-summary` | `auth` | `AuthInternalService.ListUsersByRole` | Admin emails | No |
 | `deadline-reminder` | `job-posting`, `saved-jobs` | `JobPostingInternalService.ListJobsClosingBetween`, `SavedJobsInternalService.ListJobSavers` | Closing jobs and who saved them | Yes |
-| `resume-validator` | `resume` | (defined in JT-21) | Fetch file | No |
+| `resume-validator` | `resume` | `ResumeInternalService.GetResumeFile` | Fetch file | No |
 
 Any new synchronous call must be agreed by both teams and added here.
 
@@ -515,3 +515,4 @@ Add new decisions at the bottom with the date and a one-line reason.
 - The `buf` CLI version is not pinned; the team should agree on one version.
 - Password hashing library for `auth` to be agreed (suggestion: bcrypt from `golang.org/x/crypto`).
 - Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests.
+- How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
