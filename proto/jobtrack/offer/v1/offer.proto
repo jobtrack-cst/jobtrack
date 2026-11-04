@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package jobtrack.offer.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/offer/v1;offerv1";
+
+// OfferService exposes provisional offer operations and HTTP bindings.
+// Runtime services enforce authorization and business transitions; protobuf
+// does not enforce them. Application Status owns the application lifecycle.
+// Participant verification, eligibility, multiple offers, repeated responses,
+// reversal, terms validation and viewing permissions remain team decisions.
+service OfferService {
+  // MakeOffer is limited to the authorized employer, whose identity comes
+  // from authenticated metadata. At runtime it publishes existing offer.made.
+  rpc MakeOffer(MakeOfferRequest) returns (MakeOfferResponse) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/offers"
+      body: "*"
+    };
+  }
+
+  // GetOffer requires runtime role and ownership checks; viewing rules are open.
+  rpc GetOffer(GetOfferRequest) returns (GetOfferResponse) {
+    option (google.api.http) = {get: "/v1/offers/{offer_id}"};
+  }
+
+  // AcceptOffer is limited to the intended applicant identified by authenticated
+  // metadata. At runtime it publishes the existing offer.accepted event.
+  rpc AcceptOffer(AcceptOfferRequest) returns (AcceptOfferResponse) {
+    option (google.api.http) = {
+      post: "/v1/offers/{offer_id}/accept"
+      body: "*"
+    };
+  }
+
+  // DeclineOffer is limited to the intended applicant identified by authenticated
+  // metadata. At runtime it publishes the existing offer.declined event.
+  rpc DeclineOffer(DeclineOfferRequest) returns (DeclineOfferResponse) {
+    option (google.api.http) = {
+      post: "/v1/offers/{offer_id}/decline"
+      body: "*"
+    };
+  }
+}
+
+// OfferStatus naming is provisional pending team review.
+enum OfferStatus {
+  OFFER_STATUS_UNSPECIFIED = 0;
+  // An offer has been made and has not been answered.
+  OFFER_STATUS_PENDING = 1;
+  OFFER_STATUS_ACCEPTED = 2;
+  OFFER_STATUS_DECLINED = 3;
+}
+
+// Offer uses UUID strings for all IDs.
+message Offer {
+  string offer_id = 1;
+  string application_id = 2;
+  string employer_id = 3;
+  string applicant_id = 4;
+  string terms = 5;
+  OfferStatus status = 6;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 7;
+}
+
+message MakeOfferRequest {
+  string application_id = 1;
+  string terms = 2;
+}
+
+message MakeOfferResponse {
+  Offer offer = 1;
+}
+
+message GetOfferRequest {
+  string offer_id = 1;
+}
+
+message GetOfferResponse {
+  Offer offer = 1;
+}
+
+message AcceptOfferRequest {
+  string offer_id = 1;
+}
+
+message AcceptOfferResponse {
+  Offer offer = 1;
+}
+
+message DeclineOfferRequest {
+  string offer_id = 1;
+}
+
+message DeclineOfferResponse {
+  Offer offer = 1;
+}
