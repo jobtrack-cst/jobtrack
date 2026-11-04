@@ -1,0 +1,79 @@
+# JobTrack local development environment (JT-27).
+# Run from the repo root:
+#   docker compose -f deploy/compose/docker-compose.yml up -d
+# See deploy/compose/README.md for stop and reset commands.
+
+name: jobtrack
+
+# Settings shared by every Go service. Used by the service blocks below.
+x-service-env: &service-env
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:?set in .env}:${RABBITMQ_PASSWORD:?set in .env}@rabbitmq:5672/
+  GRPC_PORT: "9090"
+  HTTP_PORT: "8080"
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      # Read by postgres-init/01-create-service-databases.sh.
+      SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?set in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set in .env}
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # web inbox
+    restart: unless-stopped
+
+  # To add a service: copy this block, uncomment it, and replace every
+  # "auth" with the service name (kebab-case for the key and SERVICE_NAME,
+  # snake_case in DATABASE_URL). Do not publish port 9090 to the host.
+  #
+  # auth:
+  #   build:
+  #     context: ../..
+  #     dockerfile: services/auth/Dockerfile
+  #   environment:
+  #     <<: *service-env
+  #     SERVICE_NAME: auth
+  #     DATABASE_URL: postgres://auth:${SERVICE_DB_PASSWORD}@postgres:5432/auth?sslmode=disable
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
