@@ -36,6 +36,9 @@ func TestMessagingContract_PublicRPCsAndHTTPBindings(t *testing.T) {
 			if method.Input().Fields().ByName("sender_id") != nil {
 				t.Error("clients must not supply sender identity")
 			}
+			if tc.method == "SendMessage" && method.Input().Fields().ByName("recipient_id") != nil {
+				t.Error("clients must not supply recipient identity")
+			}
 			if !proto.HasExtension(method.Options(), annotations.E_Http) {
 				t.Fatal("missing public HTTP annotation")
 			}
@@ -81,7 +84,7 @@ func TestMessagingContract_FieldsAndPagination(t *testing.T) {
 			{"sender_id", "", false}, {"recipient_id", "", false},
 			{"content", "", false}, {"timestamps", "jobtrack.common.v1.ResourceTimestamps", false},
 		}},
-		{"SendMessageRequest", []fieldSpec{{"application_id", "", false}, {"recipient_id", "", false}, {"content", "", false}}},
+		{"SendMessageRequest", []fieldSpec{{"application_id", "", false}, {"content", "", false}}},
 		{"SendMessageResponse", []fieldSpec{{"message", "jobtrack.messaging.v1.Message", false}}},
 		{"ListMessagesRequest", []fieldSpec{{"application_id", "", false}, {"pagination", "jobtrack.common.v1.PaginationRequest", false}}},
 		{"ListMessagesResponse", []fieldSpec{{"messages", "jobtrack.messaging.v1.Message", true}, {"pagination", "jobtrack.common.v1.PaginationResponse", false}}},
@@ -101,7 +104,11 @@ func TestMessagingContract_FieldsAndPagination(t *testing.T) {
 			}
 			for i, want := range tc.fields {
 				field := message.Fields().ByName(protoreflect.Name(want.name))
-				if field == nil || field.Number() != protoreflect.FieldNumber(i+1) {
+				number := protoreflect.FieldNumber(i + 1)
+				if tc.message == "SendMessageRequest" && want.name == "content" {
+					number = 3
+				}
+				if field == nil || field.Number() != number {
 					t.Fatalf("missing or incorrectly numbered field %s", want.name)
 				}
 				kind := protoreflect.StringKind
@@ -114,6 +121,9 @@ func TestMessagingContract_FieldsAndPagination(t *testing.T) {
 				if want.messageType != "" && field.Message().FullName() != want.messageType {
 					t.Errorf("wrong message type for %s: %s", want.name, field.Message().FullName())
 				}
+			}
+			if tc.message == "SendMessageRequest" && (!message.ReservedNames().Has("recipient_id") || !message.ReservedRanges().Has(2)) {
+				t.Error("removed recipient field name and number must remain reserved")
 			}
 		})
 	}

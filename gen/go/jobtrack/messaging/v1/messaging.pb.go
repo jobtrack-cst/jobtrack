@@ -111,9 +111,7 @@ func (x *Message) GetTimestamps() *v1.ResourceTimestamps {
 type SendMessageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ApplicationId string                 `protobuf:"bytes,1,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
-	// Provisional recipient input; participant resolution rules need team review.
-	RecipientId   string `protobuf:"bytes,2,opt,name=recipient_id,json=recipientId,proto3" json:"recipient_id,omitempty"`
-	Content       string `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	Content       string                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -151,13 +149,6 @@ func (*SendMessageRequest) Descriptor() ([]byte, []int) {
 func (x *SendMessageRequest) GetApplicationId() string {
 	if x != nil {
 		return x.ApplicationId
-	}
-	return ""
-}
-
-func (x *SendMessageRequest) GetRecipientId() string {
-	if x != nil {
-		return x.RecipientId
 	}
 	return ""
 }
@@ -331,11 +322,10 @@ const file_jobtrack_messaging_v1_messaging_proto_rawDesc = "" +
 	"\acontent\x18\x05 \x01(\tR\acontent\x12F\n" +
 	"\n" +
 	"timestamps\x18\x06 \x01(\v2&.jobtrack.common.v1.ResourceTimestampsR\n" +
-	"timestamps\"x\n" +
+	"timestamps\"i\n" +
 	"\x12SendMessageRequest\x12%\n" +
-	"\x0eapplication_id\x18\x01 \x01(\tR\rapplicationId\x12!\n" +
-	"\frecipient_id\x18\x02 \x01(\tR\vrecipientId\x12\x18\n" +
-	"\acontent\x18\x03 \x01(\tR\acontent\"O\n" +
+	"\x0eapplication_id\x18\x01 \x01(\tR\rapplicationId\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\tR\acontentJ\x04\b\x02\x10\x03R\frecipient_id\"O\n" +
 	"\x13SendMessageResponse\x128\n" +
 	"\amessage\x18\x01 \x01(\v2\x1e.jobtrack.messaging.v1.MessageR\amessage\"\x83\x01\n" +
 	"\x13ListMessagesRequest\x12%\n" +

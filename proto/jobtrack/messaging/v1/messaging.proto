@@ -9,12 +9,12 @@ option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/messaging/
 
 // MessagingService exposes provisional application-thread operations and routes.
 // Runtime services enforce role, ownership and application-participant access;
-// protobuf does not enforce authorization. Participant verification and recipient
-// resolution remain open architecture questions; no synchronous call is approved.
+// protobuf does not enforce authorization. How application participants are
+// verified remains an open architecture question; no synchronous call is approved.
 service MessagingService {
   // SendMessage derives sender_id from authenticated x-user-id metadata at
-  // runtime and publishes the existing message.sent event. The requested
-  // recipient requires runtime participant authorization, not client trust.
+  // runtime and publishes the existing message.sent event. The runtime determines
+  // the recipient from verified application participants, never client input.
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
     option (google.api.http) = {
       post: "/v1/applications/{application_id}/messages"
@@ -40,9 +40,10 @@ message Message {
 }
 
 message SendMessageRequest {
+  reserved 2;
+  reserved "recipient_id";
+
   string application_id = 1;
-  // Provisional recipient input; participant resolution rules need team review.
-  string recipient_id = 2;
   string content = 3;
 }
 

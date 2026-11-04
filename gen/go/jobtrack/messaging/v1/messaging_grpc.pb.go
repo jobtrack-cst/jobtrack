@@ -29,12 +29,12 @@ const (
 //
 // MessagingService exposes provisional application-thread operations and routes.
 // Runtime services enforce role, ownership and application-participant access;
-// protobuf does not enforce authorization. Participant verification and recipient
-// resolution remain open architecture questions; no synchronous call is approved.
+// protobuf does not enforce authorization. How application participants are
+// verified remains an open architecture question; no synchronous call is approved.
 type MessagingServiceClient interface {
 	// SendMessage derives sender_id from authenticated x-user-id metadata at
-	// runtime and publishes the existing message.sent event. The requested
-	// recipient requires runtime participant authorization, not client trust.
+	// runtime and publishes the existing message.sent event. The runtime determines
+	// the recipient from verified application participants, never client input.
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
 	// ListMessages requires runtime authorization to read the application thread.
 	// Message ordering and content validation limits remain team decisions.
@@ -75,12 +75,12 @@ func (c *messagingServiceClient) ListMessages(ctx context.Context, in *ListMessa
 //
 // MessagingService exposes provisional application-thread operations and routes.
 // Runtime services enforce role, ownership and application-participant access;
-// protobuf does not enforce authorization. Participant verification and recipient
-// resolution remain open architecture questions; no synchronous call is approved.
+// protobuf does not enforce authorization. How application participants are
+// verified remains an open architecture question; no synchronous call is approved.
 type MessagingServiceServer interface {
 	// SendMessage derives sender_id from authenticated x-user-id metadata at
-	// runtime and publishes the existing message.sent event. The requested
-	// recipient requires runtime participant authorization, not client trust.
+	// runtime and publishes the existing message.sent event. The runtime determines
+	// the recipient from verified application participants, never client input.
 	SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
 	// ListMessages requires runtime authorization to read the application thread.
 	// Message ordering and content validation limits remain team decisions.
