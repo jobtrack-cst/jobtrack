@@ -1,0 +1,155 @@
+# JobTrack CI (JT-28). Runs on every pull request and every push to main.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Cancel older runs of the same PR when new commits are pushed.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Go checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          unformatted=$(git ls-files '*.go' ':!:gen/**' | xargs -r gofmt -l)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not formatted. Run gofmt -w on them:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Unit tests with coverage
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Coverage summary
+        run: |
+          echo "### Unit test coverage" >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage.out | tail -n 1 >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
+  proto:
+    name: Proto checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # buf breaking needs the base commit
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: buf lint
+        run: buf lint
+
+      - name: buf breaking
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          buf breaking --against ".git#ref=${base}"
+
+      - name: Generated code is up to date
+        run: |
+          buf generate
+          if [ -n "$(git status --porcelain gen/)" ]; then
+            echo "gen/ is out of date. Run buf generate and commit the result:"
+            git status --porcelain gen/
+            exit 1
+          fi
+
+  images-list:
+    name: Find Dockerfiles
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.find.outputs.list }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: find
+        run: |
+          list=$( { find services functions -mindepth 2 -maxdepth 2 -name Dockerfile -printf '%h\n'
+                    [ -f gateway/Dockerfile ] && echo gateway; } \
+                  | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Found: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+  docker:
+    name: Docker build (${{ matrix.path }})
+    needs: [go, proto, images-list]
+    if: needs.images-list.outputs.list != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        path: ${{ fromJSON(needs.images-list.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Image name
+        id: image
+        run: echo "name=ghcr.io/${{ github.repository_owner }}/$(basename '${{ matrix.path }}')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.path }}/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:sha-${{ github.sha }}
+
+  # Single check to mark as required in branch protection.
+  ci:
+    name: CI passed
+    if: always()
+    needs: [go, proto, images-list, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for r in "${{ needs.go.result }}" "${{ needs.proto.result }}" "${{ needs.images-list.result }}"; do
+            [ "$r" = "success" ] || { echo "A required job did not succeed: $r"; exit 1; }
+          done
+          case "${{ needs.docker.result }}" in
+            success|skipped) echo "All checks passed." ;;
+            *) echo "Docker build failed: ${{ needs.docker.result }}"; exit 1 ;;
+          esac
