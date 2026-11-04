@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package jobtrack.job_alert.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_alert/v1;jobalertv1";
+
+// JobAlertService exposes provisional subscription operations and HTTP routes
+// pending team review. Runtime handlers require applicant role and ownership;
+// protobuf does not enforce authorization or filter validation.
+// The only approved synchronous dependency is
+// CategoryTagInternalService.ResolveNames to validate category/tag IDs and resolve names.
+// At runtime, job.published is consumed and matches publish job_alert.matched
+// using the shared protojson event envelope. Consumers ignore processed event_id
+// values. These event responsibilities do not introduce RPC endpoints.
+service JobAlertService {
+  // CreateJobAlert derives applicant_id from authenticated x-user-id metadata.
+  // Runtime matching combines all three filters with AND: category_id must be
+  // among category_ids, at least one job tag must overlap tag_ids, and location
+  // must equal the stored location name exactly. Each empty filter is unrestricted.
+  // All filters empty or more than 20 IDs in either list: INVALID_ARGUMENT.
+  // Normalize category/tag sets by sorting and deduplicating for subscription
+  // comparison; duplicate subscriptions return ALREADY_EXISTS.
+  // Exceeding 10 subscriptions per applicant: FAILED_PRECONDITION.
+  // Call CategoryTagInternalService.ResolveNames to validate category/tag IDs;
+  // any supplied ID absent from its response is INVALID_ARGUMENT.
+  // Store the job posting location NAME without separate location validation.
+  // Editing is unsupported; delete and recreate the subscription instead.
+  rpc CreateJobAlert(CreateJobAlertRequest) returns (CreateJobAlertResponse) {
+    option (google.api.http) = {
+      post: "/v1/job-alerts"
+      body: "*"
+    };
+  }
+
+  // ListMyJobAlerts lists only subscriptions owned by the authenticated applicant.
+  rpc ListMyJobAlerts(ListMyJobAlertsRequest) returns (ListMyJobAlertsResponse) {
+    option (google.api.http) = {get: "/v1/job-alerts"};
+  }
+
+  // DeleteJobAlert requires runtime ownership checks for the authenticated applicant.
+  rpc DeleteJobAlert(DeleteJobAlertRequest) returns (DeleteJobAlertResponse) {
+    option (google.api.http) = {delete: "/v1/job-alerts/{alert_id}"};
+  }
+}
+
+// JobAlert uses UUID strings for IDs and shared UTC resource timestamps.
+message JobAlert {
+  string alert_id = 1;
+  string applicant_id = 2;
+  repeated string category_ids = 3;
+  repeated string tag_ids = 4;
+  string location = 5;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 6;
+}
+
+message CreateJobAlertRequest {
+  repeated string category_ids = 1;
+  repeated string tag_ids = 2;
+  string location = 3;
+}
+
+message CreateJobAlertResponse {
+  JobAlert job_alert = 1;
+}
+
+message ListMyJobAlertsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListMyJobAlertsResponse {
+  repeated JobAlert job_alerts = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message DeleteJobAlertRequest {
+  string alert_id = 1;
+}
+
+message DeleteJobAlertResponse {}

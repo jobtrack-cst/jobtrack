@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package jobtrack.application_status.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/application_status/v1;applicationstatusv1";
+
+// ApplicationStatusService exposes read-only status and history.
+// Access is limited to the associated applicant or employer; the runtime
+// service must enforce role and ownership using forwarded caller metadata.
+// These proposed HTTP routes remain subject to final cross-team review.
+service ApplicationStatusService {
+  // GetApplicationStatus returns the application's current status.
+  rpc GetApplicationStatus(GetApplicationStatusRequest) returns (GetApplicationStatusResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/status"};
+  }
+
+  // ListApplicationStatusHistory returns a page of recorded transitions.
+  rpc ListApplicationStatusHistory(ListApplicationStatusHistoryRequest) returns (ListApplicationStatusHistoryResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/status-history"};
+  }
+}
+
+// ApplicationStatus represents the lifecycle values in AGENTS.md Section 6.
+// Event-to-transition mapping and final-state withdrawal handling remain open;
+// this enum does not implement or extend transition rules.
+enum ApplicationStatus {
+  APPLICATION_STATUS_UNSPECIFIED = 0;
+  APPLICATION_STATUS_SUBMITTED = 1;
+  APPLICATION_STATUS_UNDER_REVIEW = 2;
+  APPLICATION_STATUS_SHORTLISTED = 3;
+  APPLICATION_STATUS_INTERVIEW = 4;
+  APPLICATION_STATUS_OFFERED = 5;
+  APPLICATION_STATUS_ACCEPTED = 6;
+  APPLICATION_STATUS_DECLINED = 7;
+  APPLICATION_STATUS_REJECTED = 8;
+  APPLICATION_STATUS_WITHDRAWN = 9;
+}
+
+message ApplicationStatusRecord {
+  // UUID string identifying the application.
+  string application_id = 1;
+  ApplicationStatus status = 2;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 3;
+}
+
+message StatusHistoryEntry {
+  ApplicationStatus previous_status = 1;
+  ApplicationStatus new_status = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}
+
+message GetApplicationStatusRequest {
+  string application_id = 1;
+}
+
+message GetApplicationStatusResponse {
+  ApplicationStatusRecord status_record = 1;
+}
+
+message ListApplicationStatusHistoryRequest {
+  string application_id = 1;
+  jobtrack.common.v1.PaginationRequest pagination = 2;
+}
+
+message ListApplicationStatusHistoryResponse {
+  repeated StatusHistoryEntry entries = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}

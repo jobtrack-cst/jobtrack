@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package jobtrack.messaging.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/messaging/v1;messagingv1";
+
+// MessagingService exposes provisional application-thread operations and routes.
+// Runtime services enforce role, ownership and application-participant access;
+// protobuf does not enforce authorization. At runtime, application.submitted
+// maintains local application participants (applicant_id and employer_id).
+// No new synchronous dependency or application.withdrawn consumption is approved.
+// Unknown applications, including submitted events not yet processed: NOT_FOUND.
+service MessagingService {
+  // SendMessage derives sender_id from authenticated x-user-id metadata at
+  // runtime and publishes the existing message.sent event. The runtime determines
+  // the recipient as the other verified application participant, never client input.
+  // A non-participant sender is rejected with PERMISSION_DENIED.
+  // Content must contain 1 to 2000 characters after trimming whitespace;
+  // otherwise the runtime returns INVALID_ARGUMENT.
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/messages"
+      body: "*"
+    };
+  }
+
+  // ListMessages requires runtime authorization to read the application thread
+  // and returns messages oldest first.
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/messages"};
+  }
+}
+
+// Message uses UUID strings for IDs and shared UTC resource timestamps.
+message Message {
+  string message_id = 1;
+  string application_id = 2;
+  string sender_id = 3;
+  string recipient_id = 4;
+  string content = 5;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 6;
+}
+
+message SendMessageRequest {
+  reserved 2;
+  reserved "recipient_id";
+
+  string application_id = 1;
+  string content = 3;
+}
+
+message SendMessageResponse {
+  Message message = 1;
+}
+
+message ListMessagesRequest {
+  string application_id = 1;
+  jobtrack.common.v1.PaginationRequest pagination = 2;
+}
+
+message ListMessagesResponse {
+  repeated Message messages = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}

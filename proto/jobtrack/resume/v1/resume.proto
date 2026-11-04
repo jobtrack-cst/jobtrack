@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package jobtrack.resume.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1;resumev1";
+
+// ResumeService manages the applicant's own resumes through the gateway.
+// Runtime handlers check role and ownership using forwarded caller metadata,
+// never an applicant ID supplied in the request body.
+service ResumeService {
+  // UploadResume stores a resume as PENDING and publishes resume.uploaded.
+  // At runtime, reject empty, invalid or oversized files: decoded content must
+  // be a PDF with MIME type application/pdf and at most 2,000,000 bytes.
+  rpc UploadResume(UploadResumeRequest) returns (UploadResumeResponse) {
+    option (google.api.http) = {
+      post: "/v1/resumes"
+      body: "*"
+    };
+  }
+
+  // GetResume returns metadata for an owned resume. Application calls this
+  // public RPC with forwarded identity and checks ownership and VALIDATED status.
+  rpc GetResume(GetResumeRequest) returns (GetResumeResponse) {
+    option (google.api.http) = {get: "/v1/resumes/{resume_id}"};
+  }
+
+  // ListMyResumes lists only resumes owned by the caller.
+  rpc ListMyResumes(ListMyResumesRequest) returns (ListMyResumesResponse) {
+    option (google.api.http) = {get: "/v1/resumes"};
+  }
+
+  // DownloadResume returns the owned file; protobuf JSON encodes bytes as base64.
+  rpc DownloadResume(DownloadResumeRequest) returns (DownloadResumeResponse) {
+    option (google.api.http) = {get: "/v1/resumes/{resume_id}/content"};
+  }
+}
+
+// ResumeInternalService has no HTTP routes and does not require user identity.
+// Runtime handlers must verify x-internal-token and enforce caller restrictions
+// as specified in AGENTS.md Section 6; this schema does not enforce them.
+service ResumeInternalService {
+  // GetResumeFile fetches the uploaded file. Permitted caller: resume-validator only.
+  rpc GetResumeFile(GetResumeFileRequest) returns (GetResumeFileResponse);
+}
+
+// ResumeValidationStatus changes through resume.validated and resume.rejected
+// events after the initial PENDING state; there is no synchronous update RPC.
+enum ResumeValidationStatus {
+  RESUME_VALIDATION_STATUS_UNSPECIFIED = 0;
+  RESUME_VALIDATION_STATUS_PENDING = 1;
+  RESUME_VALIDATION_STATUS_VALIDATED = 2;
+  RESUME_VALIDATION_STATUS_REJECTED = 3;
+}
+
+// Resume describes a stored file. All IDs are UUID strings.
+message Resume {
+  string resume_id = 1;
+  string applicant_id = 2;
+  string file_name = 3;
+  string content_type = 4;
+  int64 size_bytes = 5;
+  ResumeValidationStatus validation_status = 6;
+  string rejection_reason = 7;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 8;
+}
+
+message UploadResumeRequest {
+  string file_name = 1;
+  string content_type = 2;
+  // Protobuf JSON uses base64; size and PDF checks are runtime validations.
+  bytes content = 3;
+}
+
+message UploadResumeResponse {
+  Resume resume = 1;
+}
+
+message GetResumeRequest {
+  string resume_id = 1;
+}
+
+message GetResumeResponse {
+  Resume resume = 1;
+}
+
+message ListMyResumesRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListMyResumesResponse {
+  repeated Resume resumes = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message DownloadResumeRequest {
+  string resume_id = 1;
+}
+
+message DownloadResumeResponse {
+  string file_name = 1;
+  string content_type = 2;
+  bytes content = 3;
+}
+
+message GetResumeFileRequest {
+  string resume_id = 1;
+}
+
+message GetResumeFileResponse {
+  string resume_id = 1;
+  string applicant_id = 2;
+  string file_name = 3;
+  string content_type = 4;
+  bytes content = 5;
+}
