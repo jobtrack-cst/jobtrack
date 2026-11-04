@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package jobtrack.job_alert.v1;
+
+import "google/api/annotations.proto";
+import "jobtrack/common/v1/common.proto";
+
+option go_package = "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_alert/v1;jobalertv1";
+
+// JobAlertService exposes provisional subscription operations and HTTP routes
+// pending team review. Runtime handlers require applicant role and ownership;
+// protobuf does not enforce authorization or filter validation.
+// The only approved synchronous dependency is
+// CategoryTagInternalService.ResolveNames for category and tag names.
+// At runtime, job.published is consumed and matches publish job_alert.matched
+// using the shared protojson event envelope. Consumers ignore processed event_id
+// values. These event responsibilities do not introduce RPC endpoints.
+service JobAlertService {
+  // CreateJobAlert derives applicant_id from authenticated x-user-id metadata.
+  // ANY/ALL matching, location normalization, empty filters, duplicates and
+  // validation limits remain team decisions, as does future subscription editing.
+  rpc CreateJobAlert(CreateJobAlertRequest) returns (CreateJobAlertResponse) {
+    option (google.api.http) = {
+      post: "/v1/job-alerts"
+      body: "*"
+    };
+  }
+
+  // ListMyJobAlerts lists only subscriptions owned by the authenticated applicant.
+  rpc ListMyJobAlerts(ListMyJobAlertsRequest) returns (ListMyJobAlertsResponse) {
+    option (google.api.http) = {get: "/v1/job-alerts"};
+  }
+
+  // DeleteJobAlert requires runtime ownership checks for the authenticated applicant.
+  rpc DeleteJobAlert(DeleteJobAlertRequest) returns (DeleteJobAlertResponse) {
+    option (google.api.http) = {delete: "/v1/job-alerts/{alert_id}"};
+  }
+}
+
+// JobAlert uses UUID strings for IDs and shared UTC resource timestamps.
+message JobAlert {
+  string alert_id = 1;
+  string applicant_id = 2;
+  repeated string category_ids = 3;
+  repeated string tag_ids = 4;
+  string location = 5;
+  jobtrack.common.v1.ResourceTimestamps timestamps = 6;
+}
+
+message CreateJobAlertRequest {
+  repeated string category_ids = 1;
+  repeated string tag_ids = 2;
+  string location = 3;
+}
+
+message CreateJobAlertResponse {
+  JobAlert job_alert = 1;
+}
+
+message ListMyJobAlertsRequest {
+  jobtrack.common.v1.PaginationRequest pagination = 1;
+}
+
+message ListMyJobAlertsResponse {
+  repeated JobAlert job_alerts = 1;
+  jobtrack.common.v1.PaginationResponse pagination = 2;
+}
+
+message DeleteJobAlertRequest {
+  string alert_id = 1;
+}
+
+message DeleteJobAlertResponse {}
