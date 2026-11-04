@@ -38,6 +38,9 @@ type ApplicationServiceClient interface {
 	// forwarded identity. The job must be PUBLISHED and before its deadline;
 	// the resume must belong to the applicant and be VALIDATED. The employer ID
 	// comes from the trusted Job Posting response. Publish application.submitted.
+	// Job not found: NOT_FOUND. Job closed or past deadline: FAILED_PRECONDITION.
+	// Resume not owned by the applicant: PERMISSION_DENIED.
+	// Resume not VALIDATED: FAILED_PRECONDITION.
 	SubmitApplication(ctx context.Context, in *SubmitApplicationRequest, opts ...grpc.CallOption) (*SubmitApplicationResponse, error)
 	// WithdrawApplication publishes application.withdrawn at runtime.
 	// Repeat withdrawals and final-state eligibility remain team decisions.
@@ -109,6 +112,9 @@ type ApplicationServiceServer interface {
 	// forwarded identity. The job must be PUBLISHED and before its deadline;
 	// the resume must belong to the applicant and be VALIDATED. The employer ID
 	// comes from the trusted Job Posting response. Publish application.submitted.
+	// Job not found: NOT_FOUND. Job closed or past deadline: FAILED_PRECONDITION.
+	// Resume not owned by the applicant: PERMISSION_DENIED.
+	// Resume not VALIDATED: FAILED_PRECONDITION.
 	SubmitApplication(context.Context, *SubmitApplicationRequest) (*SubmitApplicationResponse, error)
 	// WithdrawApplication publishes application.withdrawn at runtime.
 	// Repeat withdrawals and final-state eligibility remain team decisions.

@@ -265,7 +265,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // ResumeInternalService has no HTTP routes and does not require user identity.
-// Caller restrictions must be enforced by the runtime, not this schema.
+// Runtime handlers must verify x-internal-token and enforce caller restrictions
+// as specified in AGENTS.md Section 6; this schema does not enforce them.
 type ResumeInternalServiceClient interface {
 	// GetResumeFile fetches the uploaded file. Permitted caller: resume-validator only.
 	GetResumeFile(ctx context.Context, in *GetResumeFileRequest, opts ...grpc.CallOption) (*GetResumeFileResponse, error)
@@ -294,7 +295,8 @@ func (c *resumeInternalServiceClient) GetResumeFile(ctx context.Context, in *Get
 // for forward compatibility.
 //
 // ResumeInternalService has no HTTP routes and does not require user identity.
-// Caller restrictions must be enforced by the runtime, not this schema.
+// Runtime handlers must verify x-internal-token and enforce caller restrictions
+// as specified in AGENTS.md Section 6; this schema does not enforce them.
 type ResumeInternalServiceServer interface {
 	// GetResumeFile fetches the uploaded file. Permitted caller: resume-validator only.
 	GetResumeFile(context.Context, *GetResumeFileRequest) (*GetResumeFileResponse, error)

@@ -29,15 +29,20 @@ const (
 //
 // MessagingService exposes provisional application-thread operations and routes.
 // Runtime services enforce role, ownership and application-participant access;
-// protobuf does not enforce authorization. How application participants are
-// verified remains an open architecture question; no synchronous call is approved.
+// protobuf does not enforce authorization. At runtime, application.submitted
+// maintains local application participants (applicant_id and employer_id).
+// No new synchronous dependency or application.withdrawn consumption is approved.
+// Unknown applications, including submitted events not yet processed: NOT_FOUND.
 type MessagingServiceClient interface {
 	// SendMessage derives sender_id from authenticated x-user-id metadata at
 	// runtime and publishes the existing message.sent event. The runtime determines
-	// the recipient from verified application participants, never client input.
+	// the recipient as the other verified application participant, never client input.
+	// A non-participant sender is rejected with PERMISSION_DENIED.
+	// Content must contain 1 to 2000 characters after trimming whitespace;
+	// otherwise the runtime returns INVALID_ARGUMENT.
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
-	// ListMessages requires runtime authorization to read the application thread.
-	// Message ordering and content validation limits remain team decisions.
+	// ListMessages requires runtime authorization to read the application thread
+	// and returns messages oldest first.
 	ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error)
 }
 
@@ -75,15 +80,20 @@ func (c *messagingServiceClient) ListMessages(ctx context.Context, in *ListMessa
 //
 // MessagingService exposes provisional application-thread operations and routes.
 // Runtime services enforce role, ownership and application-participant access;
-// protobuf does not enforce authorization. How application participants are
-// verified remains an open architecture question; no synchronous call is approved.
+// protobuf does not enforce authorization. At runtime, application.submitted
+// maintains local application participants (applicant_id and employer_id).
+// No new synchronous dependency or application.withdrawn consumption is approved.
+// Unknown applications, including submitted events not yet processed: NOT_FOUND.
 type MessagingServiceServer interface {
 	// SendMessage derives sender_id from authenticated x-user-id metadata at
 	// runtime and publishes the existing message.sent event. The runtime determines
-	// the recipient from verified application participants, never client input.
+	// the recipient as the other verified application participant, never client input.
+	// A non-participant sender is rejected with PERMISSION_DENIED.
+	// Content must contain 1 to 2000 characters after trimming whitespace;
+	// otherwise the runtime returns INVALID_ARGUMENT.
 	SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
-	// ListMessages requires runtime authorization to read the application thread.
-	// Message ordering and content validation limits remain team decisions.
+	// ListMessages requires runtime authorization to read the application thread
+	// and returns messages oldest first.
 	ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error)
 	mustEmbedUnimplementedMessagingServiceServer()
 }

@@ -32,14 +32,23 @@ const (
 // pending team review. Runtime handlers require applicant role and ownership;
 // protobuf does not enforce authorization or filter validation.
 // The only approved synchronous dependency is
-// CategoryTagInternalService.ResolveNames for category and tag names.
+// CategoryTagInternalService.ResolveNames to validate category/tag IDs and resolve names.
 // At runtime, job.published is consumed and matches publish job_alert.matched
 // using the shared protojson event envelope. Consumers ignore processed event_id
 // values. These event responsibilities do not introduce RPC endpoints.
 type JobAlertServiceClient interface {
 	// CreateJobAlert derives applicant_id from authenticated x-user-id metadata.
-	// ANY/ALL matching, location normalization, empty filters, duplicates and
-	// validation limits remain team decisions, as does future subscription editing.
+	// Runtime matching combines all three filters with AND: category_id must be
+	// among category_ids, at least one job tag must overlap tag_ids, and location
+	// must equal the stored location name exactly. Each empty filter is unrestricted.
+	// All filters empty or more than 20 IDs in either list: INVALID_ARGUMENT.
+	// Normalize category/tag sets by sorting and deduplicating for subscription
+	// comparison; duplicate subscriptions return ALREADY_EXISTS.
+	// Exceeding 10 subscriptions per applicant: FAILED_PRECONDITION.
+	// Call CategoryTagInternalService.ResolveNames to validate category/tag IDs;
+	// any supplied ID absent from its response is INVALID_ARGUMENT.
+	// Store the job posting location NAME without separate location validation.
+	// Editing is unsupported; delete and recreate the subscription instead.
 	CreateJobAlert(ctx context.Context, in *CreateJobAlertRequest, opts ...grpc.CallOption) (*CreateJobAlertResponse, error)
 	// ListMyJobAlerts lists only subscriptions owned by the authenticated applicant.
 	ListMyJobAlerts(ctx context.Context, in *ListMyJobAlertsRequest, opts ...grpc.CallOption) (*ListMyJobAlertsResponse, error)
@@ -93,14 +102,23 @@ func (c *jobAlertServiceClient) DeleteJobAlert(ctx context.Context, in *DeleteJo
 // pending team review. Runtime handlers require applicant role and ownership;
 // protobuf does not enforce authorization or filter validation.
 // The only approved synchronous dependency is
-// CategoryTagInternalService.ResolveNames for category and tag names.
+// CategoryTagInternalService.ResolveNames to validate category/tag IDs and resolve names.
 // At runtime, job.published is consumed and matches publish job_alert.matched
 // using the shared protojson event envelope. Consumers ignore processed event_id
 // values. These event responsibilities do not introduce RPC endpoints.
 type JobAlertServiceServer interface {
 	// CreateJobAlert derives applicant_id from authenticated x-user-id metadata.
-	// ANY/ALL matching, location normalization, empty filters, duplicates and
-	// validation limits remain team decisions, as does future subscription editing.
+	// Runtime matching combines all three filters with AND: category_id must be
+	// among category_ids, at least one job tag must overlap tag_ids, and location
+	// must equal the stored location name exactly. Each empty filter is unrestricted.
+	// All filters empty or more than 20 IDs in either list: INVALID_ARGUMENT.
+	// Normalize category/tag sets by sorting and deduplicating for subscription
+	// comparison; duplicate subscriptions return ALREADY_EXISTS.
+	// Exceeding 10 subscriptions per applicant: FAILED_PRECONDITION.
+	// Call CategoryTagInternalService.ResolveNames to validate category/tag IDs;
+	// any supplied ID absent from its response is INVALID_ARGUMENT.
+	// Store the job posting location NAME without separate location validation.
+	// Editing is unsupported; delete and recreate the subscription instead.
 	CreateJobAlert(context.Context, *CreateJobAlertRequest) (*CreateJobAlertResponse, error)
 	// ListMyJobAlerts lists only subscriptions owned by the authenticated applicant.
 	ListMyJobAlerts(context.Context, *ListMyJobAlertsRequest) (*ListMyJobAlertsResponse, error)
