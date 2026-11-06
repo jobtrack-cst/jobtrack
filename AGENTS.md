@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 5 Nov 2026 (JT-21 confirmed cross-team contract decisions)
+- Last updated: 6 Nov 2026 (JT-37 Sprint 1 dates and decisions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -443,11 +443,12 @@ A task or story is Done only when:
 | Sprint | Dates | Goal |
 |---|---|---|
 | Sprint 0 | 2 to 3 Nov | Development foundation: repo, contracts for all 20 services, golden template, CI, local environment, proven cluster setup |
-| Sprint 1 | 4 to 6 Nov | All 20 services and the gateway running with basic operations |
-| Sprint 2 | 7 to 9 Nov | Core flow working end to end with events and the first functions |
-| Sprint 3 | 10 to 12 Nov | Full business logic, all 5 functions, frontend for all roles, integration tests |
-| Sprint 4 | 13 to 15 Nov | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
-| Buffer | 16 to 17 Nov | Only if needed |
+| Sprint 1 | 6 to 8 Nov | All 20 services and the gateway running in Docker Compose with their basic public operations and tests |
+| Sprint 2 | 9 to 11 Nov | Core flow working end to end with events and the first functions |
+| Sprint 3 | 12 to 14 Nov | Full business logic, all 5 functions, frontend for all roles, integration tests |
+| Sprint 4 | 15 to 17 Nov | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
+
+There is no buffer. Sprint 4 ends on 17 Nov, so any slip affects the final date directly (see the risk register in `docs/pm`).
 
 Presentation date: not yet announced (likely to be postponed).
 
@@ -455,10 +456,12 @@ Ceremonies: sprint planning (1 hour), daily stand-up (15 minutes), combined spri
 
 ### Current sprint
 
-- Sprint: Sprint 0 (2 to 3 Nov), started on 2 Nov 2026
-- Goal: Development foundation ready: repo, contracts for all 20 services, golden template, CI, local environment, and a proven cluster setup.
-- Tasks: JT-16 to JT-29 (see Jira)
-- Order: JT-16 (repo) and JT-18 (buf and event contracts) first, because JT-21 and JT-23 (service contracts) depend on them. Tasks that do not need the repo yet (charter, test plan, Docker Compose) start in parallel.
+- Sprint: Sprint 1 (6 to 8 Nov), started on 6 Nov 2026
+- Goal: All 20 services and the gateway running in Docker Compose with their basic public operations and tests. Committed minimum: the Must tasks needed for the apply-for-a-job flow.
+- Tasks: JT-30 to JT-52, plus JT-20, JT-22 and JT-29 carried over from Sprint 0 (see Jira)
+- Scope: each service works on its own with public RPCs, authorisation, migrations, tests and Docker Compose. Cross-service calls are port interfaces mocked with gomock. Events and real cross-service clients move to Sprint 2.
+- Commitment: Must tasks (Jira priority High) are the committed minimum. Should tasks (Medium) are planned; unfinished ones move to the top of Sprint 2.
+- No sub-tasks in Sprint 1. The acceptance criteria in each task are the checklist.
 - Cluster host machine: Phuntsho's laptop; RAM must still be verified against the 16 GB minimum requirement
 - Daily stand-up: Flexible, coordinated by the team each day (15 minutes).
 
@@ -500,6 +503,14 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 5 Nov 2026 | Record Team A and Team B's confirmed PR #11 Job Alert decisions: category membership, any tag overlap and exact location name, combined with AND; empty individual filters are unrestricted, all-empty filters invalid; normalized category/tag sets identify duplicates; maximum 10 subscriptions per applicant and 20 IDs per filter list; validate IDs through `ResolveNames`; delete and recreate instead of editing | Define matching and validation within the existing Category Tag dependency; detailed error mappings are in the contract comments |
 | 5 Nov 2026 | Record Team A and Team B's confirmed PR #11 submission error mapping: missing job `NOT_FOUND`, closed or expired job and unvalidated resume `FAILED_PRECONDITION`, wrong resume owner `PERMISSION_DENIED` | Make existing Job Posting and Resume eligibility checks consistent without changing their calls |
 | 5 Nov 2026 | Reaffirm Team A and Team B's PR #11 Resume internal-call requirement: runtime `x-internal-token` verification, with `GetResumeFile` restricted to `resume-validator` and no HTTP route | Clarify the existing internal security design without changing signatures or public resume permissions |
+| 5 Nov 2026 | Sprint dates (Option B): Sprint 1 6 to 8 Nov, Sprint 2 9 to 11, Sprint 3 12 to 14, Sprint 4 15 to 17; no buffer | Sprint 1 could not start before 6 Nov; keeps four 3-day sprints within the 17 Nov end date |
+| 5 Nov 2026 | JT-29 (cluster spike) reassigned from Sangay to Phuntsho | The spike runs on Phuntsho's laptop, the cluster host |
+| 5 Nov 2026 | Service ownership unchanged; Jigden keeps his six services and the gateway | Avoids handover cost mid-project; Sangay, as pair partner, can take over a task if Jigden falls behind |
+| 5 Nov 2026 | `auth` hashes passwords with bcrypt from `golang.org/x/crypto` | Standard, maintained Go library; closes the Section 16 question |
+| 5 Nov 2026 | Frontend shell moved to the Sprint 2 backlog | Sprint 1 focuses on services and the gateway running on their own |
+| 5 Nov 2026 | Sprint 1 services run on their own; cross-service calls are gomock-mocked ports; events and real clients move to Sprint 2 | Each member can build and test without waiting for other services |
+| 5 Nov 2026 | Must tasks are the committed Sprint 1 minimum; unfinished Should tasks move to the top of Sprint 2 | Protects the apply-for-a-job flow if the sprint runs short |
+| 5 Nov 2026 | No sub-tasks in Sprint 1 | Short sprint; acceptance criteria already work as the checklist |
 
 ---
 
@@ -513,6 +524,5 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
-- Password hashing library for `auth` to be agreed (suggestion: bcrypt from `golang.org/x/crypto`).
 - Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests.
 - How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
