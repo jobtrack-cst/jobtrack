@@ -116,9 +116,10 @@ func TestAuth_Login(t *testing.T) {
 			},
 		},
 		{
-			name: "unknown email", email: email, wantErr: domain.ErrInvalidCredentials,
+			name: "unknown email still runs a dummy password check", email: email, wantErr: domain.ErrInvalidCredentials,
 			setup: func(d deps) {
 				d.users.EXPECT().GetByEmail(gomock.Any(), email).Return(domain.User{}, domain.ErrUserNotFound)
+				d.hasher.EXPECT().Compare("", password).Return(domain.ErrInvalidCredentials)
 			},
 		},
 		{
@@ -165,6 +166,7 @@ func TestAuth_Login(t *testing.T) {
 func TestAuth_Login_SameErrorForWrongEmailAndWrongPassword(t *testing.T) {
 	auth, d := newAuth(t)
 	d.users.EXPECT().GetByEmail(gomock.Any(), "nobody@cst.edu.bt").Return(domain.User{}, domain.ErrUserNotFound)
+	d.hasher.EXPECT().Compare("", password).Return(domain.ErrInvalidCredentials)
 	d.users.EXPECT().GetByEmail(gomock.Any(), email).Return(domain.User{PasswordHash: hash}, nil)
 	d.hasher.EXPECT().Compare(hash, password).Return(domain.ErrInvalidCredentials)
 

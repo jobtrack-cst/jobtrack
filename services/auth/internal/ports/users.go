@@ -26,6 +26,8 @@ type UserRepository interface {
 type PasswordHasher interface {
 	Hash(password string) (string, error)
 	// Compare returns domain.ErrInvalidCredentials when the password does not match.
+	// An empty hash still does a full (dummy) check and returns ErrInvalidCredentials,
+	// so login takes the same time whether or not the email exists.
 	Compare(hash, password string) error
 }
 

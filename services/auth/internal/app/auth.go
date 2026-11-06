@@ -64,6 +64,8 @@ func (a *Auth) Login(ctx context.Context, email, password string) (LoginResult, 
 	}
 	user, err := a.users.GetByEmail(ctx, normalized)
 	if errors.Is(err, domain.ErrUserNotFound) {
+		// Run a dummy bcrypt check so unknown emails take as long as wrong passwords.
+		_ = a.hasher.Compare("", password)
 		return LoginResult{}, domain.ErrInvalidCredentials
 	}
 	if err != nil {
