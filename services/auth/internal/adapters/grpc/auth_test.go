@@ -3,6 +3,7 @@ package grpc_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -138,6 +139,19 @@ func TestAuthHandler_Login(t *testing.T) {
 		wantCode(t, wrongEmail, codes.Unauthenticated)
 		if status.Convert(wrongEmail).Message() != status.Convert(wrongPass).Message() || status.Code(wrongPass) != codes.Unauthenticated {
 			t.Fatalf("errors differ: %v / %v", wrongEmail, wrongPass)
+		}
+	})
+
+	t.Run("73-byte password gets the same UNAUTHENTICATED error as a wrong password", func(t *testing.T) {
+		h, _, d := newHandlers(t)
+		d.users.EXPECT().GetByEmail(gomock.Any(), testEmail).Return(stored, nil)
+		d.hasher.EXPECT().Compare(testHash, testPass).Return(domain.ErrInvalidCredentials)
+
+		_, tooLong := h.Login(context.Background(), &authv1.LoginRequest{Email: testEmail, Password: strings.Repeat("a", 73)})
+		_, wrongPass := h.Login(context.Background(), &authv1.LoginRequest{Email: testEmail, Password: testPass})
+		wantCode(t, tooLong, codes.Unauthenticated)
+		if status.Convert(tooLong).Message() != status.Convert(wrongPass).Message() {
+			t.Fatalf("messages differ: %v / %v", tooLong, wrongPass)
 		}
 	})
 

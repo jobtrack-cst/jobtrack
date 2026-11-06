@@ -58,6 +58,11 @@ func (a *Auth) Register(ctx context.Context, email, password, fullName string, r
 
 // Login returns ErrInvalidCredentials for every kind of wrong email or password.
 func (a *Auth) Login(ctx context.Context, email, password string) (LoginResult, error) {
+	// bcrypt refuses passwords over 72 bytes, and registration never allows them,
+	// so they can never match. Reject them here instead of returning INTERNAL.
+	if len(password) > domain.MaxPasswordBytes {
+		return LoginResult{}, domain.ErrInvalidCredentials
+	}
 	normalized, err := domain.NormalizeEmail(email)
 	if err != nil {
 		return LoginResult{}, domain.ErrInvalidCredentials

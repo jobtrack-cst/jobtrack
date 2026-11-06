@@ -162,6 +162,37 @@ func TestAuth_Login(t *testing.T) {
 	}
 }
 
+// Regression for PR #13 review: bcrypt rejects passwords over 72 bytes, so login
+// must treat them as invalid credentials, never as an INTERNAL error.
+func TestAuth_Login_PasswordByteLimit(t *testing.T) {
+	stored := domain.User{ID: userID, Email: email, Role: domain.RoleApplicant, PasswordHash: hash}
+	tibetanKa := "ཀ" // 3 bytes in UTF-8
+	for _, tt := range []struct {
+		name          string
+		password      string
+		reachesBcrypt bool
+	}{
+		{name: "exactly 72 ASCII bytes is checked normally", password: strings.Repeat("a", 72), reachesBcrypt: true},
+		{name: "73 ASCII bytes is rejected", password: strings.Repeat("a", 73)},
+		{name: "exactly 72 bytes of 3-byte characters is checked normally", password: strings.Repeat(tibetanKa, 24), reachesBcrypt: true},
+		{name: "72 bytes of 3-byte characters plus one byte is rejected", password: strings.Repeat(tibetanKa, 24) + "a"},
+		{name: "72 characters but 73 bytes is rejected", password: strings.Repeat("a", 71) + "é"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			auth, d := newAuth(t)
+			if tt.reachesBcrypt {
+				d.users.EXPECT().GetByEmail(gomock.Any(), email).Return(stored, nil)
+				d.hasher.EXPECT().Compare(hash, tt.password).Return(domain.ErrInvalidCredentials)
+			}
+			// Over-limit passwords must not reach storage or bcrypt; gomock fails on unexpected calls.
+			_, err := auth.Login(context.Background(), email, tt.password)
+			if !errors.Is(err, domain.ErrInvalidCredentials) {
+				t.Fatalf("err=%v, want ErrInvalidCredentials", err)
+			}
+		})
+	}
+}
+
 // The acceptance criteria require the same message for wrong email and wrong password.
 func TestAuth_Login_SameErrorForWrongEmailAndWrongPassword(t *testing.T) {
 	auth, d := newAuth(t)
