@@ -14,9 +14,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/postgres"
+	"github.com/jobtrack-cst/jobtrack/services/application/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/ports"
+	"github.com/jobtrack-cst/jobtrack/services/application/internal/ports/mocks"
 	pgcontainer "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestRepository_PostgresPersistenceIsolationAndConcurrency(t *testing.T) {
@@ -71,6 +77,38 @@ func TestRepository_PostgresPersistenceIsolationAndConcurrency(t *testing.T) {
 	if !errors.Is(err, domain.ErrDuplicate) {
 		t.Fatalf("duplicate: %v", err)
 	}
+	// Exercise the use case with the real repository: duplicate detection is
+	// scoped to the authenticated applicant/job, including withdrawn records.
+	checkDuplicatePrecedence := func(phase string) {
+		t.Run(phase, func(t *testing.T) {
+			for _, tt := range []struct {
+				name, applicantID, jobID string
+				published                bool
+				want                     codes.Code
+			}{
+				{"closed", owner, job, false, codes.AlreadyExists},
+				{"expired", owner, job, true, codes.AlreadyExists},
+				{"different applicant", uuid.NewString(), job, false, codes.FailedPrecondition},
+				{"different job", owner, uuid.NewString(), false, codes.FailedPrecondition},
+			} {
+				t.Run(tt.name, func(t *testing.T) {
+					ctrl := gomock.NewController(t)
+					jobs := mocks.NewMockJobPosting(ctrl)
+					resumes := mocks.NewMockResume(ctrl)
+					requestCtx := metadata.NewIncomingContext(ctx, metadata.Pairs("x-user-id", tt.applicantID, "x-user-role", "applicant"))
+					if tt.want != codes.AlreadyExists {
+						jobs.EXPECT().GetJob(requestCtx, tt.jobID).Return(domain.Job{ID: tt.jobID, EmployerID: employer, Published: tt.published, Deadline: time.Now().Add(-time.Hour)}, nil)
+					}
+					service := app.NewService(repo, jobs, resumes)
+					_, err := service.Submit(requestCtx, tt.jobID, a.ResumeID)
+					if status.Code(err) != tt.want {
+						t.Fatalf("code=%v want=%v", status.Code(err), tt.want)
+					}
+				})
+			}
+		})
+	}
+	checkDuplicatePrecedence("submitted duplicate precedence")
 	for _, tt := range []struct {
 		name string
 		f    ports.Filter
@@ -131,6 +169,7 @@ func TestRepository_PostgresPersistenceIsolationAndConcurrency(t *testing.T) {
 	if !errors.Is(err, domain.ErrDuplicate) {
 		t.Fatal("withdrawn duplicate accepted")
 	}
+	checkDuplicatePrecedence("withdrawn duplicate precedence")
 	job = uuid.NewString()
 	successes.Store(0)
 	for range 8 {

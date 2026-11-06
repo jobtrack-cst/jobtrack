@@ -6,6 +6,7 @@ import (
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/domain"
+	"github.com/jobtrack-cst/jobtrack/services/application/internal/ports"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/ports/mocks"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
@@ -31,6 +32,7 @@ func TestApplicationHandler_PublicRPCs(t *testing.T) {
 			var err error
 			switch name {
 			case "submit":
+				r.EXPECT().List(ctx, ports.Filter{ApplicantID: owner, JobID: id, Limit: 1}).Return(nil, int64(0), nil)
 				j.EXPECT().GetJob(ctx, id).Return(domain.Job{ID: id, EmployerID: id, Published: true, Deadline: time.Now().Add(time.Hour)}, nil)
 				v.EXPECT().GetResume(ctx, id).Return(domain.Resume{ID: id, ApplicantID: owner, Validated: true}, nil)
 				r.EXPECT().Create(ctx, gomock.Any()).Return(a, nil)

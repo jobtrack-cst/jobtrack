@@ -80,6 +80,14 @@ func (s *Service) Submit(ctx context.Context, jobID, resumeID string) (domain.Ap
 			return zero, err
 		}
 	}
+	// Existing applications take precedence over eligibility that may have changed.
+	existing, _, err := s.repo.List(ctx, ports.Filter{ApplicantID: i.UserID, JobID: jobID, Limit: 1})
+	if err != nil {
+		return zero, mapped(err)
+	}
+	if len(existing) != 0 {
+		return zero, mapped(domain.ErrDuplicate)
+	}
 	if s.jobs == nil || s.resumes == nil {
 		return zero, status.Error(codes.Unavailable, "eligibility clients are deferred to Sprint 2")
 	}

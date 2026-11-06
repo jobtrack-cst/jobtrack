@@ -12,8 +12,9 @@ The task owner (Phuntsho Namgyel) explicitly approved the following service deci
 - Only applicants submit/withdraw, with the applicant ID derived from `pkg/authctx`.
 - Repeat withdrawal returns `FAILED_PRECONDITION`. Withdrawal changes only the local `withdrawn` flag, without a lifecycle lookup.
 - A unique applicant/job pair remains reserved after withdrawal. No resubmission or deletion is introduced.
+- During the PR #15 edge-case review, the task owner explicitly approved duplicate precedence: after authentication and request validation, an existing applicant/job pair returns `ALREADY_EXISTS` before job/resume eligibility checks, including after the job closes or expires.
 
-The existing repository decision log and proto override the generic eligibility-failure wording: another applicant's resume returns `PERMISSION_DENIED`; missing resources return `NOT_FOUND`; closed/expired jobs and unvalidated resumes return `FAILED_PRECONDITION`.
+The existing repository decision log and proto override the generic eligibility-failure wording: another applicant's resume returns `PERMISSION_DENIED`; missing resources return `NOT_FOUND`; closed/expired jobs and unvalidated resumes return `FAILED_PRECONDITION` when no application already exists for that applicant/job pair.
 
 ## Input limits and PR notes
 
@@ -21,14 +22,14 @@ There are no free-text fields in the existing Application requests, so no title/
 
 Pagination uses the existing shared messages: default size 20, explicit sizes 1–100, negative/over-100 sizes invalid. Page tokens are canonical decimal offsets, at most 10 characters and at most 2147483547; negative, padded, nonnumeric or oversized values are invalid. Results sort by creation time descending, then UUID descending. Total count and page use one repeatable-read snapshot. Offset pagination can shift between requests if new applications arrive; tokens never bypass caller filters.
 
-Real cross-service clients and events remain deferred to Sprint 2. Runtime Submit returns `UNAVAILABLE` until those clients are wired; it never bypasses eligibility. Get/List/Withdraw use the real repository. Health checks PostgreSQL readiness, not the deliberately deferred clients. Compose uses the standard pgx `PGPASSWORD` environment alongside a password-free `DATABASE_URL`. Application startup does not initialize or depend on RabbitMQ; the shared Compose environment remains available for Sprint 2.
+Real cross-service clients and events remain deferred to Sprint 2. Runtime Submit for a new applicant/job pair returns `UNAVAILABLE` until those clients are wired; it never bypasses eligibility. Get/List/Withdraw use the real repository. Health checks PostgreSQL readiness, not the deliberately deferred clients. Compose uses the standard pgx `PGPASSWORD` environment alongside a password-free `DATABASE_URL`. Application startup does not initialize or depend on RabbitMQ; the shared Compose environment remains available for Sprint 2.
 
 ## Test matrix
 
 | Case | Technique | Expected result | Automated coverage |
 |---|---|---|---|
 | JT43-01 Valid published job, future deadline, owned validated resume | Valid partition | Persist generated ID, trusted employer, caller applicant, UTC timestamps | app submit; RPC submit; PostgreSQL persistence |
-| JT43-02 Closed job, expired job, exact deadline | Boundary values | `FAILED_PRECONDITION`; no resume lookup/write | app eligibility; domain deadline ±1 ns |
+| JT43-02 First submission: closed job, expired job, exact deadline | Boundary values | `FAILED_PRECONDITION`; no resume lookup/write | app eligibility; domain deadline ±1 ns |
 | JT43-03 Job missing, unavailable, malformed response | Error partitions | `NOT_FOUND`, `UNAVAILABLE`, `INTERNAL`; no write | app eligibility |
 | JT43-04 Resume missing/unavailable/malformed response | Error partitions | Mapped dependency failure; no write | app eligibility |
 | JT43-05 Resume owned by another applicant | Authorization | `PERMISSION_DENIED`; no write | app eligibility |
@@ -53,6 +54,8 @@ Real cross-service clients and events remain deferred to Sprint 2. Runtime Submi
 | JT43-24 Deferred clients | Sprint boundary | Valid Submit fails closed with `UNAVAILABLE` | app unit test |
 | JT43-25 Reserved database password characters | Regression partitions | pgx preserves `@`, `:`, `/`, `?`, `#`, `%`, combined characters, quotes, backslash and spaces without changing the hostname | table-driven pgx parser tests; live PostgreSQL startup authentication with combined reserved characters |
 | JT43-26 Canceled/invalid startup | Failure/secret handling | Canceled startup never opens the database; invalid configuration errors contain no synthetic password | server unit tests |
+| JT43-27 Existing application after job closes/expires | State/precedence regression | `ALREADY_EXISTS` before eligibility; submitted/withdrawn rows included; other applicants/jobs remain isolated | two-submit gomock regression; real PostgreSQL/use-case integration |
+| JT43-28 Duplicate lookup failure | Failure partitions | Safe `INTERNAL` / cancellation error; no eligibility call or insert | app unit tests |
 
 ## Reproduction
 
@@ -105,8 +108,8 @@ Coverage from Go profiles (statement-weighted; generated gomock source excluded 
 | Domain | 100% | 100% |
 | Application use cases | 100% | 100% |
 | gRPC adapters | 100% | 100% |
-| Entire production application service | 276/333 = **82.88%** | 317/333 = **95.20%** |
-| Entire application service including generated mocks | 276/388 = 71.13% | 317/388 = **81.70%** |
+| Entire production application service | 281/338 = **83.14%** | 319/338 = **94.38%** |
+| Entire application service including generated mocks | 281/393 = 71.50% | 319/393 = **81.17%** |
 
 The initial integration test exposed timezone-location differences on PostgreSQL timestamp decoding. The repository now normalizes decoded timestamps to UTC; the subsequent persistence and race runs passed.
 
@@ -137,9 +140,9 @@ RabbitMQ authentication is not required or exercised by the Sprint 1 application
 | 11 Sprint 2 clients/events deferred | PASS | No real clients/events; runtime Submit fails closed until wiring |
 | 12 Table-driven unit tests | PASS | Valid/invalid partitions, permissions, ownership, state transitions and boundaries |
 | 13 Testcontainers integration | PASS | Integration build tag; JT-20 PostgreSQL/migration pattern; isolated cleanup |
-| 14 At least 80% coverage | PASS | Production unit 82.88%; integration 95.20%; raw integration including mocks 81.70% |
+| 14 At least 80% coverage | PASS | Production unit 83.14%; integration 94.38%; raw integration including mocks 81.17% |
 | 15 Compose/startup/health | PASS | Compose config/image and actual persisted Compose application startup/HTTP 200; startup migrations verified |
-| 16 Traceable test cases | PASS | JT43-01 through JT43-26 above |
+| 16 Traceable test cases | PASS | JT43-01 through JT43-28 above |
 
 ## Changed files and review notes
 
@@ -151,3 +154,21 @@ RabbitMQ authentication is not required or exercised by the Sprint 1 application
 Final review found no changes to protobuf contracts, generated protobuf files, other owners' services, shared Go source or `.env`; no secrets added. Full cluster, frontend, real eligibility clients and event publishing remain outside JT-43. The owner authorized committing, pushing and opening a PR after these checks; merge and Jira updates are excluded.
 
 Review the PR and its CI results, then rerun local checks as needed. No merge or Jira update is performed by this workflow. The task is not Done under the project Definition of Done until the remaining review/CI, merge and time-tracking requirements are met.
+
+
+## PR #15 duplicate-precedence follow-up
+
+The focused `TestApplication_Submit_DuplicateAfterJobBecomesIneligible` first reproduced the issue against the original service: after a successful submission, both closing and expiring the job returned `FailedPrecondition` where the regression expected `AlreadyExists`. JT-43 states that duplicate submissions return `ALREADY_EXISTS`; AGENTS.md maps closed/expired jobs to `FAILED_PRECONDITION`, but neither explicitly states precedence when both apply. The task owner then explicitly confirmed: **duplicates take precedence after authentication and request validation, before job/resume eligibility**. No proto rule was invented or contract changed.
+
+The eight-line production correction reuses the existing repository `List` port with the authenticated applicant ID, requested job ID and limit 1. It includes withdrawn applications and maps lookup failures safely. Eligibility checks for new pairs remain unchanged. The lookup is supplementary: the existing PostgreSQL unique applicant/job constraint still rejects concurrent inserts if two requests both initially see no application. The existing unit case returning `ErrDuplicate` after a clear lookup and PostgreSQL concurrent-insert tests retain coverage of this race.
+
+New regression coverage includes two sequential submissions followed by closed/expired jobs, duplicate detection with deferred eligibility clients, withdrawn records, lookup failures, and use-case integration with the real PostgreSQL repository. The integration tests also verify a different applicant or different job does not cause a false duplicate. Existing authorization/input tests ensure those checks still run before repository access.
+
+Follow-up verification executed successfully:
+
+- `go test ./services/application/internal/app ./services/application/internal/adapters/grpc -count=1`
+- `go test -race -coverprofile=/tmp/jt43-unit.cover ./...`
+- `go test -race -tags=integration -coverprofile=/tmp/jt43-integration.cover ./services/application/...`
+- `go vet ./...`, `go build ./...`, formatting and `git diff --check`
+
+Coverage in the table above is refreshed from these follow-up profiles. Earlier Compose verification remains historical evidence from the initial PR implementation; this follow-up does not alter Compose, credentials or infrastructure and does not rebuild/restart the running service. Real cross-service clients and event publishing remain deferred to Sprint 2.

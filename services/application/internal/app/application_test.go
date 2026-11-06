@@ -83,6 +83,7 @@ func TestApplication_Submit_EligibilityAndPersistence(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s, r, j, v := setup(t)
 			ctx := caller("applicant", applicant)
+			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), nil)
 			job := domain.Job{ID: jobID, EmployerID: employer, Published: true, Deadline: s.now().Add(time.Hour)}
 			resume := domain.Resume{ID: resumeID, ApplicantID: applicant, Validated: true}
 			want := codes.OK
@@ -170,8 +171,11 @@ func TestApplication_Submit_InvalidInputsAndDeferredClients(t *testing.T) {
 		_, e := s.Submit(caller("applicant", applicant), ids[0], ids[1])
 		checkCode(t, e, codes.InvalidArgument)
 	}
-	s := NewService(nil, nil, nil)
-	_, e := s.Submit(caller("applicant", applicant), jobID, resumeID)
+	_, r, _, _ := setup(t)
+	ctx := caller("applicant", applicant)
+	r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), nil)
+	s := NewService(r, nil, nil)
+	_, e := s.Submit(ctx, jobID, resumeID)
 	checkCode(t, e, codes.Unavailable)
 }
 func TestApplication_Get_OwnershipAndFailures(t *testing.T) {
@@ -279,4 +283,74 @@ func TestApplication_ErrorMapping(t *testing.T) {
 		checkCode(t, dependencyError(status.Error(code, "private")), code)
 	}
 	checkCode(t, dependencyError(context.Canceled), codes.Canceled)
+}
+
+func TestApplication_Submit_DuplicateAfterJobBecomesIneligible(t *testing.T) {
+	for _, name := range []string{"closed", "expired"} {
+		t.Run(name, func(t *testing.T) {
+			s, r, j, v := setup(t)
+			ctx := caller("applicant", applicant)
+			job := domain.Job{ID: jobID, EmployerID: employer, Published: true, Deadline: s.now().Add(time.Hour)}
+			created := false
+			// The first submit creates the row; subsequent submits must find it.
+			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).DoAndReturn(func(context.Context, ports.Filter) ([]domain.Application, int64, error) {
+				if created {
+					return []domain.Application{record()}, 1, nil
+				}
+				return nil, 0, nil
+			}).Times(2)
+			j.EXPECT().GetJob(ctx, jobID).DoAndReturn(func(context.Context, string) (domain.Job, error) { return job, nil }).Times(1)
+			v.EXPECT().GetResume(ctx, resumeID).Return(domain.Resume{ID: resumeID, ApplicantID: applicant, Validated: true}, nil)
+			r.EXPECT().Create(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, a domain.Application) (domain.Application, error) {
+				created = true
+				return a, nil
+			})
+			_, err := s.Submit(ctx, jobID, resumeID)
+			checkCode(t, err, codes.OK)
+			if name == "closed" {
+				job.Published = false
+			} else {
+				job.Deadline = s.now().Add(-time.Nanosecond)
+			}
+			_, err = s.Submit(ctx, jobID, resumeID)
+			checkCode(t, err, codes.AlreadyExists)
+		})
+	}
+}
+
+func TestApplication_Submit_DuplicateLookupFailure(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		err  error
+		code codes.Code
+	}{
+		{"storage", errors.New("private storage failure"), codes.Internal},
+		{"canceled", context.Canceled, codes.Canceled},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s, r, _, _ := setup(t)
+			ctx := caller("applicant", applicant)
+			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), tt.err)
+			_, err := s.Submit(ctx, jobID, resumeID)
+			checkCode(t, err, tt.code)
+			if strings.Contains(err.Error(), "private") {
+				t.Fatal("storage details leaked")
+			}
+		})
+	}
+}
+
+func TestApplication_Submit_ExistingApplicationSkipsEligibility(t *testing.T) {
+	for _, withdrawn := range []bool{false, true} {
+		t.Run(map[bool]string{false: "submitted", true: "withdrawn"}[withdrawn], func(t *testing.T) {
+			_, r, _, _ := setup(t)
+			ctx := caller("applicant", applicant)
+			a := record()
+			a.Withdrawn = withdrawn
+			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return([]domain.Application{a}, int64(1), nil)
+			s := NewService(r, nil, nil)
+			_, err := s.Submit(ctx, jobID, resumeID)
+			checkCode(t, err, codes.AlreadyExists)
+		})
+	}
 }
