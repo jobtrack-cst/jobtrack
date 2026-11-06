@@ -1,0 +1,20 @@
+# Diagnostic attempt only; excluded from the fallback Kustomization.
+apiVersion: sources.knative.dev/v1alpha1
+kind: RabbitmqSource
+metadata:
+  name: hello-native
+  namespace: jt29-spike
+spec:
+  rabbitmqClusterReference:
+    connectionSecret:
+      name: rabbitmq-credentials
+  rabbitmqResourcesConfig:
+    predeclared: true
+    exchangeName: jobtrack.events
+    queueName: jt29.hello
+    parallelism: 1
+  sink:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: hello-world
