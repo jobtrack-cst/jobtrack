@@ -21,7 +21,6 @@ import (
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/services/auth/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/auth/internal/domain"
-	"github.com/jobtrack-cst/jobtrack/services/auth/internal/ports"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -86,21 +85,31 @@ func TestLoadConfig(t *testing.T) {
 		{"blank database URL", map[string]string{"SERVICE_NAME": "test", "DATABASE_URL": " \t"}, config{}, "DATABASE_URL"},
 		{"missing RabbitMQ URL", map[string]string{"SERVICE_NAME": "test", "RABBITMQ_URL": ""}, config{}, "RABBITMQ_URL"},
 		{"blank RabbitMQ URL", map[string]string{"SERVICE_NAME": "test", "RABBITMQ_URL": " \t"}, config{}, "RABBITMQ_URL"},
+		{"missing JWT secret", map[string]string{"SERVICE_NAME": "test", "JWT_SECRET": ""}, config{}, "JWT_SECRET"},
+		{"31 byte JWT secret", map[string]string{"SERVICE_NAME": "test", "JWT_SECRET": "private-secret-private-secret-1"}, config{}, "JWT_SECRET"},
+		{"invalid admin email", map[string]string{"SERVICE_NAME": "test", "ADMIN_EMAIL": "private-secret"}, config{}, "ADMIN_EMAIL"},
+		{"missing admin password", map[string]string{"SERVICE_NAME": "test", "ADMIN_PASSWORD": ""}, config{}, "ADMIN_PASSWORD"},
+		{"placeholder admin password", map[string]string{"SERVICE_NAME": "test", "ADMIN_PASSWORD": "change-me"}, config{}, "ADMIN_PASSWORD"},
+		{"11 character admin password", map[string]string{"SERVICE_NAME": "test", "ADMIN_PASSWORD": "private-sec"}, config{}, "ADMIN_PASSWORD"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			defaults := map[string]string{
+				"DATABASE_URL": "caller-supplied-url", "RABBITMQ_URL": "caller-supplied-url",
+				"JWT_SECRET": testJWTSecret, "ADMIN_EMAIL": "coordinator@cst.edu.bt", "ADMIN_PASSWORD": testAdminPassword,
+			}
 			got, err := loadConfig(func(key string) string {
-				if key == "DATABASE_URL" || key == "RABBITMQ_URL" {
-					if value, ok := tt.env[key]; ok {
-						return value
-					}
-					return "caller-supplied-url"
+				if value, ok := tt.env[key]; ok {
+					return value
 				}
-				return tt.env[key]
+				return defaults[key]
 			})
 			if tt.errField == "" {
 				tt.want.databaseURL = "caller-supplied-url"
 				tt.want.migrationsDir = "services/auth/migrations"
 				tt.want.rabbitMQURL = "caller-supplied-url"
+				tt.want.jwtSecret = testJWTSecret
+				tt.want.adminEmail = "coordinator@cst.edu.bt"
+				tt.want.adminPassword = testAdminPassword
 			}
 			if tt.errField != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.errField) || strings.Contains(err.Error(), "private-secret") {
@@ -153,8 +162,8 @@ func TestStartup_RabbitMQOrderFailuresAndCleanup(t *testing.T) {
 						},
 						close: func() { calls = append(calls, "close database") },
 					}, nil
-				}, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-					return runWithPublisher(ctx, cfg, logger, checker, func(url string) (publisherResource, error) {
+				}, func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+					return runWithPublisher(ctx, cfg, logger, d, func(url string) (publisherResource, error) {
 						calls = append(calls, "open RabbitMQ")
 						if url != cfg.rabbitMQURL {
 							t.Error("broker URL changed")
@@ -167,7 +176,7 @@ func TestStartup_RabbitMQOrderFailuresAndCleanup(t *testing.T) {
 							p.closeErr = errors.New("private close error")
 						}
 						return p, nil
-					}, func(context.Context, config, *slog.Logger, ports.HealthChecker) error {
+					}, func(context.Context, config, *slog.Logger, deps) error {
 						calls = append(calls, "start servers")
 						if stage == "listener failure" {
 							return errors.New("bind failed")
@@ -239,14 +248,18 @@ func TestRunWithDatabase_OrdersStartupAndCleansUp(t *testing.T) {
 							}
 							return nil
 						},
+						users: stubUsers{},
 						close: func() { calls = append(calls, "close") },
 					}, nil
-				}, func(got context.Context, _ config, _ *slog.Logger, checker ports.HealthChecker) error {
+				}, func(got context.Context, _ config, _ *slog.Logger, d deps) error {
 					calls = append(calls, "start")
 					if stage == "listener failure" {
 						return errors.New("bind failed")
 					}
-					health, err := checker.CheckHealth(got)
+					if d.users == nil {
+						t.Fatal("user repository was not wired")
+					}
+					health, err := d.checker.CheckHealth(got)
 					if err != nil || !health.IsHealthy() {
 						t.Fatalf("wired readiness failed: %v", err)
 					}
@@ -318,7 +331,7 @@ func TestServe_RegistersHealthAndShutsDownBothServers(t *testing.T) {
 	var logs bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("auth", &logs), app.NewHealth(), grpcListener, httpListener)
+		done <- serve(ctx, logging.New("auth", &logs), app.NewHealth(), nil, grpcListener, httpListener)
 	}()
 	t.Cleanup(func() { cancel() })
 	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}
@@ -393,7 +406,7 @@ func TestServe_ServerFailureClosesBothListeners(t *testing.T) {
 			}
 			done := make(chan error, 1)
 			go func() {
-				done <- serve(context.Background(), logging.New("test", io.Discard), app.NewHealth(), grpcListener, httpListener)
+				done <- serve(context.Background(), logging.New("test", io.Discard), app.NewHealth(), nil, grpcListener, httpListener)
 			}()
 			err := awaitServer(t, done)
 			if err == nil || !strings.Contains(err.Error(), fail) || strings.Contains(err.Error(), "private") {
@@ -416,19 +429,19 @@ func TestRun_BindingErrorsCleanUpListeners(t *testing.T) {
 	defer stop()
 	port := occupied.Addr().(*net.TCPAddr).Port
 	logger := logging.New("test", io.Discard)
-	if err := runServers(ctx, config{serviceName: "test", grpcPort: port, httpPort: 0}, logger, app.NewHealth()); err == nil || !strings.Contains(err.Error(), "gRPC") {
+	if err := runServers(ctx, config{serviceName: "test", grpcPort: port, httpPort: 0}, logger, app.NewHealth(), nil); err == nil || !strings.Contains(err.Error(), "gRPC") {
 		t.Fatalf("expected gRPC binding error: %v", err)
 	}
 	available := listenForTest(t)
 	grpcPort := available.Addr().(*net.TCPAddr).Port
 	available.Close()
-	if err := runServers(ctx, config{serviceName: "test", grpcPort: grpcPort, httpPort: port}, logger, app.NewHealth()); err == nil || !strings.Contains(err.Error(), "HTTP") {
+	if err := runServers(ctx, config{serviceName: "test", grpcPort: grpcPort, httpPort: port}, logger, app.NewHealth(), nil); err == nil || !strings.Contains(err.Error(), "HTTP") {
 		t.Fatalf("expected HTTP binding error: %v", err)
 	}
 	assertListenerClosed(t, net.JoinHostPort("127.0.0.1", strconv.Itoa(grpcPort)))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := runServers(ctx, config{serviceName: "test", grpcPort: 0, httpPort: 0}, logger, app.NewHealth()); !errors.Is(err, context.Canceled) {
+	if err := runServers(ctx, config{serviceName: "test", grpcPort: 0, httpPort: 0}, logger, app.NewHealth(), nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected cancellation: %v", err)
 	}
 }

@@ -15,13 +15,17 @@ import (
 	"syscall"
 	"time"
 
+	authv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/auth/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/auth/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/auth/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/auth/internal/adapters/rabbitmq"
+	"github.com/jobtrack-cst/jobtrack/services/auth/internal/adapters/security"
 	"github.com/jobtrack-cst/jobtrack/services/auth/internal/app"
+	"github.com/jobtrack-cst/jobtrack/services/auth/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/auth/internal/ports"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -33,6 +37,10 @@ type config struct {
 	databaseURL   string
 	migrationsDir string
 	rabbitMQURL   string
+	// Auth only (AGENTS.md Section 9). Never logged.
+	jwtSecret     string
+	adminEmail    string
+	adminPassword string
 }
 
 func main() {
@@ -86,15 +94,74 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if strings.TrimSpace(cfg.rabbitMQURL) == "" {
 		return config{}, errors.New("RABBITMQ_URL is required")
 	}
+	// Fail before touching the database; messages never include the values.
+	cfg.jwtSecret = getenv("JWT_SECRET")
+	if len(cfg.jwtSecret) < security.MinSecretBytes {
+		return config{}, errors.New("JWT_SECRET must be at least 32 bytes")
+	}
+	adminEmail, err := domain.NormalizeEmail(getenv("ADMIN_EMAIL"))
+	if err != nil {
+		return config{}, errors.New("ADMIN_EMAIL must be a valid email address")
+	}
+	cfg.adminEmail = adminEmail
+	cfg.adminPassword = getenv("ADMIN_PASSWORD")
+	if err := domain.ValidateAdminPassword(cfg.adminPassword); err != nil {
+		return config{}, errors.New("ADMIN_PASSWORD must be set, not the placeholder, and 12 to 72 bytes")
+	}
 	return cfg, nil
+}
+
+// deps are the resources available once the database is migrated.
+type deps struct {
+	checker ports.HealthChecker
+	users   ports.UserRepository
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
-		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-			return runWithPublisher(ctx, cfg, logger, checker,
-				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, runServers)
+		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+			return runWithPublisher(ctx, cfg, logger, d,
+				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+					register, err := setupAuth(ctx, cfg, logger, d.users, bcrypt.DefaultCost)
+					if err != nil {
+						return err
+					}
+					return runServers(ctx, cfg, logger, d.checker, register)
+				})
 		})
+}
+
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now().UTC() }
+
+// setupAuth builds the auth use cases, seeds the admin and returns a function
+// that registers both gRPC services. Publishing user.registered is Sprint 2.
+func setupAuth(ctx context.Context, cfg config, logger *slog.Logger, users ports.UserRepository, bcryptCost int) (func(grpc.ServiceRegistrar), error) {
+	hasher, err := security.NewBcrypt(bcryptCost)
+	if err != nil {
+		return nil, errors.New("initialize password hasher failed")
+	}
+	tokens, err := security.NewJWT(cfg.jwtSecret)
+	if err != nil {
+		return nil, errors.New("JWT_SECRET must be at least 32 bytes")
+	}
+	auth := app.NewAuth(users, hasher, tokens, systemClock{})
+	created, err := auth.SeedAdmin(ctx, cfg.adminEmail, cfg.adminPassword)
+	if err != nil {
+		if errors.Is(err, domain.ErrEmailTaken) {
+			return nil, errors.New("seed admin failed: ADMIN_EMAIL belongs to a non-admin account")
+		}
+		return nil, errors.New("seed admin failed")
+	}
+	// Log only whether an admin was created, never the email or password.
+	logger.Info("admin seed checked", "created", created)
+	return func(s grpc.ServiceRegistrar) {
+		authv1.RegisterAuthServiceServer(s, grpcadapter.NewAuthHandler(auth))
+		// TODO(JT-44): wrap with the internal-token interceptor once it is merged.
+		authv1.RegisterAuthInternalServiceServer(s, grpcadapter.NewInternalHandler(auth))
+	}, nil
 }
 
 type publisherResource interface {
@@ -102,9 +169,9 @@ type publisherResource interface {
 	Close() error
 }
 
-func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d deps,
 	open func(string) (publisherResource, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -121,13 +188,14 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Health has no event-producing use case; initialization must not publish events.
-	return start(ctx, cfg, logger, checker)
+	// user.registered is published in Sprint 2; initialization must not publish events.
+	return start(ctx, cfg, logger, d)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
 	readiness ports.Readiness
+	users     ports.UserRepository
 	migrate   func(context.Context, string) error
 	close     func()
 }
@@ -139,6 +207,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	}
 	return &databaseHandle{
 		readiness: postgres.NewReadiness(pool),
+		users:     postgres.NewUsers(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
 	}, nil
@@ -146,7 +215,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 
 func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	open func(context.Context, string) (*databaseHandle, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -165,10 +234,10 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness))
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), users: database.users})
 }
 
-func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
+func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar)) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -182,15 +251,18 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, grpcListener, httpListener)
+	return serve(ctx, logger, checker, register, grpcListener, httpListener)
 }
 
 // serve owns both listeners and stops the other server when either one fails.
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, grpcListener, httpListener net.Listener) error {
+func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar), grpcListener, httpListener net.Listener) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
 	grpcServer := grpc.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	if register != nil {
+		register(grpcServer)
+	}
 	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
