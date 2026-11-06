@@ -74,6 +74,21 @@ services:
   #       condition: service_healthy
   #   restart: unless-stopped
 
+  application:
+    build:
+      context: ../..
+      dockerfile: services/application/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: application
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://application@postgres:5432/application?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   rabbitmq-data:
