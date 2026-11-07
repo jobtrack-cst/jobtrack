@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 7 Nov 2026 (JT-29 cluster spike and RabbitMQ transport decision)
+- Last updated: 7 Nov 2026 (JT-31 API gateway decisions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -155,7 +155,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 ### JWT claims format
 
 - Issued by `auth` on login and signed with HS256 using `JWT_SECRET`. Lifetime 1 hour. There are no refresh tokens; the user logs in again.
-- Signed and verified with `github.com/golang-jwt/jwt/v5`. `JWT_SECRET` must be at least 32 bytes; `auth` refuses to start otherwise, and the gateway should apply the same check.
+- Signed and verified with `github.com/golang-jwt/jwt/v5`. `JWT_SECRET` must be at least 32 bytes; `auth` refuses to start otherwise, and the gateway applies the same check (JT-31).
 
 | Claim | Meaning | Example |
 |---|---|---|
@@ -241,7 +241,7 @@ Internal RPCs are restricted to their intended callers in three layers:
 
 `x-caller-service` is not proof of identity on its own; any holder of `INTERNAL_TOKEN` could set it. Layers 2 and 3 together limit misuse to compromised internal services. Full per-service identity would need mTLS, which is out of scope (Section 16).
 
-Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and agreed by all four members in PR #6, but they are not implemented yet. Until the internal interceptor, `pkg/grpcclient` headers, gateway filtering and NetworkPolicies are built (Section 16), internal RPCs are protected only by not being exposed through the gateway.
+Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and agreed by all four members in PR #6, but they are not implemented yet. The gateway already removes client-sent `x-user-*`, `x-internal-*` and `x-caller-*` metadata (JT-31). Until the internal interceptor, `pkg/grpcclient` headers and NetworkPolicies are built (Section 16), internal RPCs are protected only by not being exposed through the gateway.
 
 ---
 
@@ -524,6 +524,11 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 6 Nov 2026 | `mockgen` added as a Go tool (`go tool mockgen`); generated mocks committed in `internal/ports/mocks` (JT-30) | Same gomock version for everyone with no separate install |
 | 6 Nov 2026 | Login runs bcrypt against a dummy hash when the email is unknown (JT-30) | Response time does not reveal which emails are registered |
 | 7 Nov 2026 | JT-29 verified k3d with Knative Serving/Eventing 1.24.0 and Kourier (approved by Phuntsho); select the Go forwarder fallback for RabbitMQ events | Native RabbitMQSource could not reconcile without RabbitMQ topology CRDs; the existing Go AMQP client delivered the unchanged domain envelope as a CloudEvent and PingSource delivery was verified. See `docs/deployment/jt-29-cluster-spike.md`. |
+| 7 Nov 2026 | Gateway serves the REST API, `GET /healthz` and `GET /metrics` on container HTTP port 8080, published as host port 8000; it has no gRPC port (JT-31) | One port to publish, matching the 8080 and host port 8000 conventions |
+| 7 Nov 2026 | Only `POST /v1/auth/register` and `POST /v1/auth/login` skip the JWT check, matched exactly, and grpc-gateway HTTP method override and POST-to-GET path length fallback are turned off; `GET /healthz` and `GET /metrics` are also open (JT-31) | Fail closed: any other method or path variant needs a token, and the method cannot change after the check |
+| 7 Nov 2026 | Gateway keeps grpc-gateway v2.33's `DefaultHeaderMatcher` (it no longer forwards `Grpc-Metadata-*` headers) and adds its own filter that drops `x-user-*`, `x-internal-*` and `x-caller-*`; only `x-user-id` and `x-user-role` from the verified token are set (JT-31) | Two independent layers, so a client cannot set identity even if a default changes |
+| 7 Nov 2026 | Gateway refuses to start if `INTERNAL_TOKEN` is set or any of the 20 `<SERVICE>_ADDR` variables is missing; Compose sets all 20 and gives the gateway no RabbitMQ settings (JT-31) | Enforces Section 9 at startup; routes to services not in Compose yet return 503 instead of blocking the gateway |
+| 7 Nov 2026 | Gateway connects to each service through `pkg/grpcclient`, with one interceptor and circuit breaker per backend connection (JT-31) | Follows Section 9; one failing service cannot open the circuit for the others |
 
 ---
 
@@ -533,7 +538,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Promote the JT-29 transport spike into shared deployment wiring in the appropriate implementation tasks: durable broker storage, consumer idempotency, retry/dead-letter policy, operational health and credentials. Native RabbitMQSource needs additional topology CRDs/operators and was not selected. See `docs/deployment/jt-29-cluster-spike.md`.
 - Final presentation and submission dates not yet announced (likely to be postponed).
 - Deferred until the shared event contracts are coordinated: `actor_id` in `EventEnvelope` (for `audit-log`) and `description` in `job.published` and `job.updated` (for `job-search`).
-- Internal-call protection still to build (not active yet): the internal interceptor in `pkg/`, internal headers in `pkg/grpcclient`, header stripping in `gateway`, and NetworkPolicy manifests in `deploy/k8s` (check they work with Knative function pods during JT-29). These need Jira tasks.
+- Internal-call protection still to build (not active yet): the internal interceptor in `pkg/`, internal headers in `pkg/grpcclient`, and NetworkPolicy manifests in `deploy/k8s` (check they work with Knative function pods during JT-29). These need Jira tasks.
 - Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
