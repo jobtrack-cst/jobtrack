@@ -115,6 +115,51 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # JT-31. The only service published to the host (AGENTS.md Section 9).
+  # No *service-env: the gateway needs no RabbitMQ login, and never INTERNAL_TOKEN.
+  gateway:
+    build:
+      context: ../..
+      dockerfile: gateway/Dockerfile
+    environment:
+      SERVICE_NAME: gateway
+      HTTP_PORT: "8080"
+      # Only auth and gateway get JWT_SECRET (AGENTS.md Section 9).
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      # All 20 public services. Routes to a service not in Compose yet return 503.
+      ANALYTICS_ADDR: analytics:9090
+      APPLICANT_PROFILE_ADDR: applicant-profile:9090
+      APPLICATION_ADDR: application:9090
+      APPLICATION_STATUS_ADDR: application-status:9090
+      AUDIT_LOG_ADDR: audit-log:9090
+      AUTH_ADDR: auth:9090
+      CATEGORY_TAG_ADDR: category-tag:9090
+      COMPANY_VERIFICATION_ADDR: company-verification:9090
+      EMPLOYER_ADDR: employer:9090
+      INTERVIEW_ADDR: interview:9090
+      JOB_ALERT_ADDR: job-alert:9090
+      JOB_POSTING_ADDR: job-posting:9090
+      JOB_SEARCH_ADDR: job-search:9090
+      MESSAGING_ADDR: messaging:9090
+      MODERATION_ADDR: moderation:9090
+      NOTIFICATION_INBOX_ADDR: notification-inbox:9090
+      OFFER_ADDR: offer:9090
+      RESUME_ADDR: resume:9090
+      REVIEW_ADDR: review:9090
+      SAVED_JOBS_ADDR: saved-jobs:9090
+    ports:
+      - "8000:8080"
+    depends_on:
+      auth:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   rabbitmq-data:
