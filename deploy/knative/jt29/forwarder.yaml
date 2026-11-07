@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-forwarder
+  namespace: jt29-spike
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jt29-forwarder
+  template:
+    metadata:
+      labels:
+        app: jt29-forwarder
+    spec:
+      containers:
+        - name: forwarder
+          image: jobtrack-jt29-forwarder:spike
+          imagePullPolicy: Never
+          env:
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: amqp-url
+            - name: SINK_URL
+              value: http://hello-world.jt29-spike.svc.cluster.local
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

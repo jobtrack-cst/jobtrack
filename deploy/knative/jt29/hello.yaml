@@ -1,0 +1,29 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: hello-world
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+        autoscaling.knative.dev/max-scale: "1"
+    spec:
+      containers:
+        # Official event-display hello-world sink, pinned to Knative 1.24.0.
+        - image: gcr.io/knative-releases/knative.dev/eventing/cmd/event_display@sha256:e991bf5c8c0d37ec1660eb8b340a893c2525ef5b35203ffc236ee39fb7edae6c
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
