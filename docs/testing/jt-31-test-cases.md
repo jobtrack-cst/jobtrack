@@ -22,7 +22,9 @@ Test design follows AGENTS.md Section 10: equivalence partitioning (valid tokens
 
 The manual register and login check (JT31-A-05) ran at 16:00 UTC on the working tree that was committed unchanged as `2437b3d` (only `deploy/compose/docker-compose.yml` was uncommitted at that time).
 
-The standalone image check (JT31-S-01) ran on commit `41a1f70` on 6 Nov 2026 at 18:23 UTC. The gateway code has not changed since then.
+The standalone image check (JT31-S-01) ran on 6 Nov 2026 at 18:23 UTC, on `a96de66` plus the new `gateway/Dockerfile`, which was then committed unchanged as `41a1f70`.
+
+The self-review added one hardening change to `gateway/internal/middleware` (grpc-gateway may no longer change the request method, see JT31-A-02). `gofmt`, `go vet` and `go test -count=1 ./gateway/...` were run again before that commit was pushed.
 
 ## Unit test coverage (`2437b3d`)
 
@@ -65,7 +67,7 @@ In `cmd/server`, `loadConfig`, `newHandler` and `newAPI` are unit tested. `main`
 - Criterion: Verifies the JWT on every request except register and login; rejects a bad signature, any algorithm other than HS256, a wrong `iss`, an expired `exp` or an unknown `role` with `UNAUTHENTICATED` (HTTP 401).
 - Inputs: see the token rows of the boundary table, plus an empty token, a value that is not a JWT, a token signed with another secret, a missing `iss` and a missing `sub`.
 - Expected: every invalid token returns `ErrInvalidToken` from the verifier; through HTTP, every rejection returns status 401 with body `{"code":16,"message":"missing or invalid token","details":[]}` and never reaches the backend; register and login pass without a token (a bad token on login is ignored); a valid token attaches the caller's identity to the request.
-- Tests: `gateway/internal/jwtauth/verifier_test.go` (`TestNewVerifier_SecretLength`, `TestVerifier_Verify_AcceptsValidTokens`, `TestVerifier_Verify_RejectsInvalidTokens`, 15 rejection subtests); `gateway/internal/middleware/middleware_test.go` (`TestAuthenticate_RejectsWithUnauthenticated`, 13 subtests; `TestAuthenticate_AllowsPublicRoutesAndValidTokens`, 5 subtests).
+- Tests: `gateway/internal/jwtauth/verifier_test.go` (`TestNewVerifier_SecretLength`, `TestVerifier_Verify_AcceptsValidTokens`, `TestVerifier_Verify_RejectsInvalidTokens`, 15 rejection subtests); `gateway/internal/middleware/middleware_test.go` (`TestAuthenticate_RejectsWithUnauthenticated`, 13 subtests; `TestAuthenticate_AllowsPublicRoutesAndValidTokens`, 5 subtests; `TestNewServeMux_KeepsTheOriginalMethod`, 2 subtests: a form POST to `/v1/auth/login`, with and without `X-HTTP-Method-Override: GET`, never reaches a GET handler on the same path).
 - Command: `go test -count=1 -v ./gateway/internal/jwtauth/ ./gateway/internal/middleware/`
 - Status: PASS.
 
@@ -119,7 +121,7 @@ In `cmd/server`, `loadConfig`, `newHandler` and `newAPI` are unit tested. `main`
 - Criterion: `gateway/Dockerfile` follows the service template (multi-stage, non-root user, no secrets in the image).
 - Command: `docker build -f gateway/Dockerfile -t jobtrack-gateway:dev .`, then `docker run` with an env file holding a generated `JWT_SECRET` and the 20 addresses, publishing `8000:8080`.
 - Expected and observed: image built (34.5 MB); `/healthz` returned `ok`; `/metrics` returned `jobtrack_service_ready 1`; `/v1/auth/me` without a token returned HTTP 401; the startup log showed `http_address` `[::]:8080` and `backends` 20; the container environment had no `INTERNAL_TOKEN`.
-- Status: PASS on `41a1f70`. A first build attempt failed while downloading modules from `proxy.golang.org` (a network stream error); the retry succeeded without any change.
+- Status: PASS (see the note under Execution results for the exact tree). A first build attempt failed while downloading modules from `proxy.golang.org` (a network stream error); the retry succeeded without any change.
 
 ## Not covered or pending
 

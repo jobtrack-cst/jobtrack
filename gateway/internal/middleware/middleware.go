@@ -90,6 +90,11 @@ func NewServeMux() *runtime.ServeMux {
 	return runtime.NewServeMux(
 		runtime.WithIncomingHeaderMatcher(IncomingHeaderMatcher),
 		runtime.WithMetadata(IdentityMetadata),
+		// Authenticate decides on the original method. grpc-gateway must not change it
+		// afterwards (X-HTTP-Method-Override, or POST form falling back to GET), or a
+		// request let through as POST login could reach a different route.
+		runtime.WithDisableHTTPMethodOverride(),
+		runtime.WithDisablePathLengthFallback(),
 	)
 }
 

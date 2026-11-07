@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,6 +230,41 @@ func TestGateway_HeaderSpoofing(t *testing.T) {
 			for _, key := range tt.wantAbsent {
 				require.Empty(t, md.Get(key), key)
 			}
+		})
+	}
+}
+
+// A POST to a public route must never be turned into another method after
+// Authenticate has let it through without a token.
+func TestNewServeMux_KeepsTheOriginalMethod(t *testing.T) {
+	tests := []struct {
+		name    string
+		headers map[string]string
+	}{
+		{name: "X-HTTP-Method-Override to GET", headers: map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded", "X-HTTP-Method-Override": "GET",
+		}},
+		{name: "form POST without override", headers: map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mux := NewServeMux()
+			reached := false
+			// Stands in for a GET route that shares a public POST path.
+			require.NoError(t, mux.HandlePath(http.MethodGet, routeLogin,
+				func(http.ResponseWriter, *http.Request, map[string]string) { reached = true }))
+			req := httptest.NewRequest(http.MethodPost, routeLogin, strings.NewReader("a=b"))
+			for key, value := range tt.headers {
+				req.Header.Set(key, value)
+			}
+			rec := httptest.NewRecorder()
+
+			Authenticate(newVerifier(t), discardLogger(), mux).ServeHTTP(rec, req)
+
+			require.False(t, reached, "a public POST must not reach a GET handler")
+			require.NotEqual(t, http.StatusOK, rec.Code)
 		})
 	}
 }
