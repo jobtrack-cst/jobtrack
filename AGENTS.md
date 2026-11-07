@@ -155,6 +155,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 ### JWT claims format
 
 - Issued by `auth` on login and signed with HS256 using `JWT_SECRET`. Lifetime 1 hour. There are no refresh tokens; the user logs in again.
+- Signed and verified with `github.com/golang-jwt/jwt/v5`. `JWT_SECRET` must be at least 32 bytes; `auth` refuses to start otherwise, and the gateway should apply the same check.
 
 | Claim | Meaning | Example |
 |---|---|---|
@@ -261,6 +262,7 @@ Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and a
 | CI | GitHub Actions, images pushed to GitHub Container Registry |
 | Monitoring | Prometheus and Grafana, JSON logs |
 | Resilience | Shared gRPC client with timeout, retry and circuit breaker (`sony/gobreaker`) |
+| Passwords and tokens | bcrypt from `golang.org/x/crypto`, JWT with `github.com/golang-jwt/jwt/v5` (`auth` and `gateway` only) |
 | Testing | Go testing, testify, gomock (`go.uber.org/mock`), Testcontainers, Cypress, Apache JMeter, SonarQube (run locally) |
 | Project management | Jira (space key JT), GitHub |
 
@@ -325,6 +327,7 @@ services/<service>/
     postgres/                    repository implementations
     rabbitmq/                    event publisher and consumers
     clients/                     gRPC clients to other services
+    <other>/                     only when none of the above fit (for example security/ in auth for bcrypt and JWT)
   migrations/                    goose SQL files
   Dockerfile                     multi-stage build
 ```
@@ -349,7 +352,10 @@ services/<service>/
 - `employer_id` everywhere (events and contracts) is the employer's user ID from `auth`. Each employer account has at most one company profile.
 - Authorisation: services read the caller from `pkg/authctx` and check role and ownership themselves (for example only the owning employer can update a job). See Section 6 for internal RPCs.
 - Errors: use gRPC status codes. `INVALID_ARGUMENT` for bad input, `UNAUTHENTICATED` for a missing or invalid JWT, a missing or wrong internal token, and failed login (same message for wrong email and wrong password), `NOT_FOUND`, `PERMISSION_DENIED` for wrong role, owner or internal caller, `FAILED_PRECONDITION` for business rule violations (closed job, invalid status transition), `ALREADY_EXISTS`, `INTERNAL` only for unexpected errors.
-- List RPCs use the shared pagination messages from `common.proto`.
+- List RPCs use the shared pagination messages from `common.proto`:
+  - `page_size`: 0 means the default of 20; values above 100 are capped at 100; negative is `INVALID_ARGUMENT`.
+  - `page_token`: the offset as a plain decimal string (for example `"20"`); anything else is `INVALID_ARGUMENT`.
+  - `next_page_token` is empty on the last page; `total_count` is always filled.
 
 ### Events
 
@@ -387,6 +393,8 @@ services/<service>/
 | Code quality | SonarQube (local) | | Run once per sprint, save the report in `docs/testing` |
 
 - Test names describe behaviour: `TestApplication_Submit_RejectsClosedJob`.
+- Mocks: add `//go:generate go tool mockgen -destination=mocks/<file>_mock.go -package=mocks . <Interface>,...` in `internal/ports`, run `go generate ./services/<service>/internal/ports/...`, and commit the generated `mocks/` folder. `mockgen` is a Go tool in `go.mod`, so no separate install is needed.
+- Integration tests: the first run may time out while Docker downloads images. Pull them first: `docker pull postgres:17-alpine postgres:18-alpine rabbitmq:4.1-alpine`.
 - Design test cases with equivalence partitioning, boundary values and state transitions, and record them in the test case document with the Jira story they trace to.
 - Coverage target: at least 80 percent line coverage on `application` and `application-status`. Other services: meaningful tests for all business rules.
 - Commands: `go test ./...` (unit), `go test -tags=integration ./...` (integration), `go test -cover ./...` (coverage).
@@ -511,6 +519,10 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 5 Nov 2026 | Sprint 1 services run on their own; cross-service calls are gomock-mocked ports; events and real clients move to Sprint 2 | Each member can build and test without waiting for other services |
 | 5 Nov 2026 | Must tasks are the committed Sprint 1 minimum; unfinished Should tasks move to the top of Sprint 2 | Protects the apply-for-a-job flow if the sprint runs short |
 | 5 Nov 2026 | No sub-tasks in Sprint 1 | Short sprint; acceptance criteria already work as the checklist |
+| 6 Nov 2026 | Pagination for all list RPCs: default page size 20, maximum 100, page token is the offset as a decimal string (agreed by Phuntsho during JT-30) | One simple rule every service can implement and test the same way |
+| 6 Nov 2026 | `github.com/golang-jwt/jwt/v5` signs (auth) and verifies (gateway) JWTs; `JWT_SECRET` at least 32 bytes (JT-30) | Well-tested library instead of hand-written token code; HS256 keys shorter than 32 bytes are weaker |
+| 6 Nov 2026 | `mockgen` added as a Go tool (`go tool mockgen`); generated mocks committed in `internal/ports/mocks` (JT-30) | Same gomock version for everyone with no separate install |
+| 6 Nov 2026 | Login runs bcrypt against a dummy hash when the email is unknown (JT-30) | Response time does not reveal which emails are registered |
 | 7 Nov 2026 | JT-29 verified k3d with Knative Serving/Eventing 1.24.0 and Kourier (approved by Phuntsho); select the Go forwarder fallback for RabbitMQ events | Native RabbitMQSource could not reconcile without RabbitMQ topology CRDs; the existing Go AMQP client delivered the unchanged domain envelope as a CloudEvent and PingSource delivery was verified. See `docs/deployment/jt-29-cluster-spike.md`. |
 
 ---
@@ -527,3 +539,6 @@ Add new decisions at the bottom with the date and a one-line reason.
 - The `buf` CLI version is not pinned; the team should agree on one version.
 - Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests.
 - How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
+- Local `.env` passwords that contain `@ : / ? # %` break the `postgres://` and `amqp://` URLs in Docker Compose. Use letters and digits only (for example `openssl rand -hex 24`).
+- `.github/pull_request_template.md` is listed in Section 8 but does not exist yet.
+- Team B services have no contract tests in `tests/contract/` yet.

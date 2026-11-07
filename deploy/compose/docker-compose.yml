@@ -55,6 +55,32 @@ services:
       - "8025:8025" # web inbox
     restart: unless-stopped
 
+  # JT-30. Ports 9090 and 8080 stay inside the Docker network.
+  auth:
+    build:
+      context: ../..
+      dockerfile: services/auth/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: auth
+      DATABASE_URL: postgres://auth:${SERVICE_DB_PASSWORD}@postgres:5432/auth?sslmode=disable
+      # Only auth and gateway get JWT_SECRET (AGENTS.md Section 9).
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?set in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   # To add a service: copy this block, uncomment it, and replace every
   # "auth" with the service name (kebab-case for the key and SERVICE_NAME,
   # snake_case in DATABASE_URL). Do not publish port 9090 to the host.

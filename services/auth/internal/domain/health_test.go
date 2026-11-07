@@ -1,0 +1,26 @@
+package domain_test
+
+import (
+	"testing"
+
+	"github.com/jobtrack-cst/jobtrack/services/auth/internal/domain"
+)
+
+func TestHealthStatus_IsHealthy(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		status domain.HealthStatus
+		want   bool
+	}{
+		{"unknown zero value", domain.Unknown, false},
+		{"serving", domain.Serving, true},
+		{"not serving", domain.NotServing, false},
+		{"unrecognized status", domain.HealthStatus(255), false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.status.IsHealthy(); got != tt.want {
+				t.Errorf("IsHealthy()=%v, want %v", got, tt.want)
+			}
+		})
+	}
+}
