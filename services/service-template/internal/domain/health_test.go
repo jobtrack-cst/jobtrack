@@ -3,6 +3,8 @@ package domain_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/jobtrack-cst/jobtrack/services/service-template/internal/domain"
 )
 
@@ -18,9 +20,7 @@ func TestHealthStatus_IsHealthy(t *testing.T) {
 		{"unrecognized status", domain.HealthStatus(255), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.status.IsHealthy(); got != tt.want {
-				t.Errorf("IsHealthy()=%v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.status.IsHealthy())
 		})
 	}
 }
