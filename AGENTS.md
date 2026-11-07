@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 8 Nov 2026 (JT-20 testing conventions)
+- Last updated: 8 Nov 2026 (JT-32 employer service decisions, JT-20 testing conventions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -241,7 +241,42 @@ Internal RPCs are restricted to their intended callers in three layers:
 
 `x-caller-service` is not proof of identity on its own; any holder of `INTERNAL_TOKEN` could set it. Layers 2 and 3 together limit misuse to compromised internal services. Full per-service identity would need mTLS, which is out of scope (Section 16).
 
-Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and agreed by all four members in PR #6, but they are not implemented yet. The gateway already removes client-sent `x-user-*`, `x-internal-*` and `x-caller-*` metadata (JT-31). Until the internal interceptor, `pkg/grpcclient` headers and NetworkPolicies are built (Section 16), internal RPCs are protected only by not being exposed through the gateway.
+Status: layer 1 is in place (JT-23 contracts). JT-44 provides the layer 2 server interceptor in `pkg/authctx` and configured internal client interceptor in `pkg/grpcclient`; service owners must wire them into their servers and internal callers before protection is active. The gateway already removes client-sent `x-user-*`, `x-internal-*` and `x-caller-*` metadata (JT-31). NetworkPolicies remain pending.
+
+#### Internal-call wiring (JT-44)
+
+In a service's `main.go`, load `INTERNAL_TOKEN` only when it serves or calls internal RPCs. Tokens must be nonempty visible ASCII without whitespace; invalid configuration must stop startup. Never log the token or the configuration containing it. For an internal server (imports: `os`, `github.com/jobtrack-cst/jobtrack/pkg/authctx`, `google.golang.org/grpc`):
+
+```go
+internalAuth, err := authctx.InternalUnaryServerInterceptor(os.Getenv("INTERNAL_TOKEN"))
+if err != nil {
+    return err // from the startup function
+}
+grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(internalAuth))
+// Register this service's public and internal handlers on grpcServer.
+```
+
+For an approved internal caller (imports: `os`, `github.com/jobtrack-cst/jobtrack/pkg/grpcclient`, `google.golang.org/grpc`, `google.golang.org/grpc/credentials/insecure`), use the configured interceptor instead of the default one:
+
+```go
+internalClient, err := grpcclient.InternalUnaryClientInterceptor(
+    os.Getenv("INTERNAL_TOKEN"), os.Getenv("SERVICE_NAME"),
+)
+if err != nil {
+    return err
+}
+conn, err := grpc.NewClient(os.Getenv("AUTH_ADDR"),
+    grpc.WithTransportCredentials(insecure.NewCredentials()),
+    grpc.WithChainUnaryInterceptor(internalClient),
+)
+if err != nil {
+    return err
+}
+defer conn.Close()
+// notification-dispatcher calls GetUser; weekly-summary calls ListUsersByRole.
+```
+
+This client includes the existing timeout, retries and circuit breaker. It replaces outgoing internal token/caller headers on internal calls, removes them on public calls, and never copies incoming security metadata. The server requires exactly one token and one caller value, compares token hashes in constant time, and applies the exact RPC allowlist above (unknown internal methods are denied). Public RPCs pass through the server interceptor unchanged. All current internal contracts are unary. Public-only callers, including gateway, keep `grpcclient.UnaryClientInterceptor()` with no `INTERNAL_TOKEN`. Do not add internal credentials to gateway or frontend.
 
 ---
 
@@ -534,6 +569,9 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 7 Nov 2026 | Gateway refuses to start if `INTERNAL_TOKEN` is set or any of the 20 `<SERVICE>_ADDR` variables is missing; Compose sets all 20 and gives the gateway no RabbitMQ settings (JT-31) | Enforces Section 9 at startup; routes to services not in Compose yet return 503 instead of blocking the gateway |
 | 7 Nov 2026 | Gateway connects to each service through `pkg/grpcclient`, with one interceptor and circuit breaker per backend connection (JT-31) | Follows Section 9; one failing service cannot open the circuit for the others |
 | 8 Nov 2026 | JT-20: Testcontainers integration tests run in CI with `go test -tags=integration ./...`, in addition to the unit and coverage checks (agreed by Phuntsho; ci.yml change coordinated with Sangay) | Template integration tests must pass in CI, not only locally |
+| 7 Nov 2026 | Employer `GetCompanyProfile` is open to any authenticated role; `CreateCompanyProfile`, `GetMyCompanyProfile` and `UpdateCompanyProfile` are employer only (`PERMISSION_DENIED` otherwise) and always use the caller's own user ID; a forwarded user ID that is not a UUID or an unknown role is `UNAUTHENTICATED`; an `employer_id` that is not a UUID is `INVALID_ARGUMENT` (approved by Jigden during JT-32) | job-posting can check verification with any forwarded user, and no request field can target another employer's profile |
+| 7 Nov 2026 | Employer `UpdateCompanyProfile` replaces all four editable fields (`company_name` required) and never changes `verification_status` or `rejection_reason`; `rejection_reason` is returned only to the owning employer or an admin (JT-32) | Follows the contract comments; only verification events change verification |
+| 7 Nov 2026 | Employer field limits, in characters after trimming: `company_name` 1 to 150, `description` up to 2000, `website` up to 255 and an absolute `http` or `https` URL with a host, `location` up to 100; the database columns enforce the same lengths (JT-32) | Sets the Section 16 limits for employer and gives the boundary values for testing |
 
 ---
 
@@ -543,11 +581,11 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Promote the JT-29 transport spike into shared deployment wiring in the appropriate implementation tasks: durable broker storage, consumer idempotency, retry/dead-letter policy, operational health and credentials. Native RabbitMQSource needs additional topology CRDs/operators and was not selected. See `docs/deployment/jt-29-cluster-spike.md`.
 - Final presentation and submission dates not yet announced (likely to be postponed).
 - Deferred until the shared event contracts are coordinated: `actor_id` in `EventEnvelope` (for `audit-log`) and `description` in `job.published` and `job.updated` (for `job-search`).
-- Internal-call protection still to build (not active yet): the internal interceptor in `pkg/`, internal headers in `pkg/grpcclient`, and NetworkPolicy manifests in `deploy/k8s` (check they work with Knative function pods during JT-29). These need Jira tasks.
+- JT-44 shared internal-call helpers require adoption by each internal server/caller owner before layer 2 is active. NetworkPolicy manifests in `deploy/k8s` remain pending; verify they allow intended Knative function pods. Gateway filtering is implemented in JT-31.
 - Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
-- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests.
+- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests. Set so far: auth (JT-30) and employer (JT-32, Section 15).
 - How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
 - Local `.env` passwords that contain `@ : / ? # %` break the `postgres://` and `amqp://` URLs in Docker Compose. Use letters and digits only (for example `openssl rand -hex 24`).
 - `.github/pull_request_template.md` is listed in Section 8 but does not exist yet.
