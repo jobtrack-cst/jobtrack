@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 8 Nov 2026 (JT-32 employer service decisions)
+- Last updated: 8 Nov 2026 (JT-32 employer service decisions, JT-20 testing conventions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -433,6 +433,10 @@ services/<service>/
 - Design test cases with equivalence partitioning, boundary values and state transitions, and record them in the test case document with the Jira story they trace to.
 - Coverage target: at least 80 percent line coverage on `application` and `application-status`. Other services: meaningful tests for all business rules.
 - Commands: `go test ./...` (unit), `go test -tags=integration ./...` (integration), `go test -cover ./...` (coverage).
+- Coverage report, as CI produces it: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`. For one service: `go test -cover ./services/<service>/...`.
+- Folder layout: test files sit next to the code they test as `<file>_test.go`, in the external package (for example `package domain_test`). Integration tests are named `<file>_integration_test.go` and start with `//go:build integration`. Generated mocks live in `internal/ports/mocks`.
+- Working examples to copy are in `services/service-template`: table-driven test with testify in `internal/domain/health_test.go`, gomock port mock in `internal/app/health_test.go` (mock from `internal/ports/mocks`), Testcontainers PostgreSQL test in `internal/adapters/postgres/readiness_integration_test.go`.
+- CI runs both suites: `go test -coverprofile=coverage.out ./...` (unit and coverage) and `go test -tags=integration ./...` (integration). Both must pass before merging.
 - Bugs found in testing are logged in Jira as Bug with severity and steps to reproduce.
 
 ---
@@ -564,6 +568,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 7 Nov 2026 | Gateway keeps grpc-gateway v2.33's `DefaultHeaderMatcher` (it no longer forwards `Grpc-Metadata-*` headers) and adds its own filter that drops `x-user-*`, `x-internal-*` and `x-caller-*`; only `x-user-id` and `x-user-role` from the verified token are set (JT-31) | Two independent layers, so a client cannot set identity even if a default changes |
 | 7 Nov 2026 | Gateway refuses to start if `INTERNAL_TOKEN` is set or any of the 20 `<SERVICE>_ADDR` variables is missing; Compose sets all 20 and gives the gateway no RabbitMQ settings (JT-31) | Enforces Section 9 at startup; routes to services not in Compose yet return 503 instead of blocking the gateway |
 | 7 Nov 2026 | Gateway connects to each service through `pkg/grpcclient`, with one interceptor and circuit breaker per backend connection (JT-31) | Follows Section 9; one failing service cannot open the circuit for the others |
+| 8 Nov 2026 | JT-20: Testcontainers integration tests run in CI with `go test -tags=integration ./...`, in addition to the unit and coverage checks (agreed by Phuntsho; ci.yml change coordinated with Sangay) | Template integration tests must pass in CI, not only locally |
 | 7 Nov 2026 | Employer `GetCompanyProfile` is open to any authenticated role; `CreateCompanyProfile`, `GetMyCompanyProfile` and `UpdateCompanyProfile` are employer only (`PERMISSION_DENIED` otherwise) and always use the caller's own user ID; a forwarded user ID that is not a UUID or an unknown role is `UNAUTHENTICATED`; an `employer_id` that is not a UUID is `INVALID_ARGUMENT` (approved by Jigden during JT-32) | job-posting can check verification with any forwarded user, and no request field can target another employer's profile |
 | 7 Nov 2026 | Employer `UpdateCompanyProfile` replaces all four editable fields (`company_name` required) and never changes `verification_status` or `rejection_reason`; `rejection_reason` is returned only to the owning employer or an admin (JT-32) | Follows the contract comments; only verification events change verification |
 | 7 Nov 2026 | Employer field limits, in characters after trimming: `company_name` 1 to 150, `description` up to 2000, `website` up to 255 and an absolute `http` or `https` URL with a host, `location` up to 100; the database columns enforce the same lengths (JT-32) | Sets the Section 16 limits for employer and gives the boundary values for testing |
