@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 7 Nov 2026 (JT-31 API gateway decisions)
+- Last updated: 8 Nov 2026 (JT-20 testing conventions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -398,6 +398,9 @@ services/<service>/
 - Design test cases with equivalence partitioning, boundary values and state transitions, and record them in the test case document with the Jira story they trace to.
 - Coverage target: at least 80 percent line coverage on `application` and `application-status`. Other services: meaningful tests for all business rules.
 - Commands: `go test ./...` (unit), `go test -tags=integration ./...` (integration), `go test -cover ./...` (coverage).
+- Coverage report, as CI produces it: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`. For one service: `go test -cover ./services/<service>/...`.
+- Folder layout: test files sit next to the code they test as `<file>_test.go`, in the external package (for example `package domain_test`). Integration tests are named `<file>_integration_test.go` and start with `//go:build integration`. Generated mocks live in `internal/ports/mocks`.
+- Working examples to copy are in `services/service-template`: table-driven test with testify in `internal/domain/health_test.go`, gomock port mock in `internal/app/health_test.go` (mock from `internal/ports/mocks`), Testcontainers PostgreSQL test in `internal/adapters/postgres/readiness_integration_test.go`.
 - Bugs found in testing are logged in Jira as Bug with severity and steps to reproduce.
 
 ---
