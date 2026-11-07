@@ -241,7 +241,42 @@ Internal RPCs are restricted to their intended callers in three layers:
 
 `x-caller-service` is not proof of identity on its own; any holder of `INTERNAL_TOKEN` could set it. Layers 2 and 3 together limit misuse to compromised internal services. Full per-service identity would need mTLS, which is out of scope (Section 16).
 
-Status: layer 1 is in place (JT-23 contracts). Layers 2 and 3 are designed and agreed by all four members in PR #6, but they are not implemented yet. The gateway already removes client-sent `x-user-*`, `x-internal-*` and `x-caller-*` metadata (JT-31). Until the internal interceptor, `pkg/grpcclient` headers and NetworkPolicies are built (Section 16), internal RPCs are protected only by not being exposed through the gateway.
+Status: layer 1 is in place (JT-23 contracts). JT-44 provides the layer 2 server interceptor in `pkg/authctx` and configured internal client interceptor in `pkg/grpcclient`; service owners must wire them into their servers and internal callers before protection is active. The gateway already removes client-sent `x-user-*`, `x-internal-*` and `x-caller-*` metadata (JT-31). NetworkPolicies remain pending.
+
+#### Internal-call wiring (JT-44)
+
+In a service's `main.go`, load `INTERNAL_TOKEN` only when it serves or calls internal RPCs. Tokens must be nonempty visible ASCII without whitespace; invalid configuration must stop startup. Never log the token or the configuration containing it. For an internal server (imports: `os`, `github.com/jobtrack-cst/jobtrack/pkg/authctx`, `google.golang.org/grpc`):
+
+```go
+internalAuth, err := authctx.InternalUnaryServerInterceptor(os.Getenv("INTERNAL_TOKEN"))
+if err != nil {
+    return err // from the startup function
+}
+grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(internalAuth))
+// Register this service's public and internal handlers on grpcServer.
+```
+
+For an approved internal caller (imports: `os`, `github.com/jobtrack-cst/jobtrack/pkg/grpcclient`, `google.golang.org/grpc`, `google.golang.org/grpc/credentials/insecure`), use the configured interceptor instead of the default one:
+
+```go
+internalClient, err := grpcclient.InternalUnaryClientInterceptor(
+    os.Getenv("INTERNAL_TOKEN"), os.Getenv("SERVICE_NAME"),
+)
+if err != nil {
+    return err
+}
+conn, err := grpc.NewClient(os.Getenv("AUTH_ADDR"),
+    grpc.WithTransportCredentials(insecure.NewCredentials()),
+    grpc.WithChainUnaryInterceptor(internalClient),
+)
+if err != nil {
+    return err
+}
+defer conn.Close()
+// notification-dispatcher calls GetUser; weekly-summary calls ListUsersByRole.
+```
+
+This client includes the existing timeout, retries and circuit breaker. It replaces outgoing internal token/caller headers on internal calls, removes them on public calls, and never copies incoming security metadata. The server requires exactly one token and one caller value, compares token hashes in constant time, and applies the exact RPC allowlist above (unknown internal methods are denied). Public RPCs pass through the server interceptor unchanged. All current internal contracts are unary. Public-only callers, including gateway, keep `grpcclient.UnaryClientInterceptor()` with no `INTERNAL_TOKEN`. Do not add internal credentials to gateway or frontend.
 
 ---
 
@@ -538,7 +573,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Promote the JT-29 transport spike into shared deployment wiring in the appropriate implementation tasks: durable broker storage, consumer idempotency, retry/dead-letter policy, operational health and credentials. Native RabbitMQSource needs additional topology CRDs/operators and was not selected. See `docs/deployment/jt-29-cluster-spike.md`.
 - Final presentation and submission dates not yet announced (likely to be postponed).
 - Deferred until the shared event contracts are coordinated: `actor_id` in `EventEnvelope` (for `audit-log`) and `description` in `job.published` and `job.updated` (for `job-search`).
-- Internal-call protection still to build (not active yet): the internal interceptor in `pkg/`, internal headers in `pkg/grpcclient`, and NetworkPolicy manifests in `deploy/k8s` (check they work with Knative function pods during JT-29). These need Jira tasks.
+- JT-44 shared internal-call helpers require adoption by each internal server/caller owner before layer 2 is active. NetworkPolicy manifests in `deploy/k8s` remain pending; verify they allow intended Knative function pods. Gateway filtering is implemented in JT-31.
 - Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
