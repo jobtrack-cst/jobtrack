@@ -401,6 +401,7 @@ services/<service>/
 - Coverage report, as CI produces it: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`. For one service: `go test -cover ./services/<service>/...`.
 - Folder layout: test files sit next to the code they test as `<file>_test.go`, in the external package (for example `package domain_test`). Integration tests are named `<file>_integration_test.go` and start with `//go:build integration`. Generated mocks live in `internal/ports/mocks`.
 - Working examples to copy are in `services/service-template`: table-driven test with testify in `internal/domain/health_test.go`, gomock port mock in `internal/app/health_test.go` (mock from `internal/ports/mocks`), Testcontainers PostgreSQL test in `internal/adapters/postgres/readiness_integration_test.go`.
+- CI runs both suites: `go test -coverprofile=coverage.out ./...` (unit and coverage) and `go test -tags=integration ./...` (integration). Both must pass before merging.
 - Bugs found in testing are logged in Jira as Bug with severity and steps to reproduce.
 
 ---
@@ -532,6 +533,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 7 Nov 2026 | Gateway keeps grpc-gateway v2.33's `DefaultHeaderMatcher` (it no longer forwards `Grpc-Metadata-*` headers) and adds its own filter that drops `x-user-*`, `x-internal-*` and `x-caller-*`; only `x-user-id` and `x-user-role` from the verified token are set (JT-31) | Two independent layers, so a client cannot set identity even if a default changes |
 | 7 Nov 2026 | Gateway refuses to start if `INTERNAL_TOKEN` is set or any of the 20 `<SERVICE>_ADDR` variables is missing; Compose sets all 20 and gives the gateway no RabbitMQ settings (JT-31) | Enforces Section 9 at startup; routes to services not in Compose yet return 503 instead of blocking the gateway |
 | 7 Nov 2026 | Gateway connects to each service through `pkg/grpcclient`, with one interceptor and circuit breaker per backend connection (JT-31) | Follows Section 9; one failing service cannot open the circuit for the others |
+| 8 Nov 2026 | JT-20: Testcontainers integration tests run in CI with `go test -tags=integration ./...`, in addition to the unit and coverage checks (agreed by Phuntsho; ci.yml change coordinated with Sangay) | Template integration tests must pass in CI, not only locally |
 
 ---
 
