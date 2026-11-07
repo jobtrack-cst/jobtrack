@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 7 Nov 2026 (JT-31 API gateway decisions)
+- Last updated: 8 Nov 2026 (JT-32 employer service decisions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -564,6 +564,9 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 7 Nov 2026 | Gateway keeps grpc-gateway v2.33's `DefaultHeaderMatcher` (it no longer forwards `Grpc-Metadata-*` headers) and adds its own filter that drops `x-user-*`, `x-internal-*` and `x-caller-*`; only `x-user-id` and `x-user-role` from the verified token are set (JT-31) | Two independent layers, so a client cannot set identity even if a default changes |
 | 7 Nov 2026 | Gateway refuses to start if `INTERNAL_TOKEN` is set or any of the 20 `<SERVICE>_ADDR` variables is missing; Compose sets all 20 and gives the gateway no RabbitMQ settings (JT-31) | Enforces Section 9 at startup; routes to services not in Compose yet return 503 instead of blocking the gateway |
 | 7 Nov 2026 | Gateway connects to each service through `pkg/grpcclient`, with one interceptor and circuit breaker per backend connection (JT-31) | Follows Section 9; one failing service cannot open the circuit for the others |
+| 7 Nov 2026 | Employer `GetCompanyProfile` is open to any authenticated role; `CreateCompanyProfile`, `GetMyCompanyProfile` and `UpdateCompanyProfile` are employer only (`PERMISSION_DENIED` otherwise) and always use the caller's own user ID; a forwarded user ID that is not a UUID or an unknown role is `UNAUTHENTICATED`; an `employer_id` that is not a UUID is `INVALID_ARGUMENT` (approved by Jigden during JT-32) | job-posting can check verification with any forwarded user, and no request field can target another employer's profile |
+| 7 Nov 2026 | Employer `UpdateCompanyProfile` replaces all four editable fields (`company_name` required) and never changes `verification_status` or `rejection_reason`; `rejection_reason` is returned only to the owning employer or an admin (JT-32) | Follows the contract comments; only verification events change verification |
+| 7 Nov 2026 | Employer field limits, in characters after trimming: `company_name` 1 to 150, `description` up to 2000, `website` up to 255 and an absolute `http` or `https` URL with a host, `location` up to 100; the database columns enforce the same lengths (JT-32) | Sets the Section 16 limits for employer and gives the boundary values for testing |
 
 ---
 
@@ -577,7 +580,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
-- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests.
+- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests. Set so far: auth (JT-30) and employer (JT-32, Section 15).
 - How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
 - Local `.env` passwords that contain `@ : / ? # %` break the `postgres://` and `amqp://` URLs in Docker Compose. Use letters and digits only (for example `openssl rand -hex 24`).
 - `.github/pull_request_template.md` is listed in Section 8 but does not exist yet.
