@@ -177,6 +177,33 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # JT-36. Ports 9090 and 8080 stay inside the Docker network. analytics is
+  # the first Compose service that serves an *InternalService, so only this
+  # block gets INTERNAL_TOKEN: never the shared anchor or the gateway.
+  analytics:
+    build:
+      context: ../..
+      dockerfile: services/analytics/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: analytics
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://analytics@postgres:5432/analytics?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   # JT-45. Ports 9090 and 8080 stay inside the Docker network.
   offer:
     build:
