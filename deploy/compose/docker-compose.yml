@@ -105,6 +105,30 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # JT-33. Ports 9090 and 8080 stay inside the Docker network.
+  company-verification:
+    build:
+      context: ../..
+      dockerfile: services/company-verification/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: company-verification
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://company_verification@postgres:5432/company_verification?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   # JT-45. Ports 9090 and 8080 stay inside the Docker network.
   offer:
     build:
