@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	moderationv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/moderation/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/moderation/internal/adapters/grpc"
@@ -89,12 +90,35 @@ func loadConfig(getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
+// deps are the resources available once the database is migrated.
+type deps struct {
+	checker ports.HealthChecker
+	reports ports.ReportRepository
+}
+
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
-		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-			return runWithPublisher(ctx, cfg, logger, checker,
-				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, runServers)
+		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+			return runWithPublisher(ctx, cfg, logger, d,
+				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+					return runServers(ctx, cfg, logger, d.checker, registerModeration(d.reports))
+				})
 		})
+}
+
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now().UTC() }
+
+// registerModeration returns a function that registers the public
+// ModerationService. The contract has no internal service, and moderation
+// calls no other service, so no INTERNAL_TOKEN is loaded.
+func registerModeration(reports ports.ReportRepository) func(grpc.ServiceRegistrar) {
+	handler := grpcadapter.NewModerationHandler(app.NewReports(reports, systemClock{}))
+	return func(s grpc.ServiceRegistrar) {
+		moderationv1.RegisterModerationServiceServer(s, handler)
+	}
 }
 
 type publisherResource interface {
@@ -102,9 +126,9 @@ type publisherResource interface {
 	Close() error
 }
 
-func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d deps,
 	open func(string) (publisherResource, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -121,13 +145,15 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Health has no event-producing use case; initialization must not publish events.
-	return start(ctx, cfg, logger, checker)
+	// Publishing moderation.job_removed is Sprint 2; the connection is kept
+	// for it. Initialization must not publish events.
+	return start(ctx, cfg, logger, d)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
 	readiness ports.Readiness
+	reports   ports.ReportRepository
 	migrate   func(context.Context, string) error
 	close     func()
 }
@@ -139,6 +165,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	}
 	return &databaseHandle{
 		readiness: postgres.NewReadiness(pool),
+		reports:   postgres.NewReports(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
 	}, nil
@@ -146,7 +173,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 
 func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	open func(context.Context, string) (*databaseHandle, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -165,10 +192,10 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness))
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), reports: database.reports})
 }
 
-func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
+func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar)) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -182,15 +209,18 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, grpcListener, httpListener)
+	return serve(ctx, logger, checker, register, grpcListener, httpListener)
 }
 
 // serve owns both listeners and stops the other server when either one fails.
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, grpcListener, httpListener net.Listener) error {
+func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar), grpcListener, httpListener net.Listener) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
 	grpcServer := grpc.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	if register != nil {
+		register(grpcServer)
+	}
 	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
