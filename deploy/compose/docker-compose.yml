@@ -105,6 +105,177 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # JT-33. Ports 9090 and 8080 stay inside the Docker network.
+  company-verification:
+    build:
+      context: ../..
+      dockerfile: services/company-verification/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: company-verification
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://company_verification@postgres:5432/company_verification?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-34. Ports 9090 and 8080 stay inside the Docker network.
+  moderation:
+    build:
+      context: ../..
+      dockerfile: services/moderation/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: moderation
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://moderation@postgres:5432/moderation?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-35. Ports 9090 and 8080 stay inside the Docker network.
+  audit-log:
+    build:
+      context: ../..
+      dockerfile: services/audit-log/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: audit-log
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://audit_log@postgres:5432/audit_log?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-36. Ports 9090 and 8080 stay inside the Docker network. analytics is
+  # the first Compose service that serves an *InternalService, so only this
+  # block gets INTERNAL_TOKEN: never the shared anchor or the gateway.
+  analytics:
+    build:
+      context: ../..
+      dockerfile: services/analytics/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: analytics
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://analytics@postgres:5432/analytics?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-45. Ports 9090 and 8080 stay inside the Docker network.
+  offer:
+    build:
+      context: ../..
+      dockerfile: services/offer/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: offer
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://offer@postgres:5432/offer?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-46. Ports 9090 and 8080 stay inside the Docker network.
+  messaging:
+    build:
+      context: ../..
+      dockerfile: services/messaging/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: messaging
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://messaging@postgres:5432/messaging?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-47. Ports 9090 and 8080 stay inside the Docker network.
+  job-alert:
+    build:
+      context: ../..
+      dockerfile: services/job-alert/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: job-alert
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://job_alert@postgres:5432/job_alert?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   # To add a service: copy this block, uncomment it, and replace every
   # "auth" with the service name (kebab-case for the key and SERVICE_NAME,
   # snake_case in DATABASE_URL). Do not publish port 9090 to the host.
