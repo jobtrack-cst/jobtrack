@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 11 Nov 2026 (JT-48 resume service decisions)
+- Last updated: 11 Nov 2026 (JT-61 function transport decision)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -180,6 +180,29 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 | `weekly-summary` | Jigden | Weekly schedule (PingSource) | Gets statistics from Analytics and admin emails from Auth, then emails a summary to admins. |
 | `resume-validator` | Phuntsho | Event: `resume.uploaded` | Fetches the file from Resume, checks type (PDF only), size (max 2 MB) and content signature. Publishes `resume.validated` or `resume.rejected`. |
 | `deadline-reminder` | Kinley | Daily schedule (PingSource) | Finds jobs closing within 48 hours (Job Posting) and who saved them (Saved Jobs). Publishes `deadline.reminder` events. |
+
+JT-61 Compose execution decision: functions run as ordinary long-running HTTP
+containers on the Compose network; Compose does not run Knative or scale to zero.
+The shared Go forwarder runs as one supervised container per event-driven function,
+using a durable `<function>.events` queue and `<function>.events.dead` queue.
+The `functions` Compose profile is opt-in until the resume-validator image is
+available from its implementation task. k3d uses the same forwarder image as a
+Deployment targeting the Knative Service URL. The forwarder carries no internal
+gRPC credentials; only functions calling internal RPCs receive `INTERNAL_TOKEN`.
+The project owner approved restart-safe bounded retries for JT-61: source and dead
+queues use RabbitMQ quorum queues. Source queues set `x-delivery-limit=3`,
+`x-dead-letter-strategy=at-least-once`, `x-overflow=reject-publish`, and route to
+`<function>.events.dead`. One HTTP attempt per broker delivery permits at most
+four HTTP attempts, with 1/2/4 second backoff before redelivered attempts.
+Broker redelivery counts survive consumer reconnects and process restarts; crashes
+and cancellations consume the budget, even if no HTTP attempt completed.
+Only HTTP 2xx is acknowledged. HTTP failures use `basic.reject(requeue=true)`;
+malformed or exhausted deliveries use `basic.nack(requeue=false)`. RabbitMQ retains
+dead letters until the destination confirms receipt. Functions must deduplicate
+event IDs because HTTP success before an uncertain AMQP ack can duplicate work.
+Existing classic queues must be migrated with DevOps review; never delete queues
+or data automatically. Compose starts Resume and its dependencies for the validator.
+See `docs/deployment/jt-61-forwarder.md` for execution and verification.
 
 Functions are stateless, receive CloudEvents over HTTP, and scale to zero. JT-29 selected the Go RabbitMQ-to-HTTP forwarder fallback: preserve the domain envelope as CloudEvent data, map its event ID/type into CloudEvent headers, and acknowledge RabbitMQ only after HTTP success. See `docs/deployment/jt-29-cluster-spike.md` for the verified spike and production follow-ups.
 
