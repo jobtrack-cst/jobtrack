@@ -200,7 +200,6 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 	return shutdownErr
 }
 
-
 func shutdown(ctx context.Context, grpcServer *grpc.Server, httpServer *http.Server) error {
 	var errs []error
 	done := make(chan struct{})

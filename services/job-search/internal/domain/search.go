@@ -15,7 +15,7 @@ const (
 	MaxLocationLen = 100
 	// MaxQueryLen bounds the free-text search term. Same as title to keep
 	// the LIKE pattern small; noted in the PR.
-	MaxQueryLen = 150
+	MaxQueryLen     = 150
 	DefaultPageSize = 20
 	MaxPageSize     = 100
 )

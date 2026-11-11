@@ -76,9 +76,9 @@ func TestNewFilters(t *testing.T) {
 			want:  domain.Filters{Query: "hello world", PageSize: domain.DefaultPageSize},
 		},
 		{
-			name:      "valid category",
+			name:       "valid category",
 			categoryID: validUUID1,
-			want:      domain.Filters{CategoryID: validUUID1, PageSize: domain.DefaultPageSize},
+			want:       domain.Filters{CategoryID: validUUID1, PageSize: domain.DefaultPageSize},
 		},
 		{
 			name:       "invalid category",
@@ -91,8 +91,8 @@ func TestNewFilters(t *testing.T) {
 			want:   domain.Filters{TagIDs: []string{validUUID1, validUUID2}, PageSize: domain.DefaultPageSize},
 		},
 		{
-			name:   "invalid tag",
-			tagIDs: []string{"nope"},
+			name:    "invalid tag",
+			tagIDs:  []string{"nope"},
 			wantErr: domain.ErrInvalidTagID,
 		},
 		{

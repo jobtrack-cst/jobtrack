@@ -10,10 +10,10 @@ import (
 func TestNewCaller(t *testing.T) {
 	valid := "11111111-1111-4111-8111-111111111111"
 	tests := []struct {
-		name   string
-		userID string
-		role   string
-		want   domain.Caller
+		name    string
+		userID  string
+		role    string
+		want    domain.Caller
 		wantErr error
 	}{
 		{"applicant", valid, "applicant", domain.Caller{UserID: valid, Role: "applicant"}, nil},

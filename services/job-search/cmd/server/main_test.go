@@ -113,8 +113,6 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
-
-
 type readinessFunc func(context.Context) error
 
 func (f readinessFunc) Check(ctx context.Context) error { return f(ctx) }
