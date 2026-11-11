@@ -257,6 +257,28 @@ services:
     restart: unless-stopped
 
   # JT-46. Ports 9090 and 8080 stay inside the Docker network.
+  job-search:
+    build:
+      context: ../..
+      dockerfile: services/job-search/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: job-search
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://job_search@postgres:5432/job_search?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   messaging:
     build:
       context: ../..
