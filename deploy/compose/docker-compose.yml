@@ -217,7 +217,8 @@ services:
       PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
       # Serves JobPostingInternalService for deadline-reminder (JT-44).
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
-      # EMPLOYER_ADDR is added with the real employer client in JT-57.
+      # PublishJob checks verification through EmployerService (JT-57).
+      EMPLOYER_ADDR: employer:9090
     depends_on:
       postgres:
         condition: service_healthy
