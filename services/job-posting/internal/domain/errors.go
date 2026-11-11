@@ -37,7 +37,7 @@ var (
 	// update finds the job no longer in the expected status (a concurrent change).
 	ErrJobStatusChanged = errors.New("the job status changed during the request")
 
-	// INTERNAL, with this message instead of the generic one. Returned by the
-	// placeholder employer verifier until JT-57 adds the real client.
-	ErrEmployerCheckUnavailable = errors.New("employer verification is not available until JT-57")
+	// INTERNAL, always with this fixed message. The employer client wraps it
+	// with downstream details for logs, which must never reach the client (JT-57).
+	ErrEmployerCheckFailed = errors.New("employer verification check failed")
 )

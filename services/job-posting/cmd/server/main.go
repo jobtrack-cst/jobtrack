@@ -15,9 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	employerv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/employer/v1"
 	jobpostingv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/adapters/clients"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/job-posting/internal/adapters/grpc"
@@ -26,6 +28,7 @@ import (
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/ports"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
@@ -36,6 +39,7 @@ type config struct {
 	databaseURL   string
 	migrationsDir string
 	rabbitMQURL   string
+	employerAddr  string
 	// internalToken is a secret: never log it or the config that holds it.
 	internalToken string
 }
@@ -91,6 +95,11 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if strings.TrimSpace(cfg.rabbitMQURL) == "" {
 		return config{}, errors.New("RABBITMQ_URL is required")
 	}
+	// PublishJob checks verification through EmployerService (JT-57).
+	cfg.employerAddr = strings.TrimSpace(getenv("EMPLOYER_ADDR"))
+	if cfg.employerAddr == "" {
+		return config{}, errors.New("EMPLOYER_ADDR is required")
+	}
 	// job-posting serves JobPostingInternalService, so it needs INTERNAL_TOKEN
 	// (AGENTS.md Section 6). The error never contains the value.
 	cfg.internalToken = getenv("INTERNAL_TOKEN")
@@ -113,12 +122,17 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	verifier, closeEmployer, err := newEmployerVerifier(cfg.employerAddr)
+	if err != nil {
+		return err
+	}
+	defer closeEmployer()
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
 		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerJobPosting(d.jobs), serverOpts...)
+					return runServers(ctx, cfg, logger, d.checker, registerJobPosting(d.jobs, verifier), serverOpts...)
 				})
 		})
 }
@@ -134,6 +148,21 @@ func internalServerOptions(token string) ([]grpc.ServerOption, error) {
 	return []grpc.ServerOption{grpc.ChainUnaryInterceptor(internalAuth)}, nil
 }
 
+// newEmployerVerifier connects to EmployerService through the shared public
+// interceptor, which forwards the caller's x-user-id and x-user-role (AGENTS.md
+// Section 6). grpc.NewClient connects lazily, like the gateway, so job-posting
+// starts while employer is down and PublishJob then fails with INTERNAL.
+func newEmployerVerifier(addr string) (ports.EmployerVerifier, func(), error) {
+	conn, err := grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithChainUnaryInterceptor(grpcclient.UnaryClientInterceptor()),
+	)
+	if err != nil {
+		return nil, nil, errors.New("create employer client failed; check EMPLOYER_ADDR")
+	}
+	return clients.NewEmployerClient(employerv1.NewEmployerServiceClient(conn)), func() { _ = conn.Close() }, nil
+}
+
 type systemClock struct{}
 
 func (systemClock) Now() time.Time { return time.Now().UTC() }
@@ -142,10 +171,8 @@ func (systemClock) Now() time.Time { return time.Now().UTC() }
 // job-posting gRPC server. The gateway registers only the public
 // JobPostingService; the internal interceptor passed to serve guards
 // JobPostingInternalService and lets public RPCs through unchanged.
-// Until JT-57 the employer check is a placeholder that never verifies, so
-// PublishJob fails with INTERNAL instead of skipping the check.
-func registerJobPosting(jobs ports.JobRepository) func(grpc.ServiceRegistrar) {
-	svc := app.NewJobs(jobs, clients.UnavailableEmployerVerifier{}, systemClock{})
+func registerJobPosting(jobs ports.JobRepository, verifier ports.EmployerVerifier) func(grpc.ServiceRegistrar) {
+	svc := app.NewJobs(jobs, verifier, systemClock{})
 	public := grpcadapter.NewJobPostingHandler(svc)
 	internal := grpcadapter.NewJobPostingInternalHandler(svc)
 	return func(s grpc.ServiceRegistrar) {

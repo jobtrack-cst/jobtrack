@@ -273,15 +273,6 @@ func TestJobPostingHandler_LifecycleCodes(t *testing.T) {
 	}
 }
 
-func TestJobPostingHandler_PublishWithPlaceholderVerifierIsInternalWithReason(t *testing.T) {
-	h := newHandlers(t)
-	h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
-	h.verifier.EXPECT().IsVerified(gomock.Any(), ownerID).Return(false, domain.ErrEmployerCheckUnavailable)
-	_, err := h.public.PublishJob(asOwner(), &jpv1.PublishJobRequest{JobId: jobID})
-	wantCode(t, err, codes.Internal)
-	assert.Contains(t, status.Convert(err).Message(), "JT-57")
-}
-
 func TestJobPostingHandler_InternalErrorsDoNotLeak(t *testing.T) {
 	h := newHandlers(t)
 	h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(domain.Job{}, errDB)
@@ -399,4 +390,14 @@ func TestJobPostingInternalHandler_ListJobsClosingBetween(t *testing.T) {
 		})
 		wantCode(t, err, codes.Internal)
 	})
+}
+
+func TestJobPostingHandler_PublishEmployerCheckFailedIsInternalWithFixedMessage(t *testing.T) {
+	h := newHandlers(t)
+	h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+	// The employer client wraps downstream details; they must not reach the caller.
+	h.verifier.EXPECT().IsVerified(gomock.Any(), ownerID).Return(false, errors.Join(domain.ErrEmployerCheckFailed, errDB))
+	_, err := h.public.PublishJob(asOwner(), &jpv1.PublishJobRequest{JobId: jobID})
+	wantCode(t, err, codes.Internal)
+	assert.Equal(t, domain.ErrEmployerCheckFailed.Error(), status.Convert(err).Message())
 }
