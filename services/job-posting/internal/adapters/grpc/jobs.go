@@ -278,8 +278,8 @@ func toStatus(err error) error {
 		errors.Is(err, domain.ErrJobNotPublished), errors.Is(err, domain.ErrDeadlinePassed),
 		errors.Is(err, domain.ErrEmployerNotVerified), errors.Is(err, domain.ErrJobStatusChanged):
 		return status.Error(codes.FailedPrecondition, err.Error())
-	case errors.Is(err, domain.ErrEmployerCheckUnavailable):
-		return status.Error(codes.Internal, err.Error())
+	case errors.Is(err, domain.ErrEmployerCheckFailed):
+		return status.Error(codes.Internal, domain.ErrEmployerCheckFailed.Error())
 	case errors.Is(err, context.Canceled):
 		return status.Error(codes.Canceled, "request canceled")
 	case errors.Is(err, context.DeadlineExceeded):

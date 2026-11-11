@@ -85,6 +85,9 @@ func TestLoadConfig(t *testing.T) {
 		{"blank database URL", map[string]string{"SERVICE_NAME": "test", "DATABASE_URL": " \t"}, config{}, "DATABASE_URL"},
 		{"missing RabbitMQ URL", map[string]string{"SERVICE_NAME": "test", "RABBITMQ_URL": ""}, config{}, "RABBITMQ_URL"},
 		{"blank RabbitMQ URL", map[string]string{"SERVICE_NAME": "test", "RABBITMQ_URL": " \t"}, config{}, "RABBITMQ_URL"},
+		{"missing employer address", map[string]string{"SERVICE_NAME": "test", "EMPLOYER_ADDR": ""}, config{}, "EMPLOYER_ADDR"},
+		{"blank employer address", map[string]string{"SERVICE_NAME": "test", "EMPLOYER_ADDR": " \t"}, config{}, "EMPLOYER_ADDR"},
+		{"employer address is trimmed", map[string]string{"SERVICE_NAME": "test", "EMPLOYER_ADDR": " employer:9090 "}, config{serviceName: "test", grpcPort: 9090, httpPort: 8080}, ""},
 		{"missing internal token", map[string]string{"SERVICE_NAME": "test", "INTERNAL_TOKEN": ""}, config{}, "INTERNAL_TOKEN"},
 		{"internal token with a space", map[string]string{"SERVICE_NAME": "test", "INTERNAL_TOKEN": "private-secret value"}, config{}, "INTERNAL_TOKEN"},
 		{"internal token with a tab", map[string]string{"SERVICE_NAME": "test", "INTERNAL_TOKEN": "private-secret\t"}, config{}, "INTERNAL_TOKEN"},
@@ -98,6 +101,12 @@ func TestLoadConfig(t *testing.T) {
 					}
 					return "caller-supplied-url"
 				}
+				if key == "EMPLOYER_ADDR" {
+					if value, ok := tt.env[key]; ok {
+						return value
+					}
+					return "employer:9090"
+				}
 				if key == "INTERNAL_TOKEN" {
 					if value, ok := tt.env[key]; ok {
 						return value
@@ -110,6 +119,7 @@ func TestLoadConfig(t *testing.T) {
 				tt.want.databaseURL = "caller-supplied-url"
 				tt.want.migrationsDir = "services/job-posting/migrations"
 				tt.want.rabbitMQURL = "caller-supplied-url"
+				tt.want.employerAddr = "employer:9090"
 				tt.want.internalToken = "caller-supplied-token"
 			}
 			if tt.errField != "" {

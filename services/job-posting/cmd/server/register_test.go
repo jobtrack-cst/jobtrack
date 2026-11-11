@@ -4,9 +4,11 @@ import (
 	"context"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	employerv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/employer/v1"
 	jobpostingv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
@@ -66,6 +68,13 @@ func (stubJobs) ListClosingBetween(context.Context, domain.ClosingWindow, domain
 	return []domain.Job{stubJob()}, 1, nil
 }
 
+// stubVerifier answers IsVerified with a value each subtest can change.
+type stubVerifier struct{ verified atomic.Bool }
+
+func (v *stubVerifier) IsVerified(context.Context, string) (bool, error) {
+	return v.verified.Load(), nil
+}
+
 // recordingRegistrar keeps what registerJobPosting registers.
 type recordingRegistrar struct {
 	descs []*grpc.ServiceDesc
@@ -79,7 +88,7 @@ func (r *recordingRegistrar) RegisterService(desc *grpc.ServiceDesc, impl any) {
 
 func TestRegisterJobPosting_RegistersPublicAndInternalServices(t *testing.T) {
 	var reg recordingRegistrar
-	registerJobPosting(stubJobs{})(&reg)
+	registerJobPosting(stubJobs{}, &stubVerifier{})(&reg)
 	if len(reg.descs) != 2 ||
 		reg.descs[0].ServiceName != "jobtrack.job_posting.v1.JobPostingService" ||
 		reg.descs[1].ServiceName != "jobtrack.job_posting.v1.JobPostingInternalService" {
@@ -115,11 +124,12 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	verifier := &stubVerifier{}
 	grpcListener, httpListener := listenForTest(t), listenForTest(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerJobPosting(stubJobs{}),
+		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerJobPosting(stubJobs{}, verifier),
 			grpcListener, httpListener, serverOpts...)
 	}()
 	t.Cleanup(func() {
@@ -201,12 +211,62 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 			t.Fatalf("code=%v (%v), want PermissionDenied", status.Code(err), err)
 		}
 	})
-	// Until JT-57 the wired verifier is the placeholder, so publishing a
-	// draft fails safely instead of skipping the employer check.
-	t.Run("PublishJob uses the placeholder verifier", func(t *testing.T) {
+	// The verifier passed to registerJobPosting decides PublishJob (JT-57).
+	t.Run("PublishJob as an unverified employer", func(t *testing.T) {
+		verifier.verified.Store(false)
 		_, err := public(t).PublishJob(asRole(t, "employer"), &jobpostingv1.PublishJobRequest{JobId: stubDraftID})
-		if status.Code(err) != codes.Internal || !strings.Contains(status.Convert(err).Message(), "JT-57") {
-			t.Fatalf("code=%v (%v), want Internal mentioning JT-57", status.Code(err), err)
+		if status.Code(err) != codes.FailedPrecondition {
+			t.Fatalf("code=%v (%v), want FailedPrecondition", status.Code(err), err)
 		}
 	})
+	t.Run("PublishJob as a verified employer", func(t *testing.T) {
+		verifier.verified.Store(true)
+		_, err := public(t).PublishJob(asRole(t, "employer"), &jobpostingv1.PublishJobRequest{JobId: stubDraftID})
+		if status.Code(err) != codes.OK {
+			t.Fatalf("code=%v (%v), want OK", status.Code(err), err)
+		}
+	})
+}
+
+// verifiedEmployer is a fake EmployerService that reports every profile as
+// VERIFIED and records the identity it received.
+type verifiedEmployer struct {
+	employerv1.UnimplementedEmployerServiceServer
+	gotUserID chan string
+}
+
+func (e *verifiedEmployer) GetCompanyProfile(ctx context.Context, req *employerv1.GetCompanyProfileRequest) (*employerv1.GetCompanyProfileResponse, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	e.gotUserID <- strings.Join(md.Get("x-user-id"), ",")
+	return &employerv1.GetCompanyProfileResponse{Profile: &employerv1.CompanyProfile{
+		EmployerId:         req.GetEmployerId(),
+		VerificationStatus: employerv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED,
+	}}, nil
+}
+
+// The verifier run builds reaches EmployerService and forwards the caller.
+func TestNewEmployerVerifier_CallsEmployerWithCallerIdentity(t *testing.T) {
+	l := listenForTest(t)
+	fake := &verifiedEmployer{gotUserID: make(chan string, 1)}
+	s := grpc.NewServer()
+	employerv1.RegisterEmployerServiceServer(s, fake)
+	go func() { _ = s.Serve(l) }()
+	t.Cleanup(s.Stop)
+
+	verifier, closeEmployer, err := newEmployerVerifier(l.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(closeEmployer)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ctx = metadata.NewIncomingContext(ctx, metadata.Pairs("x-user-id", stubEmployerID, "x-user-role", "employer"))
+	verified, err := verifier.IsVerified(ctx, stubEmployerID)
+	if err != nil || !verified {
+		t.Fatalf("verified=%v err=%v, want true and no error", verified, err)
+	}
+	if got := <-fake.gotUserID; got != stubEmployerID {
+		t.Fatalf("employer received x-user-id %q, want %q", got, stubEmployerID)
+	}
 }
