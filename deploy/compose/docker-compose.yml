@@ -352,6 +352,40 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # JT-61 transport. Validator image is supplied by its implementation task.
+  resume-validator:
+    profiles: [functions]
+    image: ${RESUME_VALIDATOR_IMAGE:-jobtrack-resume-validator:local}
+    environment:
+      SERVICE_NAME: resume-validator
+      HTTP_PORT: "8080"
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      RESUME_ADDR: resume:9090
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      resume:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  resume-validator-forwarder:
+    profiles: [functions]
+    build:
+      context: ../..
+      dockerfile: cmd/rabbitmq-forwarder/Dockerfile
+    environment:
+      SERVICE_NAME: rabbitmq-forwarder
+      HTTP_PORT: "8080"
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      SINK_URL: http://resume-validator:8080/
+      FUNCTION_NAME: resume-validator
+      EVENT_TYPES: resume.uploaded
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   # JT-49. Ports 9090 and 8080 stay inside the Docker network.
   application-status:
     build:
