@@ -60,7 +60,7 @@ Commands run on branch `JT-48-resume-upload-and-status`:
 | Integration tests (Testcontainers, `postgres:18-alpine`) | Pass, 13 subtests |
 | Coverage | `domain` 100.0%, `app` 100.0%, `adapters/grpc` 98.8%, `cmd/server` 84.8% |
 | Docker Compose `/healthz` | `HTTP/1.1 200 OK` |
-| CI on the pull request | <add the run link once green> |
+| CI on the pull request | Green, [CI run](https://github.com/jobtrack-cst/jobtrack/actions/runs/43056397387) |
 
 Local note: the first Compose start on a Mac with the repository on the Desktop needed Docker Desktop's Desktop-folder permission, and a RabbitMQ container created during a port clash had to be recreated (`up -d --force-recreate rabbitmq`) before `resume` could resolve `rabbitmq`. Neither is a code change.
 
