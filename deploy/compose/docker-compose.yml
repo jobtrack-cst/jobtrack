@@ -217,7 +217,8 @@ services:
       PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
       # Serves JobPostingInternalService for deadline-reminder (JT-44).
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
-      # EMPLOYER_ADDR is added with the real employer client in JT-57.
+      # PublishJob checks verification through EmployerService (JT-57).
+      EMPLOYER_ADDR: employer:9090
     depends_on:
       postgres:
         condition: service_healthy
@@ -312,6 +313,32 @@ services:
       # pgx reads PGPASSWORD separately; raw passwords are not URI components.
       DATABASE_URL: postgres://job_alert@postgres:5432/job_alert?sslmode=disable
       PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-48. Ports 9090 and 8080 stay inside the Docker network.
+  resume:
+    build:
+      context: ../..
+      dockerfile: services/resume/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: resume
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://resume@postgres:5432/resume?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      # Serves ResumeInternalService for resume-validator (JT-44).
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
     depends_on:
       postgres:
         condition: service_healthy

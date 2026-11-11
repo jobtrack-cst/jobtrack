@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -29,6 +30,7 @@ func TestNewPage(t *testing.T) {
 		{"token letters", 10, "abc", domain.Page{}, domain.ErrInvalidPageToken},
 		{"token space", 10, " 5", domain.Page{}, domain.ErrInvalidPageToken},
 		{"token overflow", 10, "99999999999999999999999", domain.Page{}, domain.ErrInvalidPageToken},
+		{"token largest int", 100, "9223372036854775807", domain.Page{Limit: 100, Offset: math.MaxInt}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,6 +56,11 @@ func TestPage_NextPageToken(t *testing.T) {
 		{"exact last page", domain.Page{Limit: 20, Offset: 20}, 40, ""},
 		{"partial last page", domain.Page{Limit: 20, Offset: 40}, 45, ""},
 		{"empty", domain.Page{Limit: 20}, 0, ""},
+		{"offset past the end", domain.Page{Limit: 20, Offset: 100}, 45, ""},
+		{"page ends on the last row", domain.Page{Limit: 20, Offset: 25}, 45, ""},
+		{"one row left after the page", domain.Page{Limit: 20, Offset: 24}, 45, "44"},
+		{"largest offset does not overflow", domain.Page{Limit: 100, Offset: math.MaxInt}, 5, ""},
+		{"near-largest offset does not overflow", domain.Page{Limit: 100, Offset: math.MaxInt - 50}, 5, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

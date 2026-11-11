@@ -47,13 +47,14 @@ func NewPage(pageSize int32, pageToken string) (Page, error) {
 	return Page{Limit: limit, Offset: offset}, nil
 }
 
-// NextPageToken is empty on the last page.
+// NextPageToken is empty on the last page. It compares without adding
+// Offset and Limit first, so a huge page_token cannot overflow into a
+// negative token; total is never negative and Limit is at most 100.
 func (p Page) NextPageToken(total int) string {
-	next := p.Offset + p.Limit
-	if next >= total {
+	if p.Offset >= total-p.Limit {
 		return ""
 	}
-	return strconv.Itoa(next)
+	return strconv.Itoa(p.Offset + p.Limit)
 }
 
 // ClosingWindow is the [Start, End) deadline range for ListJobsClosingBetween.
