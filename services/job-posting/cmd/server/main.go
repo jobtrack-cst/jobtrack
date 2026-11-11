@@ -15,8 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	jobpostingv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1"
+	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/adapters/clients"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/job-posting/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/adapters/rabbitmq"
@@ -33,6 +36,8 @@ type config struct {
 	databaseURL   string
 	migrationsDir string
 	rabbitMQURL   string
+	// internalToken is a secret: never log it or the config that holds it.
+	internalToken string
 }
 
 func main() {
@@ -86,15 +91,67 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if strings.TrimSpace(cfg.rabbitMQURL) == "" {
 		return config{}, errors.New("RABBITMQ_URL is required")
 	}
+	// job-posting serves JobPostingInternalService, so it needs INTERNAL_TOKEN
+	// (AGENTS.md Section 6). The error never contains the value.
+	cfg.internalToken = getenv("INTERNAL_TOKEN")
+	if !authctx.ValidInternalToken(cfg.internalToken) {
+		return config{}, errors.New("INTERNAL_TOKEN must contain nonempty visible ASCII without whitespace")
+	}
 	return cfg, nil
 }
 
+// deps are the resources available once the database is migrated.
+type deps struct {
+	checker ports.HealthChecker
+	jobs    ports.JobRepository
+}
+
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
+	// Build the interceptor before opening anything, so a bad token stops
+	// startup at once (JT-44 internal-call wiring).
+	serverOpts, err := internalServerOptions(cfg.internalToken)
+	if err != nil {
+		return err
+	}
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
-		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-			return runWithPublisher(ctx, cfg, logger, checker,
-				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, runServers)
+		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+			return runWithPublisher(ctx, cfg, logger, d,
+				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+					return runServers(ctx, cfg, logger, d.checker, registerJobPosting(d.jobs), serverOpts...)
+				})
 		})
+}
+
+// internalServerOptions adds the pkg/authctx interceptor, which checks
+// INTERNAL_TOKEN and the Section 6 caller allowlist on internal RPCs and lets
+// public RPCs through unchanged. The error never contains the token.
+func internalServerOptions(token string) ([]grpc.ServerOption, error) {
+	internalAuth, err := authctx.InternalUnaryServerInterceptor(token)
+	if err != nil {
+		return nil, errors.New("INTERNAL_TOKEN is invalid")
+	}
+	return []grpc.ServerOption{grpc.ChainUnaryInterceptor(internalAuth)}, nil
+}
+
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now().UTC() }
+
+// registerJobPosting returns a function that registers both services on the
+// job-posting gRPC server. The gateway registers only the public
+// JobPostingService; the internal interceptor passed to serve guards
+// JobPostingInternalService and lets public RPCs through unchanged.
+// Until JT-57 the employer check is a placeholder that never verifies, so
+// PublishJob fails with INTERNAL instead of skipping the check.
+func registerJobPosting(jobs ports.JobRepository) func(grpc.ServiceRegistrar) {
+	svc := app.NewJobs(jobs, clients.UnavailableEmployerVerifier{}, systemClock{})
+	public := grpcadapter.NewJobPostingHandler(svc)
+	internal := grpcadapter.NewJobPostingInternalHandler(svc)
+	return func(s grpc.ServiceRegistrar) {
+		jobpostingv1.RegisterJobPostingServiceServer(s, public)
+		jobpostingv1.RegisterJobPostingInternalServiceServer(s, internal)
+	}
 }
 
 type publisherResource interface {
@@ -102,9 +159,9 @@ type publisherResource interface {
 	Close() error
 }
 
-func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d deps,
 	open func(string) (publisherResource, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -121,13 +178,16 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Health has no event-producing use case; initialization must not publish events.
-	return start(ctx, cfg, logger, checker)
+	// Publishing job events and the moderation.job_removed consumer are
+	// Sprint 2; the broker connection is kept for them, as in the template.
+	// Initialization must not publish events.
+	return start(ctx, cfg, logger, d)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
 	readiness ports.Readiness
+	jobs      ports.JobRepository
 	migrate   func(context.Context, string) error
 	close     func()
 }
@@ -139,6 +199,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	}
 	return &databaseHandle{
 		readiness: postgres.NewReadiness(pool),
+		jobs:      postgres.NewJobs(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
 	}, nil
@@ -146,7 +207,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 
 func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	open func(context.Context, string) (*databaseHandle, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -165,10 +226,12 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness))
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), jobs: database.jobs})
 }
 
-func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
+func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+	register func(grpc.ServiceRegistrar), opts ...grpc.ServerOption,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -182,15 +245,21 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, grpcListener, httpListener)
+	return serve(ctx, logger, checker, register, grpcListener, httpListener, opts...)
 }
 
 // serve owns both listeners and stops the other server when either one fails.
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, grpcListener, httpListener net.Listener) error {
+// opts carries the internal interceptor in production; tests may pass none.
+func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar),
+	grpcListener, httpListener net.Listener, opts ...grpc.ServerOption,
+) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(opts...)
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	if register != nil {
+		register(grpcServer)
+	}
 	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {

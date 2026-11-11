@@ -36,4 +36,8 @@ var (
 	// ErrJobStatusChanged is returned by the repository when a conditional
 	// update finds the job no longer in the expected status (a concurrent change).
 	ErrJobStatusChanged = errors.New("the job status changed during the request")
+
+	// INTERNAL, with this message instead of the generic one. Returned by the
+	// placeholder employer verifier until JT-57 adds the real client.
+	ErrEmployerCheckUnavailable = errors.New("employer verification is not available until JT-57")
 )
