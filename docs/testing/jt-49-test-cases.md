@@ -58,7 +58,7 @@ Commands run on branch `JT-49-application-status-state-machine`:
 | Coverage, production code without generated mocks, unit only | 73.9% (repository code is covered by integration tests) |
 | Package coverage (unit) | `domain` 100%, `app` 100%, `adapters/grpc` 100%, `cmd/server` 83.2% |
 | Docker Compose `/healthz` | `HTTP/1.1 200 OK` |
-| CI on the pull request | <add the run link once green> |
+| CI on the pull request | Green, [CI run](https://github.com/jobtrack-cst/jobtrack/actions/runs/43066196140) |
 
 ## Acceptance criteria review
 
