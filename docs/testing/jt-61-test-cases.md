@@ -97,3 +97,36 @@ DLQ transfer were tested. Existing queue migration requires DevOps review.
 | Unit mapping and acknowledgment tests | Verified |
 | Sections 5, 9, 10; no new tools/dependencies/contracts | Inspected; external package tests and event_id logging implemented |
 | Jira-key PR, green CI, merge, time logged | Unverified / intentionally untouched pending owner review |
+
+## Merge verification — 12 November 2026 (Asia/Thimphu)
+
+Merged `origin/main` at `0ab1e7b` (JT-49) into JT-61. Approved resolutions retain
+both projects' AGENTS.md decisions and all `application-status`, `resume-validator`
+and `resume-validator-forwarder` Compose blocks. Service keys were checked for
+uniqueness, and Compose parsed successfully. No JT-49 or JT-61 Go source changed.
+No PR template exists in the repository at this merge base.
+
+| Exact command | Actual result |
+| --- | --- |
+| `go vet ./...` | PASS |
+| `go test -timeout=120s ./...` | PASS; unchanged packages may use cached results |
+| `go build ./...` | PASS |
+| `go test -race -tags=integration -timeout=180s -count=1 ./pkg/forwarder ./cmd/rabbitmq-forwarder ./services/application-status/...` | PASS; forwarder 47.479 s, application-status PostgreSQL 9.087 s and RabbitMQ 14.464 s; command package has no tests |
+| `docker -H unix:///var/run/docker.sock build -f cmd/rabbitmq-forwarder/Dockerfile -t jobtrack-rabbitmq-forwarder:jt61 .` | PASS; unchanged build steps reused Docker cache |
+| Compose config command with synthetic environment in Verification commands above | PASS |
+| `buf lint` | PASS |
+| `kubectl kustomize deploy/knative/forwarder > /tmp/jt61-resolved-kustomize.yaml` | PASS |
+| `git diff --cached --check` | PASS after conflict resolution |
+| `kubectl --kubeconfig /tmp/jt61-review.kubeconfig --context k3d-jobtrack-jt29 -n jt29-spike apply --dry-run=server -k deploy/knative/forwarder` | PASS; deployment created in server dry run only |
+
+The old temporary spike kubeconfig was absent. The existing cluster was confirmed
+with `k3d cluster list --no-headers`; its kubeconfig was retrieved using
+`umask 077; k3d kubeconfig get jobtrack-jt29 > /tmp/jt61-review.kubeconfig`.
+Credentials were not printed or committed. No workloads or broker data were changed.
+
+**BLOCKED acceptance criterion:** real `resume.uploaded` delivery to the actual
+resume-validator in both Docker Compose and k3d has not been demonstrated because
+the actual validator image is absent. Transport-test HTTP receivers and the dry
+run do not satisfy it. Existing classic queues still require a reviewed migration;
+at-least-once processing can duplicate events, and crashes consume the delivery
+budget. JT-61 remains incomplete pending its blocked criterion and final workflow.
