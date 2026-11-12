@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 12 Nov 2026 (JT-51 review decisions)
+- Last updated: 12 Nov 2026 (JT-52 interview decisions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -140,7 +140,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 | 13 | `resume` | Kinley | Upload and store resumes (in its database, 2 MB limit), validation status | `resume.uploaded` | `resume.validated`, `resume.rejected` |
 | 14 | `application-status` | Kinley | Status lifecycle state machine and history | `application.status_changed` | `application.submitted`, `application.withdrawn`, `review.completed`, `interview.scheduled`, `offer.made`, `offer.accepted`, `offer.declined` |
 | 15 | `review` | Kinley | Employer scores and shortlist decisions | `review.completed` | `application.submitted` |
-| 16 | `interview` | Kinley | Schedule and record interviews | `interview.scheduled` | |
+| 16 | `interview` | Kinley | Schedule and record interviews | `interview.scheduled` | `application.submitted` |
 | 17 | `application` | Phuntsho | Submit and withdraw applications, eligibility checks | `application.submitted`, `application.withdrawn` | |
 | 18 | `offer` | Phuntsho | Offers; applicant accepts or declines | `offer.made`, `offer.accepted`, `offer.declined` | `application.submitted` |
 | 19 | `messaging` | Phuntsho | Message threads per application | `message.sent` | `application.submitted` |
@@ -642,6 +642,9 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 12 Nov 2026 | Category-tag name limits: 1 to 100 characters, no leading or trailing spaces, no control characters, unique ignoring case; database CHECK constraints and unique indexes enforce them. There is no free-text request field (JT-39) | 100 matches the job-posting `location` limit, so every location name fits in a job |
 | 12 Nov 2026 | Review maintains a local `application_participants` table from `application.submitted` (consumer in Sprint 2), following the Offer and Messaging design, and Section 4 lists review consuming `application.submitted`. `CompleteReview` requires role `employer` and the stored `employer_id` of the application; unknown or not yet processed applications are `NOT_FOUND`, another employer `PERMISSION_DENIED`, a second review `ALREADY_EXISTS` (JT-51, approved by Phuntsho during JT-51) | Settles the contract's open question of how application ownership is verified without a new synchronous call |
 | 12 Nov 2026 | Review `GetReview` is readable only by the owning employer; applicants, admins and other employers get `PERMISSION_DENIED`, checked by role before input. Score must be 1 to 5 and the decision SHORTLISTED or REJECTED (`INVALID_ARGUMENT` otherwise); scores do not decide shortlisting. Review has no free-text fields, no internal RPCs and no `INTERNAL_TOKEN` (JT-51, approved by Phuntsho during JT-51) | The score is the employer's internal assessment; the applicant sees the outcome through application-status |
+| 12 Nov 2026 | Interview maintains a local `application_participants` table from `application.submitted` (consumer in Sprint 2), following the Offer, Messaging and Review design, and Section 4 lists interview consuming `application.submitted`. `ScheduleInterview` requires role `employer` and the stored `employer_id` of the application; the applicant comes from the table, never the request. Unknown or not yet processed applications are `NOT_FOUND`, another employer `PERMISSION_DENIED` (JT-52, approved by Phuntsho during JT-52) | Ownership is verified without a new synchronous call |
+| 12 Nov 2026 | Interview `GetInterview` and `ListInterviews` are readable by the application's applicant and owning employer; admins, other applicants and other employers get `PERMISSION_DENIED`, checked by role before input. `ListInterviews` is ordered by `scheduled_at`, then `interview_id`, and uses the Section 9 pagination rules. Interview has no internal RPCs and no `INTERNAL_TOKEN` (JT-52, approved by Phuntsho during JT-52) | Both sides of the application need to see when the interview is |
+| 12 Nov 2026 | Interview `scheduled_at` is required, stored in UTC to the microsecond, and must be strictly after the current time and at most 365 days ahead (`INVALID_ARGUMENT` otherwise). An application can have several interviews, but not two at the same time (`ALREADY_EXISTS`, unique constraint). `details` is 0 to 1000 characters after trimming; newline, carriage return and tab are allowed, other control characters and invalid UTF-8 are `INVALID_ARGUMENT` (JT-52, approved by Phuntsho during JT-52) | Allows several interview rounds and gives boundary values for testing |
 
 ---
 
@@ -656,9 +659,10 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
-- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests. Set so far: auth (JT-30), employer (JT-32), company-verification (JT-33), moderation (JT-34), audit-log (JT-35), analytics (JT-36), job-posting (JT-38), resume (JT-48), applicant-profile (JT-50) and category-tag (JT-39), see Section 15.
+- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests. Set so far: auth (JT-30), employer (JT-32), company-verification (JT-33), moderation (JT-34), audit-log (JT-35), analytics (JT-36), job-posting (JT-38), resume (JT-48), applicant-profile (JT-50), category-tag (JT-39) and interview (JT-52), see Section 15.
 - Moderation cannot tell whether a reported job exists or is open, because it has no allowed call to job-posting; it only knows the jobs it removed itself (JT-34). Decide in Sprint 2 whether job events or an agreed call should feed it.
 - How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
+- Recording interview outcomes ("record interviews" in Section 4) needs a contract change: `interview.proto` has no outcome field or RPC. JT-52 implements scheduling and reading only; the change needs team agreement (JT-52).
 - Local `.env` passwords that contain `@ : / ? # %` break the `postgres://` and `amqp://` URLs in Docker Compose. Use letters and digits only (for example `openssl rand -hex 24`).
 - `.github/pull_request_template.md` is listed in Section 8 but does not exist yet.
 - Team B contract fixtures exist only for `employer.verified` and `employer.verification_rejected` (JT-56); the other Team B events have none yet.
