@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 12 Nov 2026 (JT-49 application-status decisions and JT-61 function transport decision)
+- Last updated: 12 Nov 2026 (JT-56 employer verification events)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -421,6 +421,8 @@ services/<service>/
 - Payload: JSON (protojson) of an envelope with `event_id` (UUID), `type`, `occurred_at`, `producer`, and `data` (the event message from `events.proto`).
 - Each consuming service has its own durable queue named `<service>.<purpose>`.
 - Consumers must be idempotent: ignore an `event_id` already processed.
+- Services consume with `events.Consume` from `pkg/events` (JT-56). It declares the quorum queue `<service>.<purpose>` and `<service>.<purpose>.dead` with the JT-61 policy (at most 4 attempts with 1, 2 and 4 s backoff, then the dead queue), handles one event at a time and reconnects after a broker restart. A handler returns nil to acknowledge, `events.Permanent(err)` for an event that can never be applied (dead queue at once), or any other error to retry. Store the handled `event_id` in a `processed_events` table in the same transaction as the change.
+- A service that publishes because of a database change stores the event in an outbox table in the same transaction and publishes it afterwards, so an event exists exactly when the change is committed (`company-verification`, JT-56).
 - Adding a field to an event is allowed. Removing or renaming a field needs both teams' agreement (`buf breaking` enforces this in CI).
 
 ### General
@@ -445,7 +447,7 @@ services/<service>/
 |---|---|---|---|
 | Unit | Go testing, testify, gomock | `*_test.go` next to the code, mainly `internal/domain` and `internal/app` | Table-driven tests. Mock ports, not concrete adapters. |
 | Integration | Testcontainers | `internal/adapters/...` with build tag `integration` | Real PostgreSQL and RabbitMQ in containers |
-| Contract | `buf breaking` in CI, event fixtures in `tests/contract` | | Consumers test against shared JSON fixtures of each event |
+| Contract | `buf breaking` in CI, event fixtures in `tests/contract/fixtures/<routing key>.json` | | Consumers test against shared JSON fixtures of each event |
 | End to end and GUI | Cypress | `tests/e2e` | Main workflow through the real UI |
 | Load | JMeter | `tests/load` | Deadline-rush scenario, 200 concurrent users |
 | Code quality | SonarQube (local) | | Run once per sprint, save the report in `docs/testing` |
@@ -626,6 +628,11 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 11 Nov 2026 | Application-status records a new application as SUBMITTED with a first history entry (`previous_status` UNSPECIFIED); every transition stores its history entry in the same transaction, through a conditional update, so of two concurrent transitions only one is stored (the other is `FAILED_PRECONDITION`). Any transition not in Section 6 is `FAILED_PRECONDITION`; recording an application twice is `ALREADY_EXISTS`. Transitions have no RPC: the Sprint 2 event consumers drive them (approved by Phuntsho during JT-49) | Every change is in history, and status and history can never disagree |
 | 11 Nov 2026 | Application-status `GetApplicationStatus` and `ListApplicationStatusHistory` are readable only by the application's applicant (role applicant) and its employer (role employer). Admins get `PERMISSION_DENIED` before input; other users `PERMISSION_DENIED`; an unknown application `NOT_FOUND`; an `application_id` that is not a UUID `INVALID_ARGUMENT`. History is listed oldest first. Application-status has no internal RPCs and no `INTERNAL_TOKEN` (approved by Phuntsho during JT-49) | Matches the contract's applicant-or-employer access and the messaging and offer mappings |
 | 11 Nov 2026 | The Section 10 coverage target is measured on production code, excluding generated gomock files, with unit and integration tests together; the unit-only figure is reported alongside (as in JT-43) (approved by Phuntsho during JT-49) | Repository code is tested with Testcontainers by design, so unit tests alone cannot reach it |
+| 12 Nov 2026 | Company-verification publishes `employer.verified` and `employer.verification_rejected` through a transactional outbox: `Decide` stores the decision and the event (table `outbox_events`) in one transaction, and a relay in the same process publishes unpublished events oldest first through `pkg/events` every second, stops at the first failure and then sets `published_at`. The envelope producer is `company-verification`, `event_id` a new UUID and `occurred_at` the decision time. A crash between a confirmed publish and `published_at` publishes the event again, which consumers ignore by `event_id` (approved by Jigden during JT-56) | Publishing after the commit without an outbox could lose an event for good: a decided request cannot be decided again and an approved employer cannot resubmit |
+| 12 Nov 2026 | `pkg/events` gets the shared consumer `events.Consume` with the JT-61 queue policy (quorum queue, `x-delivery-limit` 3, at-least-once dead-lettering to `<queue>.dead`, `reject-publish`), prefetch 1, backoff before redelivery, reconnection with backoff, and `events.Permanent` for errors that go straight to the dead queue; the message body and broker URL are never logged (proposed in JT-56 for review by Phuntsho as contracts lead and Sangay as DevOps lead) | Every Sprint 2 consumer can reuse one tested implementation instead of writing its own |
+| 12 Nov 2026 | Employer consumes both verification events from the queue `employer.verification`. `ApplyVerification` claims the `event_id` in `processed_events` and stores the decision in `employer_verifications` (one row per employer) in one transaction, then updates the profile's status, reason and `updated_at`. Only a later `occurred_at` replaces the stored decision (an equal or older one is stale: marked processed, nothing changed), so events in the wrong order cannot undo a newer decision; an approval clears the reason. A decision for an employer without a profile is kept and copied by `Create`; both take a per-employer transaction advisory lock, so a decision arriving during `Create` is never lost (approved by Jigden during JT-56) | Company-verification cannot check that a profile exists, and RabbitMQ redelivery and retries can repeat or reorder events |
+| 12 Nov 2026 | Employer verification event checks: `event_id` and `employer_id` must be UUIDs, `occurred_at` set, the data type must match the routing key, a rejection needs a trimmed reason of 1 to 500 characters (the JT-33 limit, no NUL or invalid UTF-8) and an approval no reason. A failing event goes straight to the dead queue; database errors are retried. The `employer_verifications` columns enforce the same rules (JT-56) | Sets the boundary values for testing and keeps bad events from blocking the queue |
+| 12 Nov 2026 | Shared event fixtures live in `tests/contract/fixtures/<routing key>.json`, are checked against `pkg/events` by a contract test, and are loaded by the consumer tests; the first are `employer.verified` and `employer.verification_rejected` (JT-56) | Producer and consumer test against the same JSON |
 
 ---
 
@@ -645,5 +652,6 @@ Add new decisions at the bottom with the date and a one-line reason.
 - How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
 - Local `.env` passwords that contain `@ : / ? # %` break the `postgres://` and `amqp://` URLs in Docker Compose. Use letters and digits only (for example `openssl rand -hex 24`).
 - `.github/pull_request_template.md` is listed in Section 8 but does not exist yet.
-- Team B services have no contract tests in `tests/contract/` yet.
-- Employer `verification_status` changes only through the `employer.verified` and `employer.verification_rejected` consumers, which are not implemented yet. Until then, manual Compose checks set it with SQL in the `employer` database (JT-57).
+- Team B contract fixtures exist only for `employer.verified` and `employer.verification_rejected` (JT-56); the other Team B events have none yet.
+- Company-verification keeps published `outbox_events` rows as a record; there is no cleanup yet. With more than one replica, two relays could publish the same event twice, which consumers ignore by `event_id` (JT-56).
+- Employers verified by manual SQL before JT-56 have no `employer_verifications` row; the next decision event for them still applies normally (JT-56).
