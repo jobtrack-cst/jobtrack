@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	applicantprofilev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/applicant_profile/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/applicant-profile/internal/adapters/grpc"
@@ -89,12 +90,36 @@ func loadConfig(getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
+// deps are the resources available once the database is migrated.
+type deps struct {
+	checker  ports.HealthChecker
+	profiles ports.ProfileRepository
+}
+
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
-		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-			return runWithPublisher(ctx, cfg, logger, checker,
-				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, runServers)
+		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+			return runWithPublisher(ctx, cfg, logger, d,
+				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+					return runServers(ctx, cfg, logger, d.checker, registerApplicantProfile(d.profiles))
+				})
 		})
+}
+
+// systemClock gives the use cases the current time in UTC.
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now().UTC() }
+
+// registerApplicantProfile returns a function that registers
+// ApplicantProfileService. The service has no internal RPCs, so it needs no
+// INTERNAL_TOKEN (AGENTS.md Section 9).
+func registerApplicantProfile(profiles ports.ProfileRepository) func(grpc.ServiceRegistrar) {
+	handler := grpcadapter.NewApplicantProfileHandler(app.NewProfiles(profiles, systemClock{}))
+	return func(s grpc.ServiceRegistrar) {
+		applicantprofilev1.RegisterApplicantProfileServiceServer(s, handler)
+	}
 }
 
 type publisherResource interface {
@@ -102,9 +127,9 @@ type publisherResource interface {
 	Close() error
 }
 
-func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d deps,
 	open func(string) (publisherResource, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -121,13 +146,16 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Health has no event-producing use case; initialization must not publish events.
-	return start(ctx, cfg, logger, checker)
+	// Applicant-profile publishes and consumes no events; the broker
+	// connection is kept as in the template.
+	// Initialization must not publish events.
+	return start(ctx, cfg, logger, d)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
 	readiness ports.Readiness
+	profiles  ports.ProfileRepository
 	migrate   func(context.Context, string) error
 	close     func()
 }
@@ -139,6 +167,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	}
 	return &databaseHandle{
 		readiness: postgres.NewReadiness(pool),
+		profiles:  postgres.NewProfiles(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
 	}, nil
@@ -146,7 +175,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 
 func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	open func(context.Context, string) (*databaseHandle, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -165,10 +194,12 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness))
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), profiles: database.profiles})
 }
 
-func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
+func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+	register func(grpc.ServiceRegistrar), opts ...grpc.ServerOption,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -182,15 +213,21 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, grpcListener, httpListener)
+	return serve(ctx, logger, checker, register, grpcListener, httpListener, opts...)
 }
 
 // serve owns both listeners and stops the other server when either one fails.
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, grpcListener, httpListener net.Listener) error {
+// opts are extra server options; production passes none.
+func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar),
+	grpcListener, httpListener net.Listener, opts ...grpc.ServerOption,
+) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(opts...)
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	if register != nil {
+		register(grpcServer)
+	}
 	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
