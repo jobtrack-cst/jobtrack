@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	domain "github.com/jobtrack-cst/jobtrack/services/resume/internal/domain"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,18 +44,18 @@ func (m *MockResumeRepository) EXPECT() *MockResumeRepositoryMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockResumeRepository) Create(ctx context.Context, file domain.ResumeFile) (domain.Resume, error) {
+func (m *MockResumeRepository) Create(ctx context.Context, file domain.ResumeFile, event *eventsv1.EventEnvelope) (domain.Resume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, file)
+	ret := m.ctrl.Call(m, "Create", ctx, file, event)
 	ret0, _ := ret[0].(domain.Resume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockResumeRepositoryMockRecorder) Create(ctx, file any) *gomock.Call {
+func (mr *MockResumeRepositoryMockRecorder) Create(ctx, file, event any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockResumeRepository)(nil).Create), ctx, file)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockResumeRepository)(nil).Create), ctx, file, event)
 }
 
 // GetByID mocks base method.

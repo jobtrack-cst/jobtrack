@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/jobtrack-cst/jobtrack/services/resume/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/resume/internal/ports"
@@ -11,8 +14,7 @@ import (
 
 // Resumes holds the resume use cases. The gRPC adapter builds the Caller
 // from pkg/authctx and translates domain errors to gRPC codes.
-// Publishing resume.uploaded is a separate Sprint 2 task; the place that will
-// publish it is marked below.
+// Upload records its outgoing event in the same transaction as the resume.
 type Resumes struct {
 	repo  ports.ResumeRepository
 	clock ports.Clock
@@ -40,7 +42,7 @@ func (r *Resumes) Upload(ctx context.Context, caller domain.Caller, in domain.Up
 		return domain.Resume{}, err
 	}
 	now := r.clock.Now().UTC()
-	stored, err := r.repo.Create(ctx, domain.ResumeFile{
+	file := domain.ResumeFile{
 		Resume: domain.Resume{
 			ID: uuid.NewString(), ApplicantID: caller.UserID,
 			FileName: upload.FileName, ContentType: upload.ContentType,
@@ -49,12 +51,16 @@ func (r *Resumes) Upload(ctx context.Context, caller domain.Caller, in domain.Up
 			CreatedAt:        now, UpdatedAt: now,
 		},
 		Content: upload.Content,
-	})
+	}
+	payload, err := anypb.New(&eventsv1.ResumeUploaded{ResumeId: file.ID, ApplicantId: file.ApplicantID})
 	if err != nil {
 		return domain.Resume{}, err
 	}
-	// Sprint 2: publish resume.uploaded here, after the resume is stored.
-	return stored, nil
+	event := &eventsv1.EventEnvelope{
+		EventId: uuid.NewString(), Type: "resume.uploaded", Producer: "resume",
+		OccurredAt: timestamppb.New(now), Data: payload,
+	}
+	return r.repo.Create(ctx, file, event)
 }
 
 // Get returns the metadata of the caller's own resume. application calls this

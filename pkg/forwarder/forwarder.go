@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -128,15 +127,7 @@ func (c Config) Validate() error {
 	if err != nil || u.Scheme != "http" || u.Host == "" || u.User != nil || u.Fragment != "" || c.Broker == "" {
 		return errors.New("RABBITMQ_URL and an HTTP SINK_URL are required")
 	}
-	if !functionPattern.MatchString(c.Function) || len(c.Bindings) == 0 {
-		return errors.New("FUNCTION_NAME and EVENT_TYPES are required")
-	}
-	for _, b := range c.Bindings {
-		if !bindingPattern.MatchString(b) {
-			return errors.New("EVENT_TYPES must contain exact event types")
-		}
-	}
-	return nil
+	return (Topology{Function: c.Function, Bindings: c.Bindings}).Validate()
 }
 
 // Dial cancels TCP establishment and AMQP handshake. Run manages cancellation
@@ -189,20 +180,8 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 		return errors.New("open AMQP channel failed")
 	}
 	queue := c.Function + ".events"
-	if err := ch.ExchangeDeclare("jobtrack.events", "topic", true, false, false, false, nil); err != nil {
+	if err := (Topology{Function: c.Function, Bindings: c.Bindings}).Declare(ch); err != nil {
 		return err
-	}
-	if _, err := ch.QueueDeclare(queue+".dead", true, false, false, false, amqp.Table{"x-queue-type": "quorum"}); err != nil {
-		return fmt.Errorf("declare dead queue (existing classic queues require migration): %w", err)
-	}
-	args := amqp.Table{"x-queue-type": "quorum", "x-delivery-limit": int32(MaxAttempts - 1), "x-dead-letter-exchange": "", "x-dead-letter-routing-key": queue + ".dead", "x-dead-letter-strategy": "at-least-once", "x-overflow": "reject-publish"}
-	if _, err := ch.QueueDeclare(queue, true, false, false, false, args); err != nil {
-		return fmt.Errorf("declare source queue (existing classic queues require migration): %w", err)
-	}
-	for _, b := range c.Bindings {
-		if err := ch.QueueBind(queue, b, "jobtrack.events", false, nil); err != nil {
-			return err
-		}
 	}
 	if err := ch.Qos(1, 0, false); err != nil {
 		return err

@@ -6,14 +6,16 @@ import (
 	"context"
 	"time"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/jobtrack-cst/jobtrack/services/resume/internal/domain"
 )
 
 // ResumeRepository stores resumes and their files. Metadata reads never load
 // the content, so listing stays small even with 2 MB files.
 type ResumeRepository interface {
-	// Create stores a new resume with its content and returns the stored metadata.
-	Create(ctx context.Context, file domain.ResumeFile) (domain.Resume, error)
+	// Create atomically stores a PENDING resume and its matching uploaded envelope.
+	// Neither record is committed if either write fails.
+	Create(ctx context.Context, file domain.ResumeFile, event *eventsv1.EventEnvelope) (domain.Resume, error)
 	// GetByID returns metadata only, or domain.ErrResumeNotFound.
 	GetByID(ctx context.Context, resumeID string) (domain.Resume, error)
 	// GetFile returns metadata and content, or domain.ErrResumeNotFound.

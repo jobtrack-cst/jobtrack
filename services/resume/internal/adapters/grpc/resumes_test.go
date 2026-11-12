@@ -8,6 +8,7 @@ import (
 	"time"
 
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	resumev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,8 +142,8 @@ func TestResumeHandler_RoleBeforeInput(t *testing.T) {
 
 func TestResumeHandler_UploadResume_MapsRequestAndResponse(t *testing.T) {
 	h := newHandlers(t)
-	h.repo.EXPECT().Create(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, f domain.ResumeFile) (domain.Resume, error) {
+	h.repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, f domain.ResumeFile, event *eventsv1.EventEnvelope) (domain.Resume, error) {
 			assert.Equal(t, ownerID, f.ApplicantID, "owner comes from metadata, never the request")
 			assert.Equal(t, "cv.pdf", f.FileName)
 			assert.Equal(t, pdfContent, f.Content)

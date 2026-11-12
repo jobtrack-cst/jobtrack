@@ -48,6 +48,13 @@ func TestPublisher_IntegrationRoutesEnvelopeToBoundQueue(t *testing.T) {
 		t.Fatal("get RabbitMQ port failed")
 	}
 	brokerURL := (&url.URL{Scheme: "amqp", Host: net.JoinHostPort(host, port.Port()), User: url.UserPassword("publisher_test", "synthetic-test-password"), Path: "/"}).String()
+	// Resume provisions topology with no validator/forwarder process running.
+	if err := ProvisionTopology(ctx, brokerURL); err != nil {
+		t.Fatal(err)
+	}
+	if err := ProvisionTopology(ctx, brokerURL); err != nil {
+		t.Fatal(err)
+	}
 	publisher, err := NewPublisher(brokerURL)
 	if err != nil {
 		t.Fatal(err)
@@ -100,4 +107,21 @@ func TestPublisher_IntegrationRoutesEnvelopeToBoundQueue(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for routed event")
 	}
+	// The named durable destination, not only the temporary test queue, received it.
+	source, err := ch.QueueDeclarePassive("resume-validator.events", true, false, false, false, nil)
+	if err != nil || source.Consumers != 0 {
+		t.Fatalf("validator inbox readiness: %v", err)
+	}
+	msg, available, err := ch.Get(source.Name, false)
+	if err != nil || !available {
+		t.Fatalf("validator inbox missing published event: %v", err)
+	}
+	decoded, err := events.UnmarshalEnvelope(msg.Body)
+	if err != nil || !proto.Equal(decoded, envelope) {
+		t.Fatalf("validator inbox payload changed: %v", err)
+	}
+	if err := msg.Ack(false); err != nil {
+		t.Fatal("acknowledge synthetic test delivery failed")
+	}
+
 }
