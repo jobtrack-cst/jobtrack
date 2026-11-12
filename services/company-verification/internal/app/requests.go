@@ -14,12 +14,13 @@ import (
 // Every use case checks the role first, then the input, then stored state,
 // so a caller with the wrong role learns nothing else.
 type Requests struct {
-	repo  ports.RequestRepository
-	clock ports.Clock
+	repo       ports.RequestRepository
+	clock      ports.Clock
+	newEventID func() string
 }
 
 func NewRequests(repo ports.RequestRepository, clock ports.Clock) *Requests {
-	return &Requests{repo: repo, clock: clock}
+	return &Requests{repo: repo, clock: clock, newEventID: uuid.NewString}
 }
 
 // ListResult is one page of requests with the values the proto pagination needs.
@@ -85,7 +86,7 @@ func (s *Requests) List(ctx context.Context, caller domain.Caller, status domain
 	return ListResult{Requests: items, TotalCount: total, NextPageToken: page.NextToken(len(items), total)}, nil
 }
 
-// Approve decides a PENDING request. Publishing employer.verified is Sprint 2.
+// Approve decides a PENDING request and stores employer.verified with it.
 func (s *Requests) Approve(ctx context.Context, caller domain.Caller, requestID string) (domain.VerificationRequest, error) {
 	if err := caller.RequireAdmin(); err != nil {
 		return domain.VerificationRequest{}, err
@@ -99,8 +100,8 @@ func (s *Requests) Approve(ctx context.Context, caller domain.Caller, requestID 
 	})
 }
 
-// Reject decides a PENDING request with a reason. Publishing
-// employer.verification_rejected is Sprint 2.
+// Reject decides a PENDING request with a reason and stores
+// employer.verification_rejected with it.
 func (s *Requests) Reject(ctx context.Context, caller domain.Caller, requestID, reason string) (domain.VerificationRequest, error) {
 	if err := caller.RequireAdmin(); err != nil {
 		return domain.VerificationRequest{}, err
@@ -120,6 +121,8 @@ func (s *Requests) Reject(ctx context.Context, caller domain.Caller, requestID, 
 
 // decide loads the request so the domain can refuse a decided one early, and
 // the repository repeats the PENDING check in the UPDATE for concurrent admins.
+// The event is stored in the same transaction as the decision; the outbox
+// relay publishes it after the commit.
 func (s *Requests) decide(ctx context.Context, id string, apply func(*domain.VerificationRequest) error) (domain.VerificationRequest, error) {
 	r, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -128,5 +131,9 @@ func (s *Requests) decide(ctx context.Context, id string, apply func(*domain.Ver
 	if err := apply(&r); err != nil {
 		return domain.VerificationRequest{}, err
 	}
-	return s.repo.Decide(ctx, r)
+	event, err := DecisionEvent(r, s.newEventID())
+	if err != nil {
+		return domain.VerificationRequest{}, err
+	}
+	return s.repo.Decide(ctx, r, event)
 }

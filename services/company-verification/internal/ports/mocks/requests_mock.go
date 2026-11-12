@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	domain "github.com/jobtrack-cst/jobtrack/services/company-verification/internal/domain"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -58,18 +59,18 @@ func (mr *MockRequestRepositoryMockRecorder) Create(ctx, r any) *gomock.Call {
 }
 
 // Decide mocks base method.
-func (m *MockRequestRepository) Decide(ctx context.Context, r domain.VerificationRequest) (domain.VerificationRequest, error) {
+func (m *MockRequestRepository) Decide(ctx context.Context, r domain.VerificationRequest, event *eventsv1.EventEnvelope) (domain.VerificationRequest, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Decide", ctx, r)
+	ret := m.ctrl.Call(m, "Decide", ctx, r, event)
 	ret0, _ := ret[0].(domain.VerificationRequest)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Decide indicates an expected call of Decide.
-func (mr *MockRequestRepositoryMockRecorder) Decide(ctx, r any) *gomock.Call {
+func (mr *MockRequestRepositoryMockRecorder) Decide(ctx, r, event any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Decide", reflect.TypeOf((*MockRequestRepository)(nil).Decide), ctx, r)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Decide", reflect.TypeOf((*MockRequestRepository)(nil).Decide), ctx, r, event)
 }
 
 // GetByID mocks base method.

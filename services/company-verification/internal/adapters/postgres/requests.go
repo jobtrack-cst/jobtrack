@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/ports"
 )
@@ -129,18 +131,35 @@ func (r *Requests) list(ctx context.Context, where, order string, page domain.Pa
 }
 
 // Decide only changes a row that is still PENDING, so two admins deciding at
-// once cannot both succeed.
-func (r *Requests) Decide(ctx context.Context, v domain.VerificationRequest) (domain.VerificationRequest, error) {
+// once cannot both succeed. The decision and its outbox event are written in
+// one transaction, so the event exists exactly when the decision is committed.
+func (r *Requests) Decide(ctx context.Context, v domain.VerificationRequest, event *eventsv1.EventEnvelope) (domain.VerificationRequest, error) {
 	status, ok := statusText(v.Status)
 	if !ok || v.Status == domain.StatusPending {
 		return domain.VerificationRequest{}, errors.New("decision status is not valid")
 	}
-	decided, err := scanRequest(r.pool.QueryRow(ctx,
-		`UPDATE verification_requests
-		 SET status = $2, rejection_reason = $3, reviewed_by = $4, updated_at = $5
-		 WHERE id = $1 AND status = 'pending'
-		 RETURNING `+requestColumns,
-		v.ID, status, v.RejectionReason, nullable(v.ReviewedBy), v.UpdatedAt))
+	payload, err := events.MarshalEnvelope(event)
+	if err != nil {
+		return domain.VerificationRequest{}, errors.New("decision event is not valid")
+	}
+	var decided domain.VerificationRequest
+	err = pgx.BeginTxFunc(ctx, r.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		var err error
+		decided, err = scanRequest(tx.QueryRow(ctx,
+			`UPDATE verification_requests
+			 SET status = $2, rejection_reason = $3, reviewed_by = $4, updated_at = $5
+			 WHERE id = $1 AND status = 'pending'
+			 RETURNING `+requestColumns,
+			v.ID, status, v.RejectionReason, nullable(v.ReviewedBy), v.UpdatedAt))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx,
+			`INSERT INTO outbox_events (event_id, routing_key, payload, created_at)
+			 VALUES ($1, $2, $3, $4)`,
+			event.GetEventId(), event.GetType(), string(payload), v.UpdatedAt)
+		return err
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.VerificationRequest{}, r.whyNotDecided(ctx, v.ID)
 	}

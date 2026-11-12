@@ -9,6 +9,7 @@ import (
 
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
 	cv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/company_verification/v1"
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -65,6 +66,10 @@ func stored(s domain.RequestStatus) domain.VerificationRequest {
 }
 
 func returnArg(_ context.Context, r domain.VerificationRequest) (domain.VerificationRequest, error) {
+	return r, nil
+}
+
+func returnDecided(_ context.Context, r domain.VerificationRequest, _ *eventsv1.EventEnvelope) (domain.VerificationRequest, error) {
 	return r, nil
 }
 
@@ -291,7 +296,7 @@ func TestVerificationHandler_ApproveVerificationRequest(t *testing.T) {
 			setup: func(d deps) {
 				d.repo.EXPECT().GetByID(gomock.Any(), requestID).Return(stored(domain.StatusPending), nil)
 				d.clock.EXPECT().Now().Return(testTime.Add(time.Hour))
-				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any()).DoAndReturn(returnArg)
+				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(returnDecided)
 			},
 		},
 		{name: "nil request", want: codes.InvalidArgument},
@@ -339,7 +344,7 @@ func TestVerificationHandler_RejectVerificationRequest(t *testing.T) {
 			setup: func(d deps) {
 				d.repo.EXPECT().GetByID(gomock.Any(), requestID).Return(stored(domain.StatusPending), nil)
 				d.clock.EXPECT().Now().Return(testTime.Add(time.Hour))
-				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any()).DoAndReturn(returnArg)
+				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(returnDecided)
 			},
 		},
 		{name: "nil request", want: codes.InvalidArgument},
