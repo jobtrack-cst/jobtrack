@@ -5,8 +5,9 @@ import (
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/domain"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=application.go -destination=mocks/application.go -package=mocks
+//go:generate go tool mockgen -destination=mocks/application.go -package=mocks . Repository,JobPosting,Resume
 
+// Repository atomically stores each successful write and its event in the outbox.
 type Repository interface {
 	Create(context.Context, domain.Application) (domain.Application, error)
 	Get(context.Context, string) (domain.Application, error)

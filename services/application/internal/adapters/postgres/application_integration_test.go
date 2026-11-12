@@ -205,6 +205,7 @@ func TestRepository_PostgresPersistenceIsolationAndConcurrency(t *testing.T) {
 	if _, _, err = repo.List(canceled, ports.Filter{Limit: 1}); err == nil {
 		t.Fatal("cancellation ignored")
 	}
+	t.Run("transactional outbox", func(t *testing.T) { checkOutbox(t, ctx, pool) })
 	pool.Close()
 	if _, err = repo.Create(ctx, a); err == nil {
 		t.Fatal("closed pool create succeeded")

@@ -16,22 +16,29 @@ import (
 	"time"
 
 	applicationv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/application/v1"
+	jobv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1"
+	resumev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/clients"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/postgres"
+	"github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/rabbitmq"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/ports"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type config struct {
-	serviceName   string
-	grpcPort      int
-	httpPort      int
-	databaseURL   string
-	migrationsDir string
+	serviceName                             string
+	grpcPort                                int
+	httpPort                                int
+	databaseURL                             string
+	migrationsDir                           string
+	jobPostingAddr, resumeAddr, rabbitMQURL string
 }
 
 func main() {
@@ -79,6 +86,15 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if strings.TrimSpace(cfg.databaseURL) == "" {
 		return config{}, errors.New("DATABASE_URL is required")
 	}
+	for _, field := range []struct {
+		name   string
+		target *string
+	}{{"JOB_POSTING_ADDR", &cfg.jobPostingAddr}, {"RESUME_ADDR", &cfg.resumeAddr}, {"RABBITMQ_URL", &cfg.rabbitMQURL}} {
+		*field.target = strings.TrimSpace(getenv(field.name))
+		if *field.target == "" {
+			return config{}, fmt.Errorf("%s is required", field.name)
+		}
+	}
 	// Start from the repository root; tests can inject another migration directory.
 	cfg.migrationsDir = "services/application/migrations"
 
@@ -86,14 +102,34 @@ func loadConfig(getenv func(string) string) (config, error) {
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
-	return runWithDatabase(ctx, cfg, logger, openDatabase, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, repo ports.Repository) error {
-		return runServers(ctx, cfg, logger, checker, app.NewService(repo, nil, nil))
+	return runWithDatabase(ctx, cfg, logger, openDatabase, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, repo ports.Repository, outbox ports.OutboxRepository) error {
+		jobs, err := grpc.NewClient(cfg.jobPostingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithChainUnaryInterceptor(grpcclient.UnaryClientInterceptor()))
+		if err != nil {
+			return errors.New("initialize job-posting client failed")
+		}
+		defer jobs.Close()
+		resumes, err := grpc.NewClient(cfg.resumeAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithChainUnaryInterceptor(grpcclient.UnaryClientInterceptor()))
+		if err != nil {
+			return errors.New("initialize resume client failed")
+		}
+		defer resumes.Close()
+		publisher, err := rabbitmq.NewPublisher(cfg.rabbitMQURL)
+		if err != nil {
+			return errors.New("initialize RabbitMQ publisher failed")
+		}
+		recovering := newRecoveringPublisher(publisher, func() (publisherResource, error) { return rabbitmq.NewPublisher(cfg.rabbitMQURL) })
+		defer recovering.Close()
+		relay := app.NewOutboxRelay(outbox, recovering, wallClock{})
+		return runWithRelay(ctx, logger, relay, outboxRelayInterval, func(ctx context.Context) error {
+			return runServers(ctx, cfg, logger, checker, app.NewService(repo, clients.NewJobPosting(jobv1.NewJobPostingServiceClient(jobs)), clients.NewResume(resumev1.NewResumeServiceClient(resumes))))
+		})
 	})
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
 	repo      ports.Repository
+	outbox    ports.OutboxRepository
 	readiness ports.Readiness
 	migrate   func(context.Context, string) error
 	close     func()
@@ -104,8 +140,10 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	if err != nil {
 		return nil, err
 	}
+	repo := postgres.NewRepository(pool)
 	return &databaseHandle{
-		repo:      postgres.NewRepository(pool),
+		repo:      repo,
+		outbox:    repo,
 		readiness: postgres.NewReadiness(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
@@ -114,7 +152,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 
 func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	open func(context.Context, string) (*databaseHandle, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker, ports.Repository) error,
+	start func(context.Context, config, *slog.Logger, ports.HealthChecker, ports.Repository, ports.OutboxRepository) error,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -133,7 +171,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness), database.repo)
+	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness), database.repo, database.outbox)
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, services ...*app.Service) error {
@@ -206,4 +244,13 @@ func shutdown(ctx context.Context, grpcServer *grpc.Server, httpServer *http.Ser
 		shutdownErr = errors.Join(shutdownErr, errors.New("gRPC graceful shutdown timed out"))
 	}
 	return shutdownErr
+}
+
+type wallClock struct{}
+
+func (wallClock) Now() time.Time { return time.Now().UTC() }
+
+type publisherResource interface {
+	ports.EventPublisher
+	Close() error
 }

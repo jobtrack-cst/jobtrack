@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/testcontainers/testcontainers-go"
 	pgcontainer "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func TestRun_RealDatabaseMigrationsAndHTTPHealth(t *testing.T) {
@@ -50,7 +52,22 @@ func TestRun_RealDatabaseMigrationsAndHTTPHealth(t *testing.T) {
 	httpPort, _ := strconv.Atoi(httpListener.Addr().String()[len("127.0.0.1:"):])
 	grpcListener.Close()
 	httpListener.Close()
-	cfg := config{serviceName: "application", databaseURL: url, migrationsDir: filepath.Join("..", "..", "migrations"), grpcPort: grpcPort, httpPort: httpPort}
+	broker, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ContainerRequest: testcontainers.ContainerRequest{Image: "rabbitmq:4.1-alpine", ExposedPorts: []string{"5672/tcp"}, WaitingFor: wait.ForListeningPort("5672/tcp")}, Started: true})
+	if broker != nil {
+		t.Cleanup(func() { _ = broker.Terminate(context.Background()) })
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	brokerHost, err := broker.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	brokerPort, err := broker.MappedPort(ctx, "5672/tcp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := config{rabbitMQURL: "amqp://guest:guest@" + net.JoinHostPort(brokerHost, brokerPort.Port()) + "/", jobPostingAddr: "job-posting:9090", resumeAddr: "resume:9090", serviceName: "application", databaseURL: url, migrationsDir: filepath.Join("..", "..", "migrations"), grpcPort: grpcPort, httpPort: httpPort}
 	runCtx, stop := context.WithCancel(ctx)
 	defer stop()
 	done := make(chan error, 1)
