@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	resumev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
@@ -38,7 +39,7 @@ func stubResume() domain.Resume {
 		ValidationStatus: domain.ValidationStatusPending, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 }
 
-func (stubResumes) Create(_ context.Context, f domain.ResumeFile) (domain.Resume, error) {
+func (stubResumes) Create(_ context.Context, f domain.ResumeFile, event *eventsv1.EventEnvelope) (domain.Resume, error) {
 	return f.Resume, nil
 }
 

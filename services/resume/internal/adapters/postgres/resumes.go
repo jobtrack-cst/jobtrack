@@ -3,9 +3,11 @@ package postgres
 import (
 	"context"
 	"errors"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/jobtrack-cst/jobtrack/services/resume/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/resume/internal/ports"
 )
@@ -20,19 +22,37 @@ var _ ports.ResumeRepository = (*Resumes)(nil)
 
 func NewResumes(pool *pgxpool.Pool) *Resumes { return &Resumes{pool: pool} }
 
-func (r *Resumes) Create(ctx context.Context, f domain.ResumeFile) (domain.Resume, error) {
-	if _, ok := domain.ParseValidationStatus(f.ValidationStatus.String()); !ok {
+// Create commits the resume and original outgoing envelope together.
+func (r *Resumes) Create(ctx context.Context, f domain.ResumeFile, event *eventsv1.EventEnvelope) (domain.Resume, error) {
+	if f.ValidationStatus != domain.ValidationStatusPending || f.RejectionReason != "" {
 		return domain.Resume{}, errors.New("resume validation status is not valid")
 	}
-	created, err := scanResume(r.pool.QueryRow(ctx,
-		`INSERT INTO resumes (resume_id, applicant_id, file_name, content_type, size_bytes,
-		     content, validation_status, rejection_reason, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		 RETURNING `+resumeColumns,
-		f.ID, f.ApplicantID, f.FileName, f.ContentType, f.SizeBytes,
-		f.Content, f.ValidationStatus.String(), f.RejectionReason, f.CreatedAt, f.UpdatedAt))
+	body, err := events.MarshalEnvelope(event)
 	if err != nil {
-		// Driver errors can contain SQL literals, so return a fixed message.
+		return domain.Resume{}, errors.New("invalid resume uploaded envelope")
+	}
+	payload := new(eventsv1.ResumeUploaded)
+	if event.Type != "resume.uploaded" || event.Producer != "resume" || event.Data.UnmarshalTo(payload) != nil ||
+		payload.ResumeId != f.ID || payload.ApplicantId != f.ApplicantID {
+		return domain.Resume{}, errors.New("resume uploaded envelope does not match resume")
+	}
+	var created domain.Resume
+	err = pgx.BeginTxFunc(ctx, r.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		var err error
+		created, err = scanResume(tx.QueryRow(ctx,
+			`INSERT INTO resumes (resume_id, applicant_id, file_name, content_type, size_bytes,
+ content, validation_status, rejection_reason, created_at, updated_at)
+ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING `+resumeColumns,
+			f.ID, f.ApplicantID, f.FileName, f.ContentType, f.SizeBytes,
+			f.Content, f.ValidationStatus.String(), f.RejectionReason, f.CreatedAt, f.UpdatedAt))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO outgoing_events (event_id, event_type, payload, created_at)
+ VALUES ($1, $2, $3, $4)`, event.EventId, event.Type, string(body), event.OccurredAt.AsTime())
+		return err
+	})
+	if err != nil {
 		return domain.Resume{}, hideDriverError(ctx, "create resume failed")
 	}
 	return created, nil

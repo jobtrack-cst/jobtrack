@@ -327,6 +327,8 @@ services:
     restart: unless-stopped
 
   # JT-48. Ports 9090 and 8080 stay inside the Docker network.
+  # JT-59: Resume synchronously provisions JT-61 queues/binding at startup
+  # before opening listeners; this runs without the optional functions profile.
   resume:
     build:
       context: ../..
