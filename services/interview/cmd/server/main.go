@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	interviewv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/interview/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/interview/internal/adapters/grpc"
@@ -89,12 +90,37 @@ func loadConfig(getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
+// deps are the resources available once the database is migrated.
+type deps struct {
+	checker      ports.HealthChecker
+	participants ports.ParticipantRepository
+	interviews   ports.InterviewRepository
+}
+
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
-		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-			return runWithPublisher(ctx, cfg, logger, checker,
-				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, runServers)
+		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+			return runWithPublisher(ctx, cfg, logger, d,
+				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+					return runServers(ctx, cfg, logger, d.checker, registerInterview(d.participants, d.interviews))
+				})
 		})
+}
+
+// systemClock gives the use cases the current time in UTC.
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now().UTC() }
+
+// registerInterview returns a function that registers InterviewService. The
+// service has no internal RPCs, so it needs no INTERNAL_TOKEN (AGENTS.md
+// Section 9).
+func registerInterview(participants ports.ParticipantRepository, interviews ports.InterviewRepository) func(grpc.ServiceRegistrar) {
+	handler := grpcadapter.NewInterviewHandler(app.NewInterviews(participants, interviews, systemClock{}))
+	return func(s grpc.ServiceRegistrar) {
+		interviewv1.RegisterInterviewServiceServer(s, handler)
+	}
 }
 
 type publisherResource interface {
@@ -102,9 +128,9 @@ type publisherResource interface {
 	Close() error
 }
 
-func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d deps,
 	open func(string) (publisherResource, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -121,15 +147,20 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Health has no event-producing use case; initialization must not publish events.
-	return start(ctx, cfg, logger, checker)
+	// Publishing interview.scheduled and the application.submitted consumer that
+	// fills application_participants are Sprint 2; the broker connection is
+	// kept for them, as in the template.
+	// Initialization must not publish events.
+	return start(ctx, cfg, logger, d)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
-	readiness ports.Readiness
-	migrate   func(context.Context, string) error
-	close     func()
+	readiness    ports.Readiness
+	participants ports.ParticipantRepository
+	interviews   ports.InterviewRepository
+	migrate      func(context.Context, string) error
+	close        func()
 }
 
 func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
@@ -138,15 +169,17 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 		return nil, err
 	}
 	return &databaseHandle{
-		readiness: postgres.NewReadiness(pool),
-		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
-		close:     pool.Close,
+		readiness:    postgres.NewReadiness(pool),
+		participants: postgres.NewParticipants(pool),
+		interviews:   postgres.NewInterviews(pool),
+		migrate:      func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
+		close:        pool.Close,
 	}, nil
 }
 
 func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	open func(context.Context, string) (*databaseHandle, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -165,10 +198,12 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness))
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), participants: database.participants, interviews: database.interviews})
 }
 
-func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
+func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
+	register func(grpc.ServiceRegistrar), opts ...grpc.ServerOption,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -182,15 +217,21 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, grpcListener, httpListener)
+	return serve(ctx, logger, checker, register, grpcListener, httpListener, opts...)
 }
 
 // serve owns both listeners and stops the other server when either one fails.
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, grpcListener, httpListener net.Listener) error {
+// opts are extra server options; production passes none.
+func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar),
+	grpcListener, httpListener net.Listener, opts ...grpc.ServerOption,
+) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(opts...)
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	if register != nil {
+		register(grpcServer)
+	}
 	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
