@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 12 Nov 2026 (JT-39 category-tag decisions)
+- Last updated: 12 Nov 2026 (JT-51 review decisions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -139,7 +139,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 | 12 | `applicant-profile` | Kinley | Applicant details, education, skills | | |
 | 13 | `resume` | Kinley | Upload and store resumes (in its database, 2 MB limit), validation status | `resume.uploaded` | `resume.validated`, `resume.rejected` |
 | 14 | `application-status` | Kinley | Status lifecycle state machine and history | `application.status_changed` | `application.submitted`, `application.withdrawn`, `review.completed`, `interview.scheduled`, `offer.made`, `offer.accepted`, `offer.declined` |
-| 15 | `review` | Kinley | Employer scores and shortlist decisions | `review.completed` | |
+| 15 | `review` | Kinley | Employer scores and shortlist decisions | `review.completed` | `application.submitted` |
 | 16 | `interview` | Kinley | Schedule and record interviews | `interview.scheduled` | |
 | 17 | `application` | Phuntsho | Submit and withdraw applications, eligibility checks | `application.submitted`, `application.withdrawn` | |
 | 18 | `offer` | Phuntsho | Offers; applicant accepts or declines | `offer.made`, `offer.accepted`, `offer.declined` | `application.submitted` |
@@ -640,6 +640,8 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 12 Nov 2026 | Category-tag `ListCategories`, `ListTags` and `ListLocations` are open to any authenticated role; a missing or malformed identity or an unknown role is `UNAUTHENTICATED`, checked before input. Lists are sorted by name ignoring case (`lower(name) COLLATE "C"`, then ID) and use the Section 9 pagination rules (approved by Jigden during JT-39) | Applicants, employers and admins all need the lists, and the order is the same on every database locale |
 | 12 Nov 2026 | Category-tag `ResolveNames` is protected by the JT-44 internal interceptor (job-alert only) and has no role check. IDs that are unknown or not UUIDs are left out of the response without an error; duplicates are removed ignoring case; more than 100 IDs in either list is `INVALID_ARGUMENT`; an empty request returns empty lists; results are sorted like the lists. Category-tag needs `INTERNAL_TOKEN` (approved by Jigden during JT-39) | Follows the contract, and job-alert already turns any missing ID into `INVALID_ARGUMENT` |
 | 12 Nov 2026 | Category-tag name limits: 1 to 100 characters, no leading or trailing spaces, no control characters, unique ignoring case; database CHECK constraints and unique indexes enforce them. There is no free-text request field (JT-39) | 100 matches the job-posting `location` limit, so every location name fits in a job |
+| 12 Nov 2026 | Review maintains a local `application_participants` table from `application.submitted` (consumer in Sprint 2), following the Offer and Messaging design, and Section 4 lists review consuming `application.submitted`. `CompleteReview` requires role `employer` and the stored `employer_id` of the application; unknown or not yet processed applications are `NOT_FOUND`, another employer `PERMISSION_DENIED`, a second review `ALREADY_EXISTS` (JT-51, approved by Phuntsho during JT-51) | Settles the contract's open question of how application ownership is verified without a new synchronous call |
+| 12 Nov 2026 | Review `GetReview` is readable only by the owning employer; applicants, admins and other employers get `PERMISSION_DENIED`, checked by role before input. Score must be 1 to 5 and the decision SHORTLISTED or REJECTED (`INVALID_ARGUMENT` otherwise); scores do not decide shortlisting. Review has no free-text fields, no internal RPCs and no `INTERNAL_TOKEN` (JT-51, approved by Phuntsho during JT-51) | The score is the employer's internal assessment; the applicant sees the outcome through application-status |
 
 ---
 
