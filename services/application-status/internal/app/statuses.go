@@ -11,10 +11,8 @@ import (
 // Statuses holds the application status use cases. The gRPC adapter builds
 // the Caller from pkg/authctx and translates domain errors to gRPC codes.
 //
-// Start and Transition have no RPC: in Sprint 2 the event consumers
-// (application.submitted, review.completed, interview.scheduled, offer.*,
-// application.withdrawn) call them, and Transition publishes
-// application.status_changed where marked below.
+// Start and Transition have no RPC. Repository writes include the status
+// event in a transactional outbox; application input also claims its event ID.
 type Statuses struct {
 	repo ports.StatusRepository
 }
@@ -64,7 +62,6 @@ func (s *Statuses) Transition(ctx context.Context, rawApplicationID string, to d
 	if err := s.repo.Transition(ctx, updated, current.Status, entry); err != nil {
 		return domain.ApplicationStatus{}, err
 	}
-	// Sprint 2: publish application.status_changed here, after it is stored.
 	return updated, nil
 }
 

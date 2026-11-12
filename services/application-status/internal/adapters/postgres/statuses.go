@@ -37,7 +37,10 @@ func (r *Statuses) Create(ctx context.Context, s domain.ApplicationStatus, first
 		if tag.RowsAffected() == 0 {
 			return domain.ErrApplicationExists
 		}
-		return insertEntry(ctx, tx, first)
+		if err := insertEntry(ctx, tx, first); err != nil {
+			return err
+		}
+		return insertStatusEvent(ctx, tx, s, first)
 	})
 }
 
@@ -90,7 +93,10 @@ func (r *Statuses) Transition(ctx context.Context, s domain.ApplicationStatus, e
 			}
 			return domain.ErrStatusChanged
 		}
-		return insertEntry(ctx, tx, entry)
+		if err := insertEntry(ctx, tx, entry); err != nil {
+			return err
+		}
+		return insertStatusEvent(ctx, tx, s, entry)
 	})
 }
 
@@ -163,7 +169,7 @@ func (r *Statuses) inTx(ctx context.Context, message string, fn func(pgx.Tx) err
 	defer func() { _ = tx.Rollback(ctx) }()
 	if err := fn(tx); err != nil {
 		if errors.Is(err, domain.ErrApplicationExists) || errors.Is(err, domain.ErrApplicationNotFound) ||
-			errors.Is(err, domain.ErrStatusChanged) {
+			errors.Is(err, domain.ErrStatusChanged) || errors.Is(err, domain.ErrConflictingEvent) || errors.Is(err, domain.ErrInvalidTransition) {
 			return err
 		}
 		return hideDriverError(ctx, message)
