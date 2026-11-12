@@ -43,13 +43,21 @@ func TestRunWithPublisher_PassesPublisherToRelay(t *testing.T) {
 	cfg := config{rabbitMQURL: "broker-config"}
 	err := runWithPublisher(context.Background(), cfg, logging.New("test", io.Discard), deps{},
 		func(string) (publisherResource, error) { return p, nil },
-		func(_ context.Context, _ config, _ *slog.Logger, d deps) error {
-			if d.publisher != p {
-				t.Error("the opened publisher was not passed on for the outbox relay")
+		func(ctx context.Context, _ config, _ *slog.Logger, d deps) error {
+			if d.publisher == nil {
+				t.Fatal("no publisher was passed on for the outbox relay")
+			}
+			// startupPublisher records a publish as "unexpected publish".
+			if err := d.publisher.Publish(ctx, nil); err != nil {
+				t.Fatal(err)
 			}
 			return nil
 		})
 	if err != nil {
 		t.Fatal(err)
+	}
+	want := []string{"unexpected publish", "close RabbitMQ"}
+	if len(calls) != 2 || calls[0] != want[0] || calls[1] != want[1] {
+		t.Fatalf("calls=%v, want the opened publisher used and then closed: %v", calls, want)
 	}
 }

@@ -14,6 +14,9 @@ import (
 // named <service>.<purpose> (AGENTS.md Section 9).
 const VerificationQueue = "employer.verification"
 
+// VerificationProducer is the only service that may publish these events.
+const VerificationProducer = "company-verification"
+
 // Routing keys the queue binds to (AGENTS.md Section 4).
 const (
 	EventEmployerVerified             = "employer.verified"
@@ -58,9 +61,13 @@ func VerificationHandler(applier VerificationApplier, logger *slog.Logger) event
 	}
 }
 
-// DecisionFromEnvelope reads either verification event. The data type must
-// match the routing key, so a mislabelled event is never applied.
+// DecisionFromEnvelope reads either verification event. The producer must be
+// company-verification and the data type must match the routing key, so a
+// mislabelled event is never applied.
 func DecisionFromEnvelope(envelope *eventsv1.EventEnvelope) (domain.VerificationDecision, error) {
+	if envelope.GetProducer() != VerificationProducer {
+		return domain.VerificationDecision{}, domain.ErrInvalidVerificationEvent
+	}
 	var employerID, reason string
 	var status domain.VerificationStatus
 	switch envelope.GetType() {

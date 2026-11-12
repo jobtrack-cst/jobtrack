@@ -18,6 +18,10 @@ import (
 // then the broker moves it to the <queue>.dead queue.
 const MaxDeliveries = 4
 
+// HandlerTimeout bounds one handler call, so a stuck database call cannot stop
+// the queue; a timed-out event is retried like any other temporary failure.
+const HandlerTimeout = 10 * time.Second
+
 // ErrPermanent marks a handler error that retrying cannot fix, such as an
 // event with an invalid ID. The event goes straight to the dead queue.
 var ErrPermanent = errors.New("permanent event failure")
@@ -46,9 +50,10 @@ type ConsumerConfig struct {
 
 	// Unexported so production always uses the JT-61 timings; tests in this
 	// package shorten them.
-	retryBase     time.Duration
-	reconnectBase time.Duration
-	reconnectMax  time.Duration
+	retryBase      time.Duration
+	handlerTimeout time.Duration
+	reconnectBase  time.Duration
+	reconnectMax   time.Duration
 }
 
 var (
@@ -79,6 +84,9 @@ func (c *ConsumerConfig) validate() error {
 	}
 	if c.retryBase <= 0 {
 		c.retryBase = time.Second
+	}
+	if c.handlerTimeout <= 0 {
+		c.handlerTimeout = HandlerTimeout
 	}
 	if c.reconnectBase <= 0 {
 		c.reconnectBase = time.Second
@@ -215,7 +223,9 @@ func settle(ctx context.Context, cfg *ConsumerConfig, body []byte, headers amqp.
 		return d.Reject(true)
 	}
 
-	err = cfg.Handler(ctx, envelope)
+	handlerCtx, cancel := context.WithTimeout(ctx, cfg.handlerTimeout)
+	err = cfg.Handler(handlerCtx, envelope)
+	cancel()
 	switch {
 	case err == nil:
 		return d.Ack(false)

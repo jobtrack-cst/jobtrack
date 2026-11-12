@@ -104,6 +104,7 @@ func TestVerificationHandler_InvalidEventsAreDeadLettered(t *testing.T) {
 		change func(e *eventsv1.EventEnvelope)
 	}{
 		{"unknown routing key", func(e *eventsv1.EventEnvelope) { e.Type = "employer.unknown" }},
+		{"producer is not company-verification", func(e *eventsv1.EventEnvelope) { e.Producer = "employer" }},
 		{"data does not match the routing key", func(e *eventsv1.EventEnvelope) { e.Data = rejectedData }},
 		{"missing data", func(e *eventsv1.EventEnvelope) { e.Data = nil }},
 		{"missing occurred_at", func(e *eventsv1.EventEnvelope) { e.OccurredAt = nil }},

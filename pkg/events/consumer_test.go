@@ -74,6 +74,7 @@ func TestConsumerConfig_Validate_FillsJT61Timings(t *testing.T) {
 	cfg := validConsumerConfig()
 	require.NoError(t, cfg.validate())
 	require.Equal(t, time.Second, cfg.retryBase)
+	require.Equal(t, HandlerTimeout, cfg.handlerTimeout)
 	require.Equal(t, time.Second, cfg.reconnectBase)
 	require.Equal(t, 30*time.Second, cfg.reconnectMax)
 }
@@ -218,4 +219,23 @@ func TestConsume_StopsReconnectingWhenContextEnds(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Consume did not return after the context ended")
 	}
+}
+
+func TestSettle_HandlerTimeoutRetriesTheEvent(t *testing.T) {
+	cfg := validConsumerConfig()
+	require.NoError(t, cfg.validate())
+	cfg.handlerTimeout = 20 * time.Millisecond
+	cfg.Handler = func(ctx context.Context, _ *eventsv1.EventEnvelope) error {
+		_, hasDeadline := ctx.Deadline()
+		require.True(t, hasDeadline, "every handler call has a deadline")
+		<-ctx.Done() // a database call that never answers
+		return ctx.Err()
+	}
+	body, err := MarshalEnvelope(publisherEnvelope(t))
+	require.NoError(t, err)
+	ack := &stubAck{}
+
+	require.NoError(t, settle(context.Background(), &cfg, body, nil, ack))
+	require.Equal(t, 1, ack.rejects, "a timed-out event is retried, not dead-lettered")
+	require.True(t, ack.rejectRequeue)
 }

@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -123,4 +124,23 @@ func TestOutboxRelay_PublishPending(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestOutboxRelay_EachPublishHasATimeout(t *testing.T) {
+	relay, d := newRelay(t)
+	pending := outboxEvents(t, firstEventID)
+	d.outbox.EXPECT().Pending(gomock.Any(), app.OutboxBatchSize).Return(pending, nil)
+	d.clock.EXPECT().Now().Return(now)
+	d.publisher.EXPECT().Publish(gomock.Any(), pending[0]).DoAndReturn(
+		func(ctx context.Context, _ *eventsv1.EventEnvelope) error {
+			deadline, ok := ctx.Deadline()
+			require.True(t, ok, "publish must not wait forever for the broker")
+			require.WithinDuration(t, time.Now().Add(app.PublishTimeout), deadline, time.Second)
+			return nil
+		})
+	d.outbox.EXPECT().MarkPublished(gomock.Any(), firstEventID, now).Return(nil)
+
+	n, err := relay.PublishPending(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
 }

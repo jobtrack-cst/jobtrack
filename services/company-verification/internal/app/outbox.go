@@ -2,12 +2,17 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/ports"
 )
 
 // OutboxBatchSize is how many events one PublishPending call reads.
 const OutboxBatchSize = 50
+
+// PublishTimeout bounds the wait for one broker confirmation, so a broker
+// that stops answering cannot stall the relay.
+const PublishTimeout = 10 * time.Second
 
 // OutboxRelay publishes the events stored by Decide, after their decisions
 // are committed (JT-56).
@@ -33,7 +38,10 @@ func (r *OutboxRelay) PublishPending(ctx context.Context) (int, error) {
 	}
 	published := 0
 	for _, event := range pending {
-		if err := r.publisher.Publish(ctx, event); err != nil {
+		publishCtx, cancel := context.WithTimeout(ctx, PublishTimeout)
+		err := r.publisher.Publish(publishCtx, event)
+		cancel()
+		if err != nil {
 			return published, err
 		}
 		if err := r.repo.MarkPublished(ctx, event.GetEventId(), r.clock.Now()); err != nil {

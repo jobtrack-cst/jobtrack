@@ -146,15 +146,16 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 	if err != nil {
 		return errors.New("initialize RabbitMQ publisher failed")
 	}
+	// The outbox relay publishes employer.verified and
+	// employer.verification_rejected through this publisher, which reconnects
+	// after a failed publish (JT-56). Initialization must not publish events.
+	recovering := newRecoveringPublisher(publisher, func() (publisherResource, error) { return open(cfg.rabbitMQURL) })
 	defer func() {
-		if closeErr := publisher.Close(); closeErr != nil {
+		if closeErr := recovering.Close(); closeErr != nil {
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// The outbox relay publishes employer.verified and
-	// employer.verification_rejected through this publisher (JT-56).
-	// Initialization must not publish events.
-	d.publisher = publisher
+	d.publisher = recovering
 	return start(ctx, cfg, logger, d)
 }
 
