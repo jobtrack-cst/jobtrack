@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/mock/gomock"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
+
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/ports/mocks"
@@ -49,8 +51,13 @@ func stored(status domain.RequestStatus) domain.VerificationRequest {
 	}
 }
 
-// returnArg makes Create and Decide behave like a repository that stores what it is given.
+// returnArg makes Create behave like a repository that stores what it is given.
 func returnArg(_ context.Context, r domain.VerificationRequest) (domain.VerificationRequest, error) {
+	return r, nil
+}
+
+// returnDecided does the same for Decide, which also receives the outbox event.
+func returnDecided(_ context.Context, r domain.VerificationRequest, _ *eventsv1.EventEnvelope) (domain.VerificationRequest, error) {
 	return r, nil
 }
 
@@ -273,7 +280,7 @@ func TestRequests_Approve(t *testing.T) {
 			setup: func(d deps) {
 				d.repo.EXPECT().GetByID(gomock.Any(), requestID).Return(stored(domain.StatusPending), nil)
 				d.clock.EXPECT().Now().Return(now)
-				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any()).DoAndReturn(returnArg)
+				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(returnDecided)
 			},
 		},
 		{name: "employer is denied", caller: employer, id: requestID, wantErr: domain.ErrAdminRoleRequired},
@@ -308,7 +315,7 @@ func TestRequests_Approve(t *testing.T) {
 			setup: func(d deps) {
 				d.repo.EXPECT().GetByID(gomock.Any(), requestID).Return(stored(domain.StatusPending), nil)
 				d.clock.EXPECT().Now().Return(now)
-				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any()).Return(domain.VerificationRequest{}, domain.ErrRequestNotPending)
+				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.VerificationRequest{}, domain.ErrRequestNotPending)
 			},
 			wantErr: domain.ErrRequestNotPending,
 		},
@@ -355,7 +362,7 @@ func TestRequests_Reject(t *testing.T) {
 			setup: func(d deps) {
 				d.repo.EXPECT().GetByID(gomock.Any(), requestID).Return(stored(domain.StatusPending), nil)
 				d.clock.EXPECT().Now().Return(now)
-				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any()).DoAndReturn(returnArg)
+				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(returnDecided)
 			},
 		},
 		{name: "employer is denied", caller: employer, id: requestID, reason: "x", wantErr: domain.ErrAdminRoleRequired},
@@ -392,7 +399,7 @@ func TestRequests_Reject(t *testing.T) {
 			setup: func(d deps) {
 				d.repo.EXPECT().GetByID(gomock.Any(), requestID).Return(stored(domain.StatusPending), nil)
 				d.clock.EXPECT().Now().Return(now)
-				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any()).Return(domain.VerificationRequest{}, errDB)
+				d.repo.EXPECT().Decide(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.VerificationRequest{}, errDB)
 			},
 			wantErr: errDB,
 		},

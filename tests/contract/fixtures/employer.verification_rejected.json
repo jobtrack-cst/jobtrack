@@ -1,0 +1,11 @@
+{
+  "event_id": "9b2e1d63-4e5f-4c7b-8d8e-2f3a4b5c6d7e",
+  "type": "employer.verification_rejected",
+  "occurred_at": "2026-11-12T04:00:00.654321Z",
+  "producer": "company-verification",
+  "data": {
+    "@type": "type.googleapis.com/jobtrack.events.v1.EmployerVerificationRejected",
+    "employer_id": "55555555-5555-4555-8555-555555555555",
+    "reason": "Registration number does not match the trade licence."
+  }
+}

@@ -101,7 +101,7 @@ func NewCompanyProfile(employerID string, f ProfileFields, now time.Time) Compan
 }
 
 // WithFields replaces the editable fields. Verification status and reason
-// are kept, because only verification events change them (Sprint 2).
+// are kept, because only verification events change them (JT-56).
 func (p CompanyProfile) WithFields(f ProfileFields, now time.Time) CompanyProfile {
 	p.CompanyName = f.CompanyName
 	p.Description = f.Description

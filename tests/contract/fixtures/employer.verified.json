@@ -1,0 +1,10 @@
+{
+  "event_id": "8a1f0c52-3d4e-4b6a-9c7d-1e2f3a4b5c6d",
+  "type": "employer.verified",
+  "occurred_at": "2026-11-12T04:30:00.123456Z",
+  "producer": "company-verification",
+  "data": {
+    "@type": "type.googleapis.com/jobtrack.events.v1.EmployerVerified",
+    "employer_id": "55555555-5555-4555-8555-555555555555"
+  }
+}

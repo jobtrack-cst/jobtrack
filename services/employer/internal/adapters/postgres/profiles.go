@@ -23,19 +23,32 @@ var _ ports.ProfileRepository = (*Profiles)(nil)
 
 func NewProfiles(pool *pgxpool.Pool) *Profiles { return &Profiles{pool: pool} }
 
+// Create copies a verification decision that arrived before the profile
+// (JT-56). The employer lock makes ApplyVerification wait, so a decision
+// committed during Create is either copied here or applied to the new row.
 func (r *Profiles) Create(ctx context.Context, p domain.CompanyProfile) (domain.CompanyProfile, error) {
 	status, ok := statusText(p.VerificationStatus)
 	if !ok {
 		return domain.CompanyProfile{}, errors.New("verification status is not valid")
 	}
-	row := r.pool.QueryRow(ctx,
-		`INSERT INTO company_profiles (employer_id, company_name, description, website, location,
-		     verification_status, rejection_reason, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		 RETURNING `+profileColumns,
-		p.EmployerID, p.CompanyName, p.Description, p.Website, p.Location,
-		status, p.RejectionReason, p.CreatedAt, p.UpdatedAt)
-	created, err := scanProfile(row)
+	var created domain.CompanyProfile
+	err := pgx.BeginTxFunc(ctx, r.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, lockEmployer, p.EmployerID); err != nil {
+			return err
+		}
+		var err error
+		created, err = scanProfile(tx.QueryRow(ctx,
+			`INSERT INTO company_profiles (employer_id, company_name, description, website, location,
+			     verification_status, rejection_reason, created_at, updated_at)
+			 SELECT $1, $2, $3, $4, $5,
+			     COALESCE(v.status, $6), COALESCE(v.rejection_reason, $7), $8, $9
+			 FROM (SELECT 1) AS one
+			 LEFT JOIN employer_verifications v ON v.employer_id = $1
+			 RETURNING `+profileColumns,
+			p.EmployerID, p.CompanyName, p.Description, p.Website, p.Location,
+			status, p.RejectionReason, p.CreatedAt, p.UpdatedAt))
+		return err
+	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
 		return domain.CompanyProfile{}, domain.ErrProfileExists

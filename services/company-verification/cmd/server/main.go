@@ -90,10 +90,13 @@ func loadConfig(getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
-// deps are the resources available once the database is migrated.
+// deps are the resources available once the database is migrated, plus the
+// publisher once RabbitMQ is connected.
 type deps struct {
-	checker  ports.HealthChecker
-	requests ports.RequestRepository
+	checker   ports.HealthChecker
+	requests  ports.RequestRepository
+	outbox    ports.OutboxRepository
+	publisher ports.EventPublisher
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -102,7 +105,10 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerCompanyVerification(d.requests))
+					relay := app.NewOutboxRelay(d.outbox, d.publisher, systemClock{})
+					return runWithRelay(ctx, logger, relay, outboxRelayInterval, func(ctx context.Context) error {
+						return runServers(ctx, cfg, logger, d.checker, registerCompanyVerification(d.requests))
+					})
 				})
 		})
 }
@@ -140,13 +146,16 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 	if err != nil {
 		return errors.New("initialize RabbitMQ publisher failed")
 	}
+	// The outbox relay publishes employer.verified and
+	// employer.verification_rejected through this publisher, which reconnects
+	// after a failed publish (JT-56). Initialization must not publish events.
+	recovering := newRecoveringPublisher(publisher, func() (publisherResource, error) { return open(cfg.rabbitMQURL) })
 	defer func() {
-		if closeErr := publisher.Close(); closeErr != nil {
+		if closeErr := recovering.Close(); closeErr != nil {
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Publishing employer.verified and employer.verification_rejected is
-	// Sprint 2; the connection is kept for it. Initialization must not publish events.
+	d.publisher = recovering
 	return start(ctx, cfg, logger, d)
 }
 
@@ -154,6 +163,7 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 type databaseHandle struct {
 	readiness ports.Readiness
 	requests  ports.RequestRepository
+	outbox    ports.OutboxRepository
 	migrate   func(context.Context, string) error
 	close     func()
 }
@@ -166,6 +176,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	return &databaseHandle{
 		readiness: postgres.NewReadiness(pool),
 		requests:  postgres.NewRequests(pool),
+		outbox:    postgres.NewOutbox(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
 	}, nil
@@ -192,7 +203,11 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), requests: database.requests})
+	return start(ctx, cfg, logger, deps{
+		checker:  app.NewHealthWithReadiness(database.readiness),
+		requests: database.requests,
+		outbox:   database.outbox,
+	})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar)) error {

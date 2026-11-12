@@ -11,11 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgcontainer "github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/adapters/postgres"
+	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/company-verification/internal/domain"
 )
 
@@ -70,6 +73,16 @@ func startVerificationDB(t *testing.T) (context.Context, *pgxpool.Pool) {
 func newPending(n int, employer string, at time.Time) domain.VerificationRequest {
 	id := "a0000000-0000-4000-8000-" + strings.Repeat("0", 11) + string(rune('0'+n))
 	return domain.NewVerificationRequest(id, employer, domain.Submission{RegistrationNumber: "BT-1", Notes: "note"}, at)
+}
+
+// eventFor builds the outbox event the app layer would store with v.
+func eventFor(t *testing.T, v domain.VerificationRequest) *eventsv1.EventEnvelope {
+	t.Helper()
+	e, err := app.DecisionEvent(v, uuid.NewString())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
 }
 
 func TestRequests_CreateGetAndStatuses(t *testing.T) {
@@ -129,7 +142,7 @@ func TestRequests_Decide(t *testing.T) {
 	if err := first.Reject(adminID, "Expired licence", later); err != nil {
 		t.Fatal(err)
 	}
-	rejected, err := repo.Decide(ctx, first)
+	rejected, err := repo.Decide(ctx, first, eventFor(t, first))
 	if err != nil || rejected != first {
 		t.Fatalf("rejected %+v,%v, want %+v,nil", rejected, err, first)
 	}
@@ -137,7 +150,7 @@ func TestRequests_Decide(t *testing.T) {
 	t.Run("deciding an already decided request", func(t *testing.T) {
 		again := newPending(1, employerID, base)
 		_ = again.Approve(adminID, later)
-		if _, err := repo.Decide(ctx, again); !errors.Is(err, domain.ErrRequestNotPending) {
+		if _, err := repo.Decide(ctx, again, eventFor(t, again)); !errors.Is(err, domain.ErrRequestNotPending) {
 			t.Fatalf("err=%v, want ErrRequestNotPending", err)
 		}
 	})
@@ -145,7 +158,7 @@ func TestRequests_Decide(t *testing.T) {
 		missing := newPending(9, employerID, base)
 		missing.ID = unknownID
 		_ = missing.Approve(adminID, later)
-		if _, err := repo.Decide(ctx, missing); !errors.Is(err, domain.ErrRequestNotFound) {
+		if _, err := repo.Decide(ctx, missing, eventFor(t, missing)); !errors.Is(err, domain.ErrRequestNotFound) {
 			t.Fatalf("err=%v, want ErrRequestNotFound", err)
 		}
 	})
@@ -157,7 +170,7 @@ func TestRequests_Decide(t *testing.T) {
 	if err := second.Approve(adminID, later.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	approved, err := repo.Decide(ctx, second)
+	approved, err := repo.Decide(ctx, second, eventFor(t, second))
 	if err != nil || approved != second || approved.ReviewedBy != adminID {
 		t.Fatalf("approved %+v,%v, want %+v,nil", approved, err, second)
 	}
@@ -169,12 +182,14 @@ func TestRequests_Decide(t *testing.T) {
 			t.Fatal(err)
 		}
 		_ = third.Approve(adminID, later)
-		if _, err := repo.Decide(ctx, third); !errors.Is(err, domain.ErrAlreadyVerified) {
+		if _, err := repo.Decide(ctx, third, eventFor(t, third)); !errors.Is(err, domain.ErrAlreadyVerified) {
 			t.Fatalf("err=%v, want ErrAlreadyVerified", err)
 		}
 	})
 	t.Run("pending status is not a decision", func(t *testing.T) {
-		if _, err := repo.Decide(ctx, newPending(4, otherID, base)); err == nil {
+		approvedLater := newPending(4, otherID, base)
+		_ = approvedLater.Approve(adminID, later)
+		if _, err := repo.Decide(ctx, newPending(4, otherID, base), eventFor(t, approvedLater)); err == nil {
 			t.Fatal("expected an error for a PENDING decision")
 		}
 	})
@@ -194,11 +209,13 @@ func TestRequests_Decide_ConcurrentAdmins(t *testing.T) {
 
 	var wg sync.WaitGroup
 	errs := make([]error, 2)
-	for i, v := range []domain.VerificationRequest{approve, reject} {
+	decisions := []domain.VerificationRequest{approve, reject}
+	decisionEvents := []*eventsv1.EventEnvelope{eventFor(t, approve), eventFor(t, reject)}
+	for i, v := range decisions {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errs[i] = repo.Decide(ctx, v)
+			_, errs[i] = repo.Decide(ctx, v, decisionEvents[i])
 		}()
 	}
 	wg.Wait()
@@ -228,7 +245,7 @@ func TestRequests_Lists(t *testing.T) {
 			t.Fatal(err)
 		}
 		_ = r.Reject(adminID, "missing licence", base.Add(at+time.Minute))
-		if _, err := repo.Decide(ctx, r); err != nil {
+		if _, err := repo.Decide(ctx, r, eventFor(t, r)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -329,7 +346,7 @@ func TestRequests_DatabaseLimits(t *testing.T) {
 				t.Fatal(err)
 			}
 			_ = v.Reject(adminID, strings.Repeat("ä", tt.n), base.Add(time.Minute))
-			if _, err := repo.Decide(ctx, v); tt.wantErr != (err != nil) {
+			if _, err := repo.Decide(ctx, v, eventFor(t, v)); tt.wantErr != (err != nil) {
 				t.Fatalf("%d characters: err=%v, wantErr=%v", tt.n, err, tt.wantErr)
 			}
 		}
