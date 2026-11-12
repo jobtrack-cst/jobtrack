@@ -57,7 +57,7 @@ Commands run on branch `JT-52-interview-basic-operations`:
 | Integration tests (Testcontainers, `postgres:18-alpine`) | Pass, 8 subtests |
 | Package coverage (unit) | `domain` 100%, `app` 100%, `adapters/grpc` 100%, `cmd/server` 81.2% |
 | Docker Compose `/healthz` | `HTTP/1.1 200 OK` |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Green, [CI run](https://github.com/jobtrack-cst/jobtrack/actions/runs/43265228067) |
 
 ## Acceptance criteria review
 
