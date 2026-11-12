@@ -392,6 +392,29 @@ services:
     restart: unless-stopped
 
   # JT-49. Ports 9090 and 8080 stay inside the Docker network.
+  saved-jobs:
+    build:
+      context: ../..
+      dockerfile: services/saved-jobs/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: saved-jobs
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://saved_jobs@postgres:5432/saved_jobs?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   application-status:
     build:
       context: ../..
@@ -428,6 +451,58 @@ services:
       DATABASE_URL: postgres://applicant_profile@postgres:5432/applicant_profile?sslmode=disable
       PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
       # No INTERNAL_TOKEN: applicant-profile serves and calls no internal RPCs.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-39. Ports 9090 and 8080 stay inside the Docker network. category-tag
+  # never publishes or consumes events; RabbitMQ stays as in the template.
+  category-tag:
+    build:
+      context: ../..
+      dockerfile: services/category-tag/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: category-tag
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://category_tag@postgres:5432/category_tag?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      # Serves CategoryTagInternalService for job-alert (JT-44).
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-51. Ports 9090 and 8080 stay inside the Docker network.
+  review:
+    build:
+      context: ../..
+      dockerfile: services/review/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: review
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://review@postgres:5432/review?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      # No INTERNAL_TOKEN: review serves and calls no internal RPCs.
     depends_on:
       postgres:
         condition: service_healthy
