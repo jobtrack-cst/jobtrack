@@ -354,10 +354,13 @@ services:
       retries: 6
     restart: unless-stopped
 
-  # JT-61 transport. Validator image is supplied by its implementation task.
+  # JT-62 real validator, using the JT-61 transport.
   resume-validator:
     profiles: [functions]
     image: ${RESUME_VALIDATOR_IMAGE:-jobtrack-resume-validator:local}
+    build:
+      context: ../..
+      dockerfile: functions/resume-validator/Dockerfile
     environment:
       SERVICE_NAME: resume-validator
       HTTP_PORT: "8080"
