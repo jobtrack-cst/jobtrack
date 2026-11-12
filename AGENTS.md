@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 12 Nov 2026 (JT-49 application-status decisions and JT-61 function transport decision)
+- Last updated: 12 Nov 2026 (JT-50 applicant-profile decisions)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -626,6 +626,8 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 11 Nov 2026 | Application-status records a new application as SUBMITTED with a first history entry (`previous_status` UNSPECIFIED); every transition stores its history entry in the same transaction, through a conditional update, so of two concurrent transitions only one is stored (the other is `FAILED_PRECONDITION`). Any transition not in Section 6 is `FAILED_PRECONDITION`; recording an application twice is `ALREADY_EXISTS`. Transitions have no RPC: the Sprint 2 event consumers drive them (approved by Phuntsho during JT-49) | Every change is in history, and status and history can never disagree |
 | 11 Nov 2026 | Application-status `GetApplicationStatus` and `ListApplicationStatusHistory` are readable only by the application's applicant (role applicant) and its employer (role employer). Admins get `PERMISSION_DENIED` before input; other users `PERMISSION_DENIED`; an unknown application `NOT_FOUND`; an `application_id` that is not a UUID `INVALID_ARGUMENT`. History is listed oldest first. Application-status has no internal RPCs and no `INTERNAL_TOKEN` (approved by Phuntsho during JT-49) | Matches the contract's applicant-or-employer access and the messaging and offer mappings |
 | 11 Nov 2026 | The Section 10 coverage target is measured on production code, excluding generated gomock files, with unit and integration tests together; the unit-only figure is reported alongside (as in JT-43) (approved by Phuntsho during JT-49) | Repository code is tested with Testcontainers by design, so unit tests alone cannot reach it |
+| 12 Nov 2026 | Applicant-profile `CreateMyProfile`, `GetMyProfile` and `UpdateMyProfile` are applicant only and always act on the caller's own profile; employers and admins get `PERMISSION_DENIED`, checked before input. A second create is `ALREADY_EXISTS`; get or update without a profile is `NOT_FOUND`. `UpdateMyProfile` replaces the summary, education and skills (an empty list clears it) and keeps `created_at`. No internal RPCs and no `INTERNAL_TOKEN` (JT-50) | The contract has no RPC for other roles, and the request names no applicant |
+| 12 Nov 2026 | Applicant-profile limits, in characters after trimming: `summary` 0 to 2000 (line breaks allowed); up to 20 education entries, `institution` and `qualification` 1 to 150 on one line; `start_year` 1950 to next year; `end_year` 0 (ongoing) or `start_year` to 10 years ahead; up to 50 skills, each 1 to 50 on one line, no duplicates ignoring case; no invalid UTF-8 or other control characters; every failure is `INVALID_ARGUMENT` naming the entry. The database enforces the same limits except the clock-based year bounds (JT-50) | Sets the Section 16 limits for applicant-profile and the boundary values for testing |
 
 ---
 
@@ -640,7 +642,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 - Remaining risk: without mTLS, a compromised internal service that holds `INTERNAL_TOKEN` could call internal RPCs. Accepted by all four members in PR #6.
 - Suggest a `.gitattributes` file with `* text=auto eol=lf` so line endings match on Windows and WSL.
 - The `buf` CLI version is not pinned; the team should agree on one version.
-- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests. Set so far: auth (JT-30), employer (JT-32), company-verification (JT-33), moderation (JT-34), audit-log (JT-35), analytics (JT-36), job-posting (JT-38) and resume (JT-48), see Section 15.
+- Maximum lengths for free-text fields (title, description, reason, notes) to be set in the implementation tasks and used for boundary value tests. Set so far: auth (JT-30), employer (JT-32), company-verification (JT-33), moderation (JT-34), audit-log (JT-35), analytics (JT-36), job-posting (JT-38), resume (JT-48) and applicant-profile (JT-50), see Section 15.
 - Moderation cannot tell whether a reported job exists or is open, because it has no allowed call to job-posting; it only knows the jobs it removed itself (JT-34). Decide in Sprint 2 whether job events or an agreed call should feed it.
 - How employers view an applicant's resume during review (GetResume and DownloadResume are owner-only).
 - Local `.env` passwords that contain `@ : / ? # %` break the `postgres://` and `amqp://` URLs in Docker Compose. Use letters and digits only (for example `openssl rand -hex 24`).
