@@ -101,8 +101,11 @@ func loadConfig(getenv func(string) string) (config, error) {
 
 // deps are the resources available once the database is migrated.
 type deps struct {
-	checker ports.HealthChecker
-	resumes ports.ResumeRepository
+	checker    ports.HealthChecker
+	resumes    ports.ResumeRepository
+	outbox     ports.OutboxRepository
+	publisher  ports.EventPublisher
+	validation ports.ValidationRepository
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -114,12 +117,39 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	}
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
 		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-			return runWithPublisher(ctx, cfg, logger, d,
-				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+			return runWithTopology(ctx, cfg, logger, d, rabbitmq.ProvisionTopology,
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerResume(d.resumes), serverOpts...)
+					return runWithPublisher(ctx, cfg, logger, d,
+						func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+						func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+							worker := app.NewOutboxDispatcher(d.outbox, d.publisher, logger)
+							return runWithDispatcher(ctx, worker.Run, func(ctx context.Context) error {
+								consumer := &rabbitmq.ValidationConsumer{Broker: cfg.rabbitMQURL, Handler: &rabbitmq.ValidationHandler{Results: app.NewValidationResults(d.validation, systemClock{}), Logger: logger}, Logger: logger}
+								return runWithDispatcher(ctx, consumer.Run, func(ctx context.Context) error {
+									return runServers(ctx, cfg, logger, d.checker, registerResume(d.resumes), serverOpts...)
+								})
+							})
+						})
 				})
 		})
+}
+
+// runWithTopology fails startup before publisher/listeners if provisioning fails.
+// It runs inside runWithDatabase, after migrations have completed.
+func runWithTopology(ctx context.Context, cfg config, logger *slog.Logger, d deps,
+	provision func(context.Context, string) error,
+	start func(context.Context, config, *slog.Logger, deps) error,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := provision(ctx, cfg.rabbitMQURL); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return start(ctx, cfg, logger, d)
 }
 
 // internalServerOptions adds the pkg/authctx interceptor, which checks
@@ -170,24 +200,24 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 	if err != nil {
 		return errors.New("initialize RabbitMQ publisher failed")
 	}
+	managed := &recoveringPublisher{current: publisher, open: open, url: cfg.rabbitMQURL}
+	d.publisher = managed
 	defer func() {
-		if closeErr := publisher.Close(); closeErr != nil {
+		if closeErr := managed.Close(); closeErr != nil {
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Publishing resume.uploaded and the resume.validated and resume.rejected
-	// consumers are Sprint 2; the broker connection is kept for them, as in
-	// the template.
-	// Initialization must not publish events.
 	return start(ctx, cfg, logger, d)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
-	readiness ports.Readiness
-	resumes   ports.ResumeRepository
-	migrate   func(context.Context, string) error
-	close     func()
+	readiness  ports.Readiness
+	resumes    ports.ResumeRepository
+	outbox     ports.OutboxRepository
+	validation ports.ValidationRepository
+	migrate    func(context.Context, string) error
+	close      func()
 }
 
 func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
@@ -196,10 +226,12 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 		return nil, err
 	}
 	return &databaseHandle{
-		readiness: postgres.NewReadiness(pool),
-		resumes:   postgres.NewResumes(pool),
-		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
-		close:     pool.Close,
+		readiness:  postgres.NewReadiness(pool),
+		resumes:    postgres.NewResumes(pool),
+		outbox:     postgres.NewOutbox(pool),
+		validation: postgres.NewValidation(pool),
+		migrate:    func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
+		close:      pool.Close,
 	}, nil
 }
 
@@ -224,7 +256,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), resumes: database.resumes})
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), resumes: database.resumes, outbox: database.outbox, validation: database.validation})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,

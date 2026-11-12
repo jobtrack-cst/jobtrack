@@ -327,6 +327,8 @@ services:
     restart: unless-stopped
 
   # JT-48. Ports 9090 and 8080 stay inside the Docker network.
+  # JT-59: Resume synchronously provisions JT-61 queues/binding at startup
+  # before opening listeners; this runs without the optional functions profile.
   resume:
     build:
       context: ../..
@@ -398,6 +400,31 @@ services:
       DATABASE_URL: postgres://application_status@postgres:5432/application_status?sslmode=disable
       PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
       # No INTERNAL_TOKEN: application-status serves and calls no internal RPCs.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget ships with the alpine runtime image.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # JT-50. Ports 9090 and 8080 stay inside the Docker network.
+  applicant-profile:
+    build:
+      context: ../..
+      dockerfile: services/applicant-profile/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: applicant-profile
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://applicant_profile@postgres:5432/applicant_profile?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      # No INTERNAL_TOKEN: applicant-profile serves and calls no internal RPCs.
     depends_on:
       postgres:
         condition: service_healthy

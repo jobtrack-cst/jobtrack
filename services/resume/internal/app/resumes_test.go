@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -41,7 +42,7 @@ type fixture struct {
 func newFixture(t *testing.T) fixture {
 	ctrl := gomock.NewController(t)
 	clock := mocks.NewMockClock(ctrl)
-	clock.EXPECT().Now().Return(now).AnyTimes()
+	clock.EXPECT().Now().Return(now.In(time.FixedZone("UTC+6", 6*60*60))).AnyTimes()
 	f := fixture{repo: mocks.NewMockResumeRepository(ctrl)}
 	f.resumes = app.NewResumes(f.repo, clock)
 	return f
@@ -76,8 +77,8 @@ func TestResumes_Upload(t *testing.T) {
 		{
 			name: "applicant uploads a PENDING resume owned by the caller", caller: owner,
 			setup: func(f fixture) {
-				f.repo.EXPECT().Create(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, file domain.ResumeFile) (domain.Resume, error) {
+				f.repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, file domain.ResumeFile, event *eventsv1.EventEnvelope) (domain.Resume, error) {
 						_, err := uuid.Parse(file.ID)
 						assert.NoError(t, err, "resume_id is a generated UUID")
 						assert.Equal(t, ownerID, file.ApplicantID)
@@ -89,10 +90,22 @@ func TestResumes_Upload(t *testing.T) {
 						assert.Equal(t, now, file.CreatedAt)
 						assert.Equal(t, now, file.UpdatedAt)
 						assert.Equal(t, pdfContent, file.Content)
+						_, err = uuid.Parse(event.EventId)
+						assert.NoError(t, err)
+						assert.NotEqual(t, file.ID, event.EventId)
+						assert.Equal(t, "resume.uploaded", event.Type)
+						assert.Equal(t, "resume", event.Producer)
+						assert.Equal(t, now, event.OccurredAt.AsTime())
+						payload := new(eventsv1.ResumeUploaded)
+						require.NoError(t, event.Data.UnmarshalTo(payload))
+						assert.Equal(t, file.ID, payload.ResumeId)
+						assert.Equal(t, file.ApplicantID, payload.ApplicantId)
 						return file.Resume, nil
 					})
 			},
 		},
+		{name: "empty content", caller: owner, input: func(in *domain.UploadInput) { in.Content = nil }, wantErr: domain.ErrInvalidContentSize},
+		{name: "empty filename", caller: owner, input: func(in *domain.UploadInput) { in.FileName = " " }, wantErr: domain.ErrInvalidFileName},
 		{name: "employer denied", caller: employer, wantErr: domain.ErrApplicantRoleRequired},
 		{name: "admin denied", caller: admin, wantErr: domain.ErrApplicantRoleRequired},
 		{
@@ -118,7 +131,7 @@ func TestResumes_Upload(t *testing.T) {
 		{
 			name: "repository error", caller: owner,
 			setup: func(f fixture) {
-				f.repo.EXPECT().Create(gomock.Any(), gomock.Any()).Return(domain.Resume{}, errDB)
+				f.repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.Resume{}, errDB)
 			},
 			wantErr: errDB,
 		},

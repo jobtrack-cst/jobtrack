@@ -94,7 +94,7 @@ func TestResumes_Integration(t *testing.T) {
 
 	t.Run("create round-trips every field and the content", func(t *testing.T) {
 		in := newFile(applicantA, base.Add(123*time.Microsecond), pdf(1000))
-		created, err := repo.Create(ctx, in)
+		created, err := repo.Create(ctx, in, uploaded(t, in))
 		require.NoError(t, err)
 		assert.Equal(t, in.Resume, created)
 
@@ -141,7 +141,7 @@ func TestResumes_Integration(t *testing.T) {
 				// applicantB keeps these rows out of the list test below.
 				f := newFile(applicantB, base, pdf(100))
 				tt.edit(&f)
-				_, err := repo.Create(ctx, f)
+				_, err := repo.Create(ctx, f, uploaded(t, f))
 				if tt.wantOK {
 					require.NoError(t, err)
 					file, err := repo.GetFile(ctx, f.ID)
@@ -158,7 +158,7 @@ func TestResumes_Integration(t *testing.T) {
 	t.Run("invalid status is refused before the database", func(t *testing.T) {
 		f := newFile(applicantA, base, pdf(100))
 		f.ValidationStatus = domain.ValidationStatusUnspecified
-		_, err := repo.Create(ctx, f)
+		_, err := repo.Create(ctx, f, uploaded(t, f))
 		require.Error(t, err)
 	})
 
@@ -171,7 +171,7 @@ func TestResumes_Integration(t *testing.T) {
 		tieHigh := newFile(applicantC, base.Add(2*time.Hour), pdf(10))
 		tieLow.ID, tieHigh.ID = "aaaaaaaa-0000-4000-8000-000000000000", "ffffffff-0000-4000-8000-000000000000"
 		for _, f := range []domain.ResumeFile{older, newer, tieLow, tieHigh} {
-			_, err := repo.Create(ctx, f)
+			_, err := repo.Create(ctx, f, uploaded(t, f))
 			require.NoError(t, err)
 		}
 
