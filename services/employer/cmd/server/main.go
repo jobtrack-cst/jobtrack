@@ -17,6 +17,7 @@ import (
 
 	employerv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/employer/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/employer/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/employer/internal/adapters/postgres"
@@ -92,8 +93,9 @@ func loadConfig(getenv func(string) string) (config, error) {
 
 // deps are the resources available once the database is migrated.
 type deps struct {
-	checker  ports.HealthChecker
-	profiles ports.ProfileRepository
+	checker       ports.HealthChecker
+	profiles      ports.ProfileRepository
+	verifications ports.VerificationRepository
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -102,7 +104,13 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerEmployer(d.profiles))
+					verifications := app.NewVerifications(d.verifications, systemClock{})
+					consume := func(ctx context.Context) error {
+						return events.Consume(ctx, rabbitmq.VerificationConsumerConfig(cfg.rabbitMQURL, logger, verifications))
+					}
+					return runWithConsumer(ctx, consume, func(ctx context.Context) error {
+						return runServers(ctx, cfg, logger, d.checker, registerEmployer(d.profiles))
+					})
 				})
 		})
 }
@@ -112,7 +120,8 @@ type systemClock struct{}
 func (systemClock) Now() time.Time { return time.Now().UTC() }
 
 // registerEmployer returns a function that registers the public EmployerService.
-// Employer has no internal service; consuming verification events is Sprint 2.
+// Employer has no internal service; verification events arrive through the
+// employer.verification queue (JT-56).
 func registerEmployer(profiles ports.ProfileRepository) func(grpc.ServiceRegistrar) {
 	handler := grpcadapter.NewEmployerHandler(app.NewProfiles(profiles, systemClock{}))
 	return func(s grpc.ServiceRegistrar) {
@@ -144,17 +153,19 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Employer publishes no events; the connection is kept for the Sprint 2
-	// verification consumers. Initialization must not publish events.
+	// Employer publishes no events; opening the publisher checks RabbitMQ at
+	// startup. The verification consumer uses its own connection (JT-56).
+	// Initialization must not publish events.
 	return start(ctx, cfg, logger, d)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
-	readiness ports.Readiness
-	profiles  ports.ProfileRepository
-	migrate   func(context.Context, string) error
-	close     func()
+	readiness     ports.Readiness
+	profiles      ports.ProfileRepository
+	verifications ports.VerificationRepository
+	migrate       func(context.Context, string) error
+	close         func()
 }
 
 func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
@@ -163,10 +174,11 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 		return nil, err
 	}
 	return &databaseHandle{
-		readiness: postgres.NewReadiness(pool),
-		profiles:  postgres.NewProfiles(pool),
-		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
-		close:     pool.Close,
+		readiness:     postgres.NewReadiness(pool),
+		profiles:      postgres.NewProfiles(pool),
+		verifications: postgres.NewVerifications(pool),
+		migrate:       func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
+		close:         pool.Close,
 	}, nil
 }
 
@@ -191,7 +203,11 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), profiles: database.profiles})
+	return start(ctx, cfg, logger, deps{
+		checker:       app.NewHealthWithReadiness(database.readiness),
+		profiles:      database.profiles,
+		verifications: database.verifications,
+	})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar)) error {

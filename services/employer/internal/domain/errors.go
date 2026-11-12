@@ -19,3 +19,7 @@ var (
 	// ALREADY_EXISTS
 	ErrProfileExists = errors.New("company profile already exists for this employer")
 )
+
+// ErrInvalidVerificationEvent is not a gRPC error: the consumer sends such an
+// event to the dead queue, because retrying cannot fix it (JT-56).
+var ErrInvalidVerificationEvent = errors.New("verification event is not valid")
