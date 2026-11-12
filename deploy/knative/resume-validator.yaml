@@ -1,0 +1,53 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: resume-validator
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+    spec:
+      containerConcurrency: 10
+      timeoutSeconds: 15
+      containers:
+        - image: jobtrack-resume-validator:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVICE_NAME
+              value: resume-validator
+            - name: HTTP_PORT
+              value: "8080"
+            - name: RESUME_ADDR
+              value: resume:9090
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: resume-validator-credentials
+                  key: internal-token
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: amqp-url
+          readinessProbe:
+            httpGet:
+              path: /healthz
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: [ALL]

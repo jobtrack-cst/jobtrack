@@ -354,10 +354,13 @@ services:
       retries: 6
     restart: unless-stopped
 
-  # JT-61 transport. Validator image is supplied by its implementation task.
+  # JT-62 real validator, using the JT-61 transport.
   resume-validator:
     profiles: [functions]
     image: ${RESUME_VALIDATOR_IMAGE:-jobtrack-resume-validator:local}
+    build:
+      context: ../..
+      dockerfile: functions/resume-validator/Dockerfile
     environment:
       SERVICE_NAME: resume-validator
       HTTP_PORT: "8080"
@@ -389,6 +392,29 @@ services:
     restart: unless-stopped
 
   # JT-49. Ports 9090 and 8080 stay inside the Docker network.
+  saved-jobs:
+    build:
+      context: ../..
+      dockerfile: services/saved-jobs/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: saved-jobs
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://saved_jobs@postgres:5432/saved_jobs?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   application-status:
     build:
       context: ../..
