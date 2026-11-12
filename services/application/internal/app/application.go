@@ -89,7 +89,7 @@ func (s *Service) Submit(ctx context.Context, jobID, resumeID string) (domain.Ap
 		return zero, mapped(domain.ErrDuplicate)
 	}
 	if s.jobs == nil || s.resumes == nil {
-		return zero, status.Error(codes.Unavailable, "eligibility clients are deferred to Sprint 2")
+		return zero, status.Error(codes.Unavailable, "eligibility clients unavailable")
 	}
 	job, err := s.jobs.GetJob(ctx, jobID)
 	if err != nil {

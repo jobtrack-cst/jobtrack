@@ -78,6 +78,9 @@ func TestLoadConfig(t *testing.T) {
 		{"defaults", map[string]string{"SERVICE_NAME": "application"}, config{serviceName: "application", grpcPort: 9090, httpPort: 8080}, ""},
 		{"custom", map[string]string{"SERVICE_NAME": "job-posting", "GRPC_PORT": "19090", "HTTP_PORT": "18080"}, config{serviceName: "job-posting", grpcPort: 19090, httpPort: 18080}, ""},
 		{"boundary ports", map[string]string{"SERVICE_NAME": "test", "GRPC_PORT": "1", "HTTP_PORT": "65535"}, config{serviceName: "test", grpcPort: 1, httpPort: 65535}, ""},
+		{"missing job address", map[string]string{"SERVICE_NAME": "application", "JOB_POSTING_ADDR": ""}, config{}, "JOB_POSTING_ADDR"},
+		{"blank resume address", map[string]string{"SERVICE_NAME": "application", "RESUME_ADDR": " \t"}, config{}, "RESUME_ADDR"},
+		{"missing broker URL", map[string]string{"SERVICE_NAME": "application", "RABBITMQ_URL": ""}, config{}, "RABBITMQ_URL"},
 		{"missing name", nil, config{}, "SERVICE_NAME"},
 		{"invalid name", map[string]string{"SERVICE_NAME": "Invalid Name"}, config{}, "SERVICE_NAME"},
 		{"invalid gRPC port", map[string]string{"SERVICE_NAME": "test", "GRPC_PORT": "private-secret"}, config{}, "GRPC_PORT"},
@@ -90,7 +93,7 @@ func TestLoadConfig(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := loadConfig(func(key string) string {
-				if key == "DATABASE_URL" || key == "RABBITMQ_URL" {
+				if key == "DATABASE_URL" || key == "RABBITMQ_URL" || key == "JOB_POSTING_ADDR" || key == "RESUME_ADDR" {
 					if value, ok := tt.env[key]; ok {
 						return value
 					}
@@ -100,6 +103,9 @@ func TestLoadConfig(t *testing.T) {
 			})
 			if tt.errField == "" {
 				tt.want.databaseURL = "caller-supplied-url"
+				tt.want.rabbitMQURL = "caller-supplied-url"
+				tt.want.jobPostingAddr = "caller-supplied-url"
+				tt.want.resumeAddr = "caller-supplied-url"
 				tt.want.migrationsDir = "services/application/migrations"
 			}
 			if tt.errField != "" {
@@ -153,7 +159,7 @@ func TestRunWithDatabase_OrdersStartupAndCleansUp(t *testing.T) {
 						},
 						close: func() { calls = append(calls, "close") },
 					}, nil
-				}, func(got context.Context, _ config, _ *slog.Logger, checker ports.HealthChecker, _ ports.Repository) error {
+				}, func(got context.Context, _ config, _ *slog.Logger, checker ports.HealthChecker, _ ports.Repository, _ ports.OutboxRepository) error {
 					calls = append(calls, "start")
 					if stage == "listener failure" {
 						return errors.New("bind failed")
@@ -389,7 +395,7 @@ func TestLoadConfig_PgxPasswordEnvironmentPreservesReservedCharacters(t *testing
 			password := "synthetic-" + character + "-password"
 			t.Setenv("PGPASSWORD", password)
 			cfg, err := loadConfig(func(key string) string {
-				return map[string]string{"SERVICE_NAME": "application", "DATABASE_URL": "postgres://application@postgres:5432/application?sslmode=disable"}[key]
+				return map[string]string{"SERVICE_NAME": "application", "JOB_POSTING_ADDR": "job-posting:9090", "RESUME_ADDR": "resume:9090", "RABBITMQ_URL": "amqp://localhost", "DATABASE_URL": "postgres://application@postgres:5432/application?sslmode=disable"}[key]
 			})
 			if err != nil {
 				t.Fatal("load configuration failed")

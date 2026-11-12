@@ -34,17 +34,21 @@ func scan(row pgx.Row) (domain.Application, error) {
 	return a, err
 }
 func (r *Repository) Create(ctx context.Context, a domain.Application) (domain.Application, error) {
-	return scan(r.pool.QueryRow(ctx, "INSERT INTO applications ("+columns+") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "+columns, a.ID, a.ApplicantID, a.JobID, a.ResumeID, a.EmployerID, a.Withdrawn, a.CreatedAt, a.UpdatedAt))
+	return r.write(ctx, false, func(tx pgx.Tx) (domain.Application, error) {
+		return scan(tx.QueryRow(ctx, "INSERT INTO applications ("+columns+") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "+columns, a.ID, a.ApplicantID, a.JobID, a.ResumeID, a.EmployerID, a.Withdrawn, a.CreatedAt, a.UpdatedAt))
+	})
 }
 func (r *Repository) Get(ctx context.Context, id string) (domain.Application, error) {
 	return scan(r.pool.QueryRow(ctx, "SELECT "+columns+" FROM applications WHERE application_id=$1", id))
 }
 func (r *Repository) Withdraw(ctx context.Context, id, owner string) (domain.Application, error) {
-	a, err := scan(r.pool.QueryRow(ctx, "UPDATE applications SET withdrawn=true, updated_at=clock_timestamp() WHERE application_id=$1 AND applicant_id=$2 AND NOT withdrawn RETURNING "+columns, id, owner))
-	if errors.Is(err, domain.ErrNotFound) {
-		return a, domain.ErrWithdrawn
-	}
-	return a, err
+	return r.write(ctx, true, func(tx pgx.Tx) (domain.Application, error) {
+		a, err := scan(tx.QueryRow(ctx, "UPDATE applications SET withdrawn=true, updated_at=clock_timestamp() WHERE application_id=$1 AND applicant_id=$2 AND NOT withdrawn RETURNING "+columns, id, owner))
+		if errors.Is(err, domain.ErrNotFound) {
+			return a, domain.ErrWithdrawn
+		}
+		return a, err
+	})
 }
 func (r *Repository) List(ctx context.Context, f ports.Filter) ([]domain.Application, int64, error) {
 	// A repeatable snapshot keeps total and page consistent during concurrent submissions.
