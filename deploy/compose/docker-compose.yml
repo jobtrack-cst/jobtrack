@@ -232,6 +232,30 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # JT-42. Ports 9090 and 8080 stay inside the Docker network.
+  notification-inbox:
+    build:
+      context: ../..
+      dockerfile: services/notification-inbox/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: notification-inbox
+      # pgx reads PGPASSWORD separately; raw passwords are not URI components.
+      DATABASE_URL: postgres://notification_inbox@postgres:5432/notification_inbox?sslmode=disable
+      PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
   # JT-45. Ports 9090 and 8080 stay inside the Docker network.
   offer:
     build:
@@ -249,7 +273,6 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      # busybox wget ships with the alpine runtime image.
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
       interval: 10s
       timeout: 5s
