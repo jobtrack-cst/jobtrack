@@ -17,6 +17,7 @@ import (
 
 	applicationstatusv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/application_status/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/application-status/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/application-status/internal/adapters/postgres"
@@ -92,8 +93,11 @@ func loadConfig(getenv func(string) string) (config, error) {
 
 // deps are the resources available once the database is migrated.
 type deps struct {
-	checker  ports.HealthChecker
-	statuses ports.StatusRepository
+	checker   ports.HealthChecker
+	statuses  ports.StatusRepository
+	outbox    ports.OutboxRepository
+	inputs    ports.ApplicationEventRepository
+	publisher ports.EventPublisher
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -102,7 +106,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerApplicationStatus(d.statuses))
+					return runWorkers(ctx, cfg, logger, d)
 				})
 		})
 }
@@ -136,14 +140,14 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 	if err != nil {
 		return errors.New("initialize RabbitMQ publisher failed")
 	}
+	publisher = newRecoveringPublisher(publisher, func() (publisherResource, error) { return open(cfg.rabbitMQURL) })
+	d.publisher = publisher
 	defer func() {
 		if closeErr := publisher.Close(); closeErr != nil {
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// The event consumers and publishing application.status_changed are
-	// Sprint 2; the broker connection is kept for them, as in the template.
-	// Initialization must not publish events.
+	// Workers start after both resources are available.
 	return start(ctx, cfg, logger, d)
 }
 
@@ -151,6 +155,8 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 type databaseHandle struct {
 	readiness ports.Readiness
 	statuses  ports.StatusRepository
+	outbox    ports.OutboxRepository
+	inputs    ports.ApplicationEventRepository
 	migrate   func(context.Context, string) error
 	close     func()
 }
@@ -163,6 +169,8 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	return &databaseHandle{
 		readiness: postgres.NewReadiness(pool),
 		statuses:  postgres.NewStatuses(pool),
+		outbox:    postgres.NewOutbox(pool),
+		inputs:    postgres.NewStatuses(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
 	}, nil
@@ -189,7 +197,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), statuses: database.statuses})
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), statuses: database.statuses, outbox: database.outbox, inputs: database.inputs})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
@@ -267,4 +275,48 @@ func shutdown(ctx context.Context, grpcServer *grpc.Server, httpServer *http.Ser
 		shutdownErr = errors.Join(shutdownErr, errors.New("gRPC graceful shutdown timed out"))
 	}
 	return shutdownErr
+}
+
+// runWorkers joins workers before closing the publisher and database.
+func runWorkers(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 2)
+	go func() {
+		done <- events.Consume(ctx, rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.inputs))
+	}()
+	go func() {
+		relay := app.NewOutboxRelay(d.outbox, d.publisher, time.Now)
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			if _, err := relay.PublishPending(ctx); err != nil && ctx.Err() == nil {
+				logger.Warn("outbox publish failed; retrying")
+			}
+			select {
+			case <-ctx.Done():
+				done <- nil
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	server := make(chan error, 1)
+	go func() { server <- runServers(ctx, cfg, logger, d.checker, registerApplicationStatus(d.statuses)) }()
+	var err error
+	select {
+	case err = <-server:
+		cancel()
+		<-done
+		<-done
+	case err = <-done:
+		cancel()
+		<-done
+		serverErr := <-server
+		err = errors.Join(err, serverErr)
+	}
+	if ctx.Err() != nil && errors.Is(err, context.Canceled) {
+		return nil
+	}
+	return err
 }

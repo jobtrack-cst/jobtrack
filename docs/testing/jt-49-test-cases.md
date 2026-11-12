@@ -6,7 +6,7 @@ Traceability: [JT-49](https://jobtrack-cst.atlassian.net/browse/JT-49) (parent J
 
 The application status lifecycle from AGENTS.md Section 6, its history, and the two read-only public RPCs `GetApplicationStatus` and `ListApplicationStatusHistory`, using the existing `application_status.proto` contract without changes.
 
-Transitions have no RPC. `app.Statuses.Start` and `app.Statuses.Transition` are implemented and tested now; the Sprint 2 event consumers will call them and publish `application.status_changed` where marked. Until then no application is recorded at runtime, so reads return `NOT_FOUND`.
+Transitions have no RPC. JT-49 implemented `app.Statuses.Start` and `app.Statuses.Transition`. JT-60 now consumes application submitted/withdrawn events and stores status events through a transactional outbox; see [JT-60 test cases](jt-60-test-cases.md).
 
 Rules agreed for JT-49 (AGENTS.md Section 15):
 
