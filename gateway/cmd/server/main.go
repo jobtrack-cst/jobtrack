@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/jobtrack-cst/jobtrack/gateway/internal/backends"
+	"github.com/jobtrack-cst/jobtrack/gateway/internal/cors"
 	"github.com/jobtrack-cst/jobtrack/gateway/internal/jwtauth"
 	"github.com/jobtrack-cst/jobtrack/gateway/internal/middleware"
 	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
@@ -32,6 +33,7 @@ type config struct {
 	serviceName string
 	httpPort    int
 	jwtSecret   string
+	corsPolicy  cors.Policy       // zero value: CORS off
 	addrs       map[string]string // backend name -> gRPC address
 }
 
@@ -71,6 +73,11 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if len(cfg.jwtSecret) < jwtauth.MinSecretBytes {
 		return config{}, jwtauth.ErrWeakSecret
 	}
+	policy, err := cors.Parse(getenv("CORS_ALLOWED_ORIGIN"))
+	if err != nil {
+		return config{}, err
+	}
+	cfg.corsPolicy = policy
 	var missing []string
 	for _, b := range backends.All() {
 		addr := strings.TrimSpace(getenv(b.AddrEnv()))
@@ -100,7 +107,10 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	if err != nil {
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
-	return serve(ctx, logger, newHandler(api, verifier, logger), listener)
+	logger.Info("CORS configuration", "allowed_origin", cfg.corsPolicy.Origin())
+	// CORS sits outside authentication: it answers preflights itself, and every other
+	// request still goes through the JT-31 JWT check and header stripping.
+	return serve(ctx, logger, cfg.corsPolicy.Wrap(newHandler(api, verifier, logger)), listener)
 }
 
 // newAPI registers every public backend through pkg/grpcclient. grpc.NewClient
