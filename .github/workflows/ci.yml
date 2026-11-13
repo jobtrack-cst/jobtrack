@@ -16,6 +16,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Cypress auth and API tests
+        run: |
+          npm run dev > /tmp/jobtrack-vite.log 2>&1 &
+          trap 'kill $!' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:5173 > /dev/null; then break; fi
+            sleep 1
+          done
+          npm test
+
   go:
     name: Go checks
     runs-on: ubuntu-latest
@@ -145,11 +172,11 @@ jobs:
   ci:
     name: CI passed
     if: always()
-    needs: [go, proto, images-list, docker]
+    needs: [go, proto, images-list, docker, frontend]
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for r in "${{ needs.go.result }}" "${{ needs.proto.result }}" "${{ needs.images-list.result }}"; do
+          for r in "${{ needs.go.result }}" "${{ needs.proto.result }}" "${{ needs.images-list.result }}" "${{ needs.frontend.result }}"; do
             [ "$r" = "success" ] || { echo "A required job did not succeed: $r"; exit 1; }
           done
           case "${{ needs.docker.result }}" in
