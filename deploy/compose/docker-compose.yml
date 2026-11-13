@@ -612,8 +612,9 @@ services:
       HTTP_PORT: "8080"
       # Only auth and gateway get JWT_SECRET (AGENTS.md Section 9).
       JWT_SECRET: ${JWT_SECRET:?set in .env}
-      # The one browser origin allowed to call the API (JT-53).
-      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:-http://localhost:5173}
+      # The one browser origin allowed to call the API (JT-53). Unset uses the
+      # default; set it empty in .env to turn CORS off.
+      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN-http://localhost:5173}
       # All 20 public services. Routes to a service not in Compose yet return 503.
       ANALYTICS_ADDR: analytics:9090
       APPLICANT_PROFILE_ADDR: applicant-profile:9090
