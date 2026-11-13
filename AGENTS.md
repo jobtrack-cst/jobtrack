@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 12 Nov 2026 (JT-52 interview decisions)
+- Last updated: 13 Nov 2026 (JT-64 revised sprint schedule and scope priorities)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -516,24 +516,26 @@ A task or story is Done only when:
 |---|---|---|
 | Sprint 0 | 2 to 3 Nov | Development foundation: repo, contracts for all 20 services, golden template, CI, local environment, proven cluster setup |
 | Sprint 1 | 6 to 8 Nov | All 20 services and the gateway running in Docker Compose with their basic public operations and tests |
-| Sprint 2 | 9 to 11 Nov | Core flow working end to end with events and the first functions |
-| Sprint 3 | 12 to 14 Nov | Full business logic, all 5 functions, frontend for all roles, integration tests |
-| Sprint 4 | 15 to 17 Nov | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
+| Sprint 2 | 9 to 13 Nov | Core flow working end to end with events and the first functions |
+| Sprint 3 | 14 to 16 Nov | Full business logic, all 5 functions, frontend for all roles, integration tests |
+| Sprint 4 | 17 to 19 Nov | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
 
-There is no buffer. Sprint 4 ends on 17 Nov, so any slip affects the final date directly (see the risk register in `docs/pm`).
+Planned project completion: 19 Nov 2026 (schedule revised on 11 Nov 2026, see Section 15). There is no buffer. Sprint 4 ends on 19 Nov, so any slip affects the final date directly (see the risk register in `docs/pm`).
 
 Presentation date: not yet announced (likely to be postponed).
 
-Ceremonies: sprint planning (1 hour), daily stand-up (15 minutes), combined sprint review and retrospective (1 hour). Sprint lengths stay fixed; if a goal is met early, pull the next items from the backlog.
+Ceremonies: sprint planning (1 hour), daily stand-up (15 minutes), combined sprint review and retrospective (1 hour). Sprint lengths stay fixed (the only change so far is the agreed Sprint 2 extension, Section 15, 11 Nov 2026); if a goal is met early, pull the next items from the backlog.
 
 ### Current sprint
 
-- Sprint: Sprint 1 (6 to 8 Nov), started on 6 Nov 2026
-- Goal: All 20 services and the gateway running in Docker Compose with their basic public operations and tests. Committed minimum: the Must tasks needed for the apply-for-a-job flow.
-- Tasks: JT-30 to JT-52, plus JT-20, JT-22 and JT-29 carried over from Sprint 0 (see Jira)
-- Scope: each service works on its own with public RPCs, authorisation, migrations, tests and Docker Compose. Cross-service calls are port interfaces mocked with gomock. Events and real cross-service clients move to Sprint 2.
-- Commitment: Must tasks (Jira priority High) are the committed minimum. Should tasks (Medium) are planned; unfinished ones move to the top of Sprint 2.
-- No sub-tasks in Sprint 1. The acceptance criteria in each task are the checklist.
+- Sprint: Sprint 2 (9 to 13 Nov), started on 9 Nov 2026 and extended to 13 Nov on 11 Nov 2026 (Section 15)
+- Goal: Finish the Sprint 1 carryovers (Musts first: JT-38, JT-39, JT-48, JT-49) and get the core application flow working end to end with real gRPC calls, events and the first function. Committed minimum: the four Must carryovers.
+- Tasks: JT-53 to JT-64, plus the 11 Sprint 1 carryovers JT-22, JT-38 to JT-42 and JT-48 to JT-52 (see Jira)
+- Scope: real cross-service gRPC clients replace the mocked ports, services publish and consume their domain events, and the first function (resume-validator) runs through the forwarder.
+- Commitment: Must tasks (Jira priority High) are the committed minimum. Should tasks (Medium) are planned; unfinished ones move to the top of Sprint 3.
+- Scope priorities if time runs short (agreed with the Product Owner on 12 Nov 2026): (1) the end-to-end apply-for-a-job flow, JT-58 first because JT-60 depends on it; (2) the remaining basic service operations; (3) JT-53 before JT-63, because the frontend depends on the gateway configuration; (4) JT-54 and JT-55 by whether they block integration or testing. Lower-priority scope is kept minimal, but each task keeps its required acceptance criteria.
+- Next sprints: Sprint 3 (Jira sprint 37) 14 to 16 Nov, Sprint 4 (Jira sprint 38) 17 to 19 Nov, both planned in Jira.
+- Sprint 1 review and retrospective: `docs/pm/sprint-1-review.md` (15 of 26 tasks, 49 of 80 points).
 - Cluster host machine: Phuntsho's laptop; 16 GiB physical RAM verified during JT-29 (Docker Desktop approximately 7.75 GiB allocated)
 - Daily stand-up: Flexible, coordinated by the team each day (15 minutes).
 
@@ -645,6 +647,8 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 12 Nov 2026 | Interview maintains a local `application_participants` table from `application.submitted` (consumer in Sprint 2), following the Offer, Messaging and Review design, and Section 4 lists interview consuming `application.submitted`. `ScheduleInterview` requires role `employer` and the stored `employer_id` of the application; the applicant comes from the table, never the request. Unknown or not yet processed applications are `NOT_FOUND`, another employer `PERMISSION_DENIED` (JT-52, approved by Phuntsho during JT-52) | Ownership is verified without a new synchronous call |
 | 12 Nov 2026 | Interview `GetInterview` and `ListInterviews` are readable by the application's applicant and owning employer; admins, other applicants and other employers get `PERMISSION_DENIED`, checked by role before input. `ListInterviews` is ordered by `scheduled_at`, then `interview_id`, and uses the Section 9 pagination rules. Interview has no internal RPCs and no `INTERNAL_TOKEN` (JT-52, approved by Phuntsho during JT-52) | Both sides of the application need to see when the interview is |
 | 12 Nov 2026 | Interview `scheduled_at` is required, stored in UTC to the microsecond, and must be strictly after the current time and at most 365 days ahead (`INVALID_ARGUMENT` otherwise). An application can have several interviews, but not two at the same time (`ALREADY_EXISTS`, unique constraint). `details` is 0 to 1000 characters after trimming; newline, carriage return and tab are allowed, other control characters and invalid UTF-8 are `INVALID_ARGUMENT` (JT-52, approved by Phuntsho during JT-52) | Allows several interview rounds and gives boundary values for testing |
+| 11 Nov 2026 | Revised sprint schedule: Sprint 2 extended to 9 to 13 Nov, Sprint 3 14 to 16 Nov, Sprint 4 17 to 19 Nov; planned project completion 19 Nov (previously 17 Nov); still no buffer. Roles and service ownership in Sections 2, 4 and 5 are unchanged. Decided by Jigden as Scrum Master on 11 Nov 2026 and approved by Phuntsho as Product Owner on 12 Nov 2026 (JT-64) | Sprint 1 finished 15 of 26 tasks (49 of 80 points), so 11 tasks (31 points) were carried into Sprint 2 on top of its event and function work, and Kinley and Sangay were not available at the start of Sprint 2 |
+| 12 Nov 2026 | Scope priorities if time runs short, agreed with Phuntsho as Product Owner: (1) end-to-end apply-for-a-job flow, JT-58 before JT-60; (2) remaining basic service operations; (3) JT-53 before JT-63; (4) JT-54 and JT-55 by whether they block integration or testing. Lower-priority scope is kept minimal while each task keeps its required acceptance criteria (JT-64) | The revised schedule still has no buffer, so the core flow must be protected first |
 
 ---
 
