@@ -14,6 +14,20 @@ set +a
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; exit 1; }
 
+published_port() {
+  local service=$1 container_port=$2 binding port
+  binding=$($COMPOSE port "$service" "$container_port") \
+    || fail "$service: could not resolve published port for $container_port" >&2
+  # Compose prints IPv4, bracketed IPv6, or unbracketed IPv6 host:port.
+  local binding_pattern='^([0-9.]+|\[[0-9a-fA-F:.]+\]|[0-9a-fA-F:]*:[0-9a-fA-F:.]*):([0-9]{1,5})$'
+  [[ $binding =~ $binding_pattern ]] \
+    || fail "$service: invalid published port for $container_port" >&2
+  port=${BASH_REMATCH[2]}
+  (( 10#$port >= 1 && 10#$port <= 65535 )) \
+    || fail "$service: invalid published port for $container_port" >&2
+  printf '%s\n' "$((10#$port))"
+}
+
 # Must match postgres-init/01-create-service-databases.sh.
 SERVICES="auth employer company_verification moderation audit_log analytics
 job_posting category_tag job_search saved_jobs notification_inbox
@@ -52,11 +66,13 @@ docker run --rm --network jobtrack_default \
   '
 
 # 5. RabbitMQ management API and Mailpit respond.
-curl -fsS -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" http://localhost:15672/api/overview >/dev/null \
-  || fail "RabbitMQ management API not reachable on port 15672"
+rabbitmq_port=$(published_port rabbitmq 15672) || exit 1
+curl -fsS -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" "http://localhost:$rabbitmq_port/api/overview" >/dev/null \
+  || fail "RabbitMQ management API not reachable on port $rabbitmq_port"
 pass "RabbitMQ management API responds"
-curl -fsS http://localhost:8025/api/v1/info >/dev/null \
-  || fail "Mailpit not reachable on port 8025"
+mailpit_port=$(published_port mailpit 8025) || exit 1
+curl -fsS "http://localhost:$mailpit_port/api/v1/info" >/dev/null \
+  || fail "Mailpit not reachable on port $mailpit_port"
 pass "Mailpit responds"
 
 echo "All checks passed."
