@@ -1,0 +1,45 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: email-sender
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+    spec:
+      containerConcurrency: 10
+      timeoutSeconds: 25
+      containers:
+        - image: jobtrack-email-sender:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVICE_NAME
+              value: email-sender
+            - name: HTTP_PORT
+              value: "8080"
+            - name: SMTP_ADDR
+              value: mailpit:1025
+            - name: SMTP_FROM
+              value: noreply@jobtrack.test
+          readinessProbe:
+            httpGet:
+              path: /healthz
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: [ALL]
