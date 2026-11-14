@@ -10,7 +10,8 @@ import (
 )
 
 // ParticipantRepository reads the local trusted projection of
-// application.submitted. The Sprint 2 consumer adds the method that fills it.
+// application.submitted, filled by the JT-79 consumer through
+// postgres.Participants.RecordApplication.
 type ParticipantRepository interface {
 	// GetByApplicationID returns domain.ErrApplicationNotFound for an unknown
 	// or not yet processed application.
@@ -19,8 +20,9 @@ type ParticipantRepository interface {
 
 // ReviewRepository stores at most one completed review per application.
 type ReviewRepository interface {
-	// Create stores the review, or returns domain.ErrReviewExists if the
-	// application already has one.
+	// Create stores the review and its review.completed outbox event in one
+	// transaction, or returns domain.ErrReviewExists if the application
+	// already has a review (then nothing is stored).
 	Create(ctx context.Context, review domain.Review) error
 	// GetByApplicationID returns the review, or domain.ErrReviewNotFound.
 	GetByApplicationID(ctx context.Context, applicationID string) (domain.Review, error)
