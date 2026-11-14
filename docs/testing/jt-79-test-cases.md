@@ -56,7 +56,7 @@ Commands run on branch `JT-79-review-events`:
 | Integration tests (Testcontainers `postgres:18-alpine` and `rabbitmq:4.1-alpine`) | Pass, including `TestReviewEvents_RealBrokerAndPostgres` |
 | Package coverage (unit) | `domain` 100%, `app` 98.2%, `adapters/grpc` 98.4%, `adapters/rabbitmq` 96.2%, `cmd/server` 86.0% |
 | Docker Compose end to end | Pass: application `c5ba671e-12a1-497c-b827-d0decf7f64ca`; `review.applications` 1 consumer, 0 ready; `review.applications.dead` 0; log "outbox events published" |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Green, [CI run](https://github.com/jobtrack-cst/jobtrack/actions/runs/43632892754) |
 
 ## Acceptance criteria review
 
