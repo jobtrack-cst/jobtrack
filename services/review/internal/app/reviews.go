@@ -41,10 +41,11 @@ func (r *Reviews) Complete(ctx context.Context, caller domain.Caller, in domain.
 		ReviewID: uuid.NewString(), ApplicationID: valid.ApplicationID, EmployerID: caller.UserID,
 		Score: valid.Score, Decision: valid.Decision, CreatedAt: now, UpdatedAt: now,
 	}
+	// Create stores review.completed in the same transaction; the outbox
+	// relay publishes it after the commit (JT-79).
 	if err := r.reviews.Create(ctx, review); err != nil {
 		return domain.Review{}, err
 	}
-	// Sprint 2: publish review.completed here, after the review is stored.
 	return review, nil
 }
 

@@ -17,8 +17,8 @@ const (
 	DecisionRejected
 )
 
-// String returns the value stored in the database and, in Sprint 2, the
-// decision string in review.completed.
+// String returns the value stored in the database and the decision string
+// in review.completed (JT-79).
 func (d Decision) String() string {
 	switch d {
 	case DecisionShortlisted:
@@ -41,7 +41,7 @@ func ParseDecision(s string) (Decision, bool) {
 }
 
 // ApplicationParticipants is the trusted local projection of
-// application.submitted (filled by the Sprint 2 consumer), the same design as
+// application.submitted (filled by the JT-79 consumer), the same design as
 // Offer and Messaging. EmployerID is the employer's user ID.
 type ApplicationParticipants struct {
 	ApplicationID string

@@ -23,4 +23,9 @@ var (
 
 	// ALREADY_EXISTS
 	ErrReviewExists = errors.New("application already has a completed review")
+
+	// Not a gRPC error: an application.submitted event whose participants
+	// differ from those already stored. The consumer sends it to the dead
+	// queue, because retrying can never apply it (JT-79).
+	ErrConflictingParticipants = errors.New("application participants differ from those already stored")
 )
