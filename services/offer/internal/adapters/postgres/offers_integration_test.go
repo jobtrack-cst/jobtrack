@@ -3,6 +3,7 @@
 package postgres_test
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -10,9 +11,58 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jobtrack-cst/jobtrack/services/offer/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/offer/internal/domain"
 )
+
+func TestOffers_Decide_SingleConnectionPreservesFailureSemantics(t *testing.T) {
+	ctx, database := startParticipantsDB(t)
+	cfg := database.Config()
+	cfg.MaxConns = 1
+	cfg.MinConns = 0
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	repo := postgres.NewOffers(pool)
+	o := syntheticOffer()
+	if _, err := repo.Create(ctx, o); err != nil {
+		t.Fatal(err)
+	}
+	at := o.UpdatedAt.Add(time.Hour)
+	want, err := repo.Decide(ctx, o.ID, o.ApplicantID, domain.OfferStatusAccepted, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, offerID, applicantID string
+		next                       domain.OfferStatus
+		wantErr                    error
+	}{
+		{"repeat", o.ID, o.ApplicantID, domain.OfferStatusAccepted, domain.ErrOfferNotPending},
+		{"reverse", o.ID, o.ApplicantID, domain.OfferStatusDeclined, domain.ErrOfferNotPending},
+		{"other applicant", o.ID, uuid.NewString(), domain.OfferStatusDeclined, domain.ErrPermissionDenied},
+		{"unknown offer", uuid.NewString(), o.ApplicantID, domain.OfferStatusAccepted, domain.ErrOfferNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			decisionCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+			if _, err := repo.Decide(decisionCtx, tc.offerID, tc.applicantID, tc.next, at.Add(time.Hour)); !errors.Is(err, tc.wantErr) {
+				t.Fatalf("got %v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+	got, err := repo.GetByID(ctx, o.ID)
+	if err != nil || got != want {
+		t.Fatalf("failed decisions changed offer: got %+v, %v; want %+v", got, err, want)
+	}
+	var count int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM outbox_events`).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("got %d outbox events, %v; want only creation and acceptance", count, err)
+	}
+}
 
 func syntheticOffer() domain.Offer {
 	at := time.Date(2026, 11, 8, 12, 0, 0, 123456000, time.FixedZone("Bhutan", 21600))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -95,6 +97,8 @@ type deps struct {
 	checker      ports.HealthChecker
 	offers       ports.OfferRepository
 	participants ports.ParticipantRepository
+	outbox       ports.OutboxRepository
+	recorder     rabbitmq.ApplicationRecorder
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -142,9 +146,23 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Offer business publishing and participant consumption belong to Sprint 2.
-	// Initialization must not publish events.
-	return start(ctx, cfg, logger, d)
+	if d.outbox == nil || d.recorder == nil {
+		return start(ctx, cfg, logger, d)
+	}
+	recovering := newRecoveringPublisher(publisher, func() (publisherResource, error) { return open(cfg.rabbitMQURL) })
+	defer recovering.Close()
+	workerCtx, cancel := context.WithCancel(ctx)
+	var workers sync.WaitGroup
+	workers.Add(1)
+	go func() {
+		defer workers.Done()
+		if err := events.Consume(workerCtx, rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.recorder)); err != nil && workerCtx.Err() == nil {
+			logger.Error("application consumer stopped", "error", err)
+		}
+	}()
+	defer func() { cancel(); workers.Wait() }()
+	relay := app.NewOutboxRelay(d.outbox, recovering, systemClock{})
+	return runWithRelay(workerCtx, logger, relay, outboxRelayInterval, func(ctx context.Context) error { return start(ctx, cfg, logger, d) })
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
@@ -153,6 +171,8 @@ type databaseHandle struct {
 	offers       ports.OfferRepository
 	participants ports.ParticipantRepository
 	migrate      func(context.Context, string) error
+	outbox       ports.OutboxRepository
+	recorder     rabbitmq.ApplicationRecorder
 	close        func()
 }
 
@@ -163,6 +183,8 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	}
 	return &databaseHandle{
 		readiness:    postgres.NewReadiness(pool),
+		outbox:       postgres.NewOutbox(pool),
+		recorder:     postgres.NewParticipants(pool),
 		offers:       postgres.NewOffers(pool),
 		participants: postgres.NewParticipants(pool),
 		migrate:      func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
@@ -191,7 +213,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), offers: database.offers, participants: database.participants})
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), offers: database.offers, participants: database.participants, outbox: database.outbox, recorder: database.recorder})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar)) error {
