@@ -77,6 +77,9 @@ interrupted by process exit.
 Do not retry an unchanged 4xx request; correct the request first. A 503 may be
 transient or uncertain, so retry only with awareness of possible duplication.
 The function makes one SMTP attempt and leaves retry policy to its callers.
+Permanent SMTP responses such as 550 also currently map to HTTP 503. Repeated
+retries may therefore never succeed and can be wasteful; 503 does not imply
+that the underlying SMTP failure is transient.
 
 **Retrying 503 is not guaranteed duplicate-free.** SMTP might have accepted
 DATA but its final reply was lost or timed out, causing the function to return
