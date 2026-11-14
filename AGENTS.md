@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 13 Nov 2026 (JT-53 gateway CORS for the frontend dev server)
+- Last updated: 14 Nov 2026 (JT-89 Sprint 2 review and Sprint 3 plan)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -529,14 +529,16 @@ Ceremonies: sprint planning (1 hour), daily stand-up (15 minutes), combined spri
 
 ### Current sprint
 
-- Sprint: Sprint 2 (9 to 13 Nov), started on 9 Nov 2026 and extended to 13 Nov on 11 Nov 2026 (Section 15)
-- Goal: Finish the Sprint 1 carryovers (Musts first: JT-38, JT-39, JT-48, JT-49) and get the core application flow working end to end with real gRPC calls, events and the first function. Committed minimum: the four Must carryovers.
-- Tasks: JT-53 to JT-64, plus the 11 Sprint 1 carryovers JT-22, JT-38 to JT-42 and JT-48 to JT-52 (see Jira)
-- Scope: real cross-service gRPC clients replace the mocked ports, services publish and consume their domain events, and the first function (resume-validator) runs through the forwarder.
-- Commitment: Must tasks (Jira priority High) are the committed minimum. Should tasks (Medium) are planned; unfinished ones move to the top of Sprint 3.
-- Scope priorities if time runs short (agreed with the Product Owner on 12 Nov 2026): (1) the end-to-end apply-for-a-job flow, JT-58 first because JT-60 depends on it; (2) the remaining basic service operations; (3) JT-53 before JT-63, because the frontend depends on the gateway configuration; (4) JT-54 and JT-55 by whether they block integration or testing. Lower-priority scope is kept minimal, but each task keeps its required acceptance criteria.
-- Next sprints: Sprint 3 (Jira sprint 37) 14 to 16 Nov, Sprint 4 (Jira sprint 38) 17 to 19 Nov, both planned in Jira.
-- Sprint 1 review and retrospective: `docs/pm/sprint-1-review.md` (15 of 26 tasks, 49 of 80 points).
+- Sprint: Sprint 3 (14 to 16 Nov, Jira sprint 37), started on 14 Nov 2026 at 09:00
+- Goal: Full business logic, all 5 functions, frontend for all roles, integration tests. Committed minimum: the Must tasks (44 points).
+- Tasks: JT-68 to JT-89, plus the carryovers JT-54, JT-66 and JT-67: 25 tasks, 62 points (44 Must, 18 Should). See Jira and `docs/pm/sprint-3-planning.md`, which lists the cross-service dependencies of every task.
+- Scope: the remaining services publish and consume their domain events, the four remaining functions (notification-dispatcher, email-sender, deadline-reminder, weekly-summary) are built, and each member builds the frontend pages for their own services. A consumer whose producer is not ready builds against the fixtures in `tests/contract/fixtures`.
+- Commitment: Must tasks (Jira priority High) are the committed minimum. Should tasks (Medium) are planned; unfinished ones move to the top of Sprint 4. Sprint 3 is planned at 62 points on purpose, above the agreed figure of about 50, and is not extended (Section 15, 14 Nov 2026).
+- Slip order: the carryovers JT-66 and JT-67 slip first, then the other Should tasks. JT-54 is done early because JT-83 (Must) needs it for resume upload through the gateway.
+- Sprint 3 assignments outside Section 4 and 5 ownership: JT-77 (email-sender) to Phuntsho as DevOps backup, reviewed by Sangay; JT-72 (audit-log consumer) to Sangay as Jigden's backup, reviewed by Jigden. Ownership in Sections 4 and 5 is unchanged.
+- No sub-tasks in Sprint 3; the acceptance criteria in each task are the checklist.
+- Next sprint: Sprint 4 (Jira sprint 38) 17 to 19 Nov, planned in Jira.
+- Sprint reviews: `docs/pm/sprint-1-review.md` (15 of 26 tasks, 49 of 80 points) and `docs/pm/sprint-2-review.md` (21 of 21 tasks, 60 points, with the two-day extension).
 - Cluster host machine: Phuntsho's laptop; 16 GiB physical RAM verified during JT-29 (Docker Desktop approximately 7.75 GiB allocated)
 - Daily stand-up: Flexible, coordinated by the team each day (15 minutes).
 
@@ -651,6 +653,11 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 11 Nov 2026 | Revised sprint schedule: Sprint 2 extended to 9 to 13 Nov, Sprint 3 14 to 16 Nov, Sprint 4 17 to 19 Nov; planned project completion 19 Nov (previously 17 Nov); still no buffer. Roles and service ownership in Sections 2, 4 and 5 are unchanged. Decided by Jigden as Scrum Master on 11 Nov 2026 and approved by Phuntsho as Product Owner on 12 Nov 2026 (JT-64) | Sprint 1 finished 15 of 26 tasks (49 of 80 points), so 11 tasks (31 points) were carried into Sprint 2 on top of its event and function work, and Kinley and Sangay were not available at the start of Sprint 2 |
 | 12 Nov 2026 | Scope priorities if time runs short, agreed with Phuntsho as Product Owner: (1) end-to-end apply-for-a-job flow, JT-58 before JT-60; (2) remaining basic service operations; (3) JT-53 before JT-63; (4) JT-54 and JT-55 by whether they block integration or testing. Lower-priority scope is kept minimal while each task keeps its required acceptance criteria (JT-64) | The revised schedule still has no buffer, so the core flow must be protected first |
 | 13 Nov 2026 | Gateway CORS instead of a Vite dev proxy: the gateway allows browser calls from one origin set in `CORS_ALLOWED_ORIGIN` (exactly lowercase `scheme://host[:port]`; Compose default `http://localhost:5173` when unset; an empty value turns CORS off; an invalid value stops startup), and the shared frontend API client sends the JWT as `Authorization: Bearer <token>`. CORS wraps the JWT middleware: a preflight (`OPTIONS` with `Origin` and `Access-Control-Request-Method`) from that origin for `GET`, `POST`, `PUT`, `PATCH` or `DELETE`, asking only for `Authorization` and `Content-Type`, gets 204 with `Access-Control-Max-Age` 600 and never reaches authentication or a service; any other preflight gets 403. Other requests from that origin get `Access-Control-Allow-Origin` and still pass the JT-31 JWT check and header stripping; other origins get no CORS headers. No credentials or cookies, no new library (proposed by Jigden during JT-53, agreed by Phuntsho as frontend shell owner in PR #47) | Port 5173 and host port 8000 are different origins. CORS also works for a built frontend, which a Vite proxy does not cover, and the JWT check stays in front of every real request |
+| 14 Nov 2026 | Sprint 3 is planned at 62 points (44 Must, 18 Should) on purpose, above the figure of about 50 from the Sprint 1 retrospective (Option 1). Must tasks are the committed minimum and stay within that figure; unfinished Should tasks move to the top of Sprint 4, and Sprint 3 is not extended. The carryovers JT-54, JT-66 and JT-67 are Should tasks, keep their size and count inside each owner's share; JT-66 and JT-67 slip first. Agreed by Jigden as Scrum Master with Phuntsho as Product Owner on 14 Nov 2026 (JT-89) | Sprint 2 delivered 60 points, but over 5 days; the schedule has no buffer, so Sprint 4 absorbs unfinished Should work instead of an extension |
+| 14 Nov 2026 | JT-54 (gateway body size limit) is done early in Sprint 3 instead of slipping with the other carryovers (proposed by Jigden as Scrum Master during JT-89, for Phuntsho as Product Owner to confirm in the JT-89 PR) | JT-83 (Must) needs it for resume upload through the gateway |
+| 14 Nov 2026 | For Sprint 3 only, JT-77 (email-sender) is assigned to Phuntsho as DevOps backup and JT-72 (audit-log consumer) to Sangay as Jigden's backup; Sangay and Jigden, as the owners, review those PRs. JT-66 (error logging) is assigned to Phuntsho as architecture lead. Ownership in Sections 4 and 5 is unchanged (agreed with Phuntsho as Product Owner on 14 Nov 2026, JT-89) | Keeps the load at 15 to 16 points per member without a handover of ownership |
+| 14 Nov 2026 | In Sprint 3, a consumer whose producer is not ready builds and tests against the shared fixtures in `tests/contract/fixtures/<routing key>.json`, and is verified end to end in Docker Compose once the producer is merged (JT-89) | No task waits for another to merge; follows the R4 retrospective action |
+| 14 Nov 2026 | No sub-tasks in Sprint 3 (JT-89) | Short sprint; acceptance criteria already work as the checklist |
 
 ---
 
