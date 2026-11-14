@@ -59,7 +59,7 @@ Full business logic, all 5 functions, frontend for all roles, integration tests.
 
 25 tasks, 62 points: 22 new (JT-68 to JT-89) and 3 carried over (JT-54 from Sprint 2; JT-66 and JT-67 found during Sprint 2). 16 Must tasks (44 points) and 9 Should tasks (18 points).
 
-JT-53 (gateway CORS) was Done in Sprint 2 but had been added to Sprint 3 in Jira; it was removed from Sprint 3 on 14 Nov.
+JT-53 (gateway CORS, unestimated) was carried into Sprint 3 from Sprint 2 (In Review at close), was Done on 14 Nov and was then removed from Sprint 3, so it is not part of the 25 tasks or the 62 points.
 
 ---
 
@@ -121,7 +121,7 @@ Recorded in the AGENTS.md Decision log (Section 15) on 14 Nov 2026, agreed with 
 
 - Option 1: Sprint 3 is planned at 62 points (44 Must, 18 Should), above the figure of about 50 from the Sprint 1 retrospective. The Must points stay within it. Unfinished Should tasks move to the top of Sprint 4; Sprint 3 is not extended.
 - The carryovers JT-54, JT-66 and JT-67 are Should tasks, keep their size and count inside each owner's share. JT-66 and JT-67 slip first.
-- JT-54 is done early instead of slipping, because JT-83 (Must) needs it for resume upload through the gateway (proposed by Jigden as Scrum Master during JT-89, for Phuntsho as Product Owner to confirm in the JT-89 PR).
+- JT-54 is done early instead of slipping, because JT-83 (Must) needs it for resume upload through the gateway (proposed by Jigden as Scrum Master during JT-89 and agreed by Phuntsho as Product Owner in PR #50 on 14 Nov 2026).
 - JT-77 (email-sender) is assigned to Phuntsho as DevOps backup for this sprint; Sangay, as the function's owner, reviews the PR.
 - JT-72 (audit-log consumer) is assigned to Sangay as Jigden's backup for this sprint; Jigden, as the service's owner, reviews the PR.
 - Ownership in AGENTS.md Sections 4 and 5 is unchanged.
