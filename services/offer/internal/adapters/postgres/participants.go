@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"regexp"
 	"strings"
 
@@ -46,4 +47,32 @@ func (r *Participants) GetByApplicationID(ctx context.Context, applicationID str
 		return domain.ApplicationParticipants{}, errors.New("get application participants failed")
 	}
 	return participants, nil
+}
+
+// RecordApplication claims the event and stores immutable participants together.
+// Conflicting participants fail without retaining the deduplication claim.
+func (r *Participants) RecordApplication(ctx context.Context, eventID string, p domain.ApplicationParticipants) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return offerDBError(ctx)
+	}
+	defer tx.Rollback(ctx)
+	result, err := tx.Exec(ctx, `INSERT INTO processed_events(event_id) VALUES($1) ON CONFLICT DO NOTHING`, eventID)
+	if err != nil {
+		return offerDBError(ctx)
+	}
+	if result.RowsAffected() == 0 {
+		return tx.Commit(ctx)
+	}
+	result, err = tx.Exec(ctx, `INSERT INTO application_participants(application_id,applicant_id,employer_id) VALUES($1,$2,$3) ON CONFLICT(application_id) DO UPDATE SET applicant_id=EXCLUDED.applicant_id WHERE application_participants.applicant_id=EXCLUDED.applicant_id AND application_participants.employer_id=EXCLUDED.employer_id`, p.ApplicationID, p.ApplicantID, p.EmployerID)
+	if err != nil {
+		return offerDBError(ctx)
+	}
+	if result.RowsAffected() == 0 {
+		return events.Permanent(errors.New("conflicting application participants"))
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return offerDBError(ctx)
+	}
+	return nil
 }
