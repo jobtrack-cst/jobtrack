@@ -17,6 +17,7 @@ import (
 
 	reviewv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/review/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/review/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/review/internal/adapters/postgres"
@@ -95,6 +96,8 @@ type deps struct {
 	checker      ports.HealthChecker
 	participants ports.ParticipantRepository
 	reviews      ports.ReviewRepository
+	outbox       ports.OutboxRepository
+	recorder     rabbitmq.ApplicationRecorder
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -147,11 +150,20 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Publishing review.completed and the application.submitted consumer that
-	// fills application_participants are Sprint 2; the broker connection is
-	// kept for them, as in the template.
-	// Initialization must not publish events.
-	return start(ctx, cfg, logger, d)
+	if d.outbox == nil || d.recorder == nil {
+		// Only startup tests leave these unset; runWithDatabase always sets both.
+		return start(ctx, cfg, logger, d)
+	}
+	// Initialization publishes nothing: events leave only through the relay,
+	// after their reviews are committed (JT-79, the JT-74 Offer design).
+	recovering := newRecoveringPublisher(publisher, func() (publisherResource, error) { return open(cfg.rabbitMQURL) })
+	defer recovering.Close()
+	relay := app.NewOutboxRelay(d.outbox, recovering, systemClock{})
+	consume := func(ctx context.Context) error {
+		return events.Consume(ctx, rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.recorder))
+	}
+	return runWithWorkers(ctx, logger, consume, relay, outboxRelayInterval,
+		func(ctx context.Context) error { return start(ctx, cfg, logger, d) })
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
@@ -159,6 +171,8 @@ type databaseHandle struct {
 	readiness    ports.Readiness
 	participants ports.ParticipantRepository
 	reviews      ports.ReviewRepository
+	outbox       ports.OutboxRepository
+	recorder     rabbitmq.ApplicationRecorder
 	migrate      func(context.Context, string) error
 	close        func()
 }
@@ -168,10 +182,13 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	if err != nil {
 		return nil, err
 	}
+	participants := postgres.NewParticipants(pool)
 	return &databaseHandle{
 		readiness:    postgres.NewReadiness(pool),
-		participants: postgres.NewParticipants(pool),
+		participants: participants,
 		reviews:      postgres.NewReviews(pool),
+		outbox:       postgres.NewOutbox(pool),
+		recorder:     participants,
 		migrate:      func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:        pool.Close,
 	}, nil
@@ -198,7 +215,10 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), participants: database.participants, reviews: database.reviews})
+	return start(ctx, cfg, logger, deps{
+		checker: app.NewHealthWithReadiness(database.readiness), participants: database.participants,
+		reviews: database.reviews, outbox: database.outbox, recorder: database.recorder,
+	})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
