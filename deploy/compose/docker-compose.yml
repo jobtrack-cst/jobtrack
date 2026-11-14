@@ -377,6 +377,24 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # JT-77: HTTP is internal to the Compose network.
+  email-sender:
+    profiles: [functions]
+    image: ${EMAIL_SENDER_IMAGE:-jobtrack-email-sender:local}
+    build:
+      context: ../..
+      dockerfile: functions/email-sender/Dockerfile
+    environment:
+      SERVICE_NAME: email-sender
+      HTTP_PORT: "8080"
+      SMTP_ADDR: mailpit:1025
+      SMTP_FROM: ${EMAIL_SENDER_FROM:-noreply@jobtrack.test}
+    depends_on:
+      mailpit:
+        condition: service_started
+    stop_grace_period: 25s
+    restart: unless-stopped
+
   # JT-62 real validator, using the JT-61 transport.
   resume-validator:
     profiles: [functions]

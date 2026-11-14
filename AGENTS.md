@@ -176,7 +176,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 | Function (folder) | Owner | Trigger | Responsibility |
 |---|---|---|---|
 | `notification-dispatcher` | Sangay | Events: `application.submitted`, `application.status_changed`, `interview.scheduled`, `offer.made`, `message.sent`, `job_alert.matched`, `employer.verified`, `deadline.reminder` | Decides who is notified and how. Writes to Notification Inbox (gRPC) and calls Email Sender for emails. Gets user emails from Auth. |
-| `email-sender` | Sangay | HTTP call from other functions | Sends email through SMTP to Mailpit |
+| `email-sender` | Sangay | Direct HTTP JSON call from other functions | Sends email through SMTP to Mailpit; [shared HTTP contract](docs/deployment/email-sender-http-contract.md) |
 | `weekly-summary` | Jigden | Weekly schedule (PingSource) | Gets statistics from Analytics and admin emails from Auth, then emails a summary to admins. |
 | `resume-validator` | Phuntsho | Event: `resume.uploaded` | Fetches the file from Resume, checks type (PDF only), size (max 2 MB) and content signature. Publishes `resume.validated` or `resume.rejected`. |
 | `deadline-reminder` | Kinley | Daily schedule (PingSource) | Finds jobs closing within 48 hours (Job Posting) and who saved them (Saved Jobs). Publishes `deadline.reminder` events. |
@@ -204,7 +204,7 @@ Existing classic queues must be migrated with DevOps review; never delete queues
 or data automatically. Compose starts Resume and its dependencies for the validator.
 See `docs/deployment/jt-61-forwarder.md` for execution and verification.
 
-Functions are stateless, receive CloudEvents over HTTP, and scale to zero. JT-29 selected the Go RabbitMQ-to-HTTP forwarder fallback: preserve the domain envelope as CloudEvent data, map its event ID/type into CloudEvent headers, and acknowledge RabbitMQ only after HTTP success. See `docs/deployment/jt-29-cluster-spike.md` for the verified spike and production follow-ups.
+Functions are stateless and scale to zero in Knative. Event-triggered functions receive CloudEvents over HTTP; email-sender instead accepts direct `POST /send-email` JSON requests from Notification Dispatcher and Weekly Summary. JT-29 selected the Go RabbitMQ-to-HTTP forwarder fallback: preserve the domain envelope as CloudEvent data, map its event ID/type into CloudEvent headers, and acknowledge RabbitMQ only after HTTP success. See `docs/deployment/jt-29-cluster-spike.md` for the verified spike and production follow-ups.
 
 ---
 
@@ -658,11 +658,13 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 14 Nov 2026 | For Sprint 3 only, JT-77 (email-sender) is assigned to Phuntsho as DevOps backup and JT-72 (audit-log consumer) to Sangay as Jigden's backup; Sangay and Jigden, as the owners, review those PRs. JT-66 (error logging) is assigned to Phuntsho as architecture lead. Ownership in Sections 4 and 5 is unchanged (agreed with Phuntsho as Product Owner on 14 Nov 2026, JT-89) | Keeps the load at 15 to 16 points per member without a handover of ownership |
 | 14 Nov 2026 | In Sprint 3, a consumer whose producer is not ready builds and tests against the shared fixtures in `tests/contract/fixtures/<routing key>.json`, and is verified end to end in Docker Compose once the producer is merged (JT-89) | No task waits for another to merge; follows the R4 retrospective action |
 | 14 Nov 2026 | No sub-tasks in Sprint 3 (JT-89) | Short sprint; acceptance criteria already work as the checklist |
+| 14 Nov 2026 | JT-77 email-sender accepts direct HTTP JSON requests at `POST /send-email` with `recipient`, `subject` and `body`; Phuntsho, Sangay (Notification Dispatcher) and Jigden (Weekly Summary) agreed to this request format. Returns 204 after SMTP acceptance, 4xx for invalid requests and 503 for SMTP failures. The [shared HTTP contract](docs/deployment/email-sender-http-contract.md) documents the interface and retry limits: lost SMTP acceptance replies or HTTP responses leave delivery uncertain, so retries can duplicate email; there is no idempotent delivery guarantee | Gives both calling functions one written interface while preserving the JT-29/JT-61 transport for event-triggered functions |
 
 ---
 
 ## 16. Known issues and open questions
 
+- JT-77 cluster deployment dependency: `deploy/knative/email-sender.yaml` sets `SMTP_ADDR=mailpit:1025`, which requires reachable Mailpit SMTP and the `mailpit` DNS name in the function's cluster namespace. Mailpit is configured only in Compose; cluster manifests and an explicit deployment task remain to be provided by DevOps before cluster email delivery can be verified.
 - Offer application lifecycle eligibility remains unresolved for Sprint 2, including required lifecycle state, interview completion, employer verification and withdrawal handling. Whether Offer should consume `application.withdrawn` and which trusted data sources support these checks require agreement; Sprint 1 checks only local participants, employer ownership and lifetime offer uniqueness (JT-45).
 - JT-29 confirmed 16 GiB physical RAM and the forwarder fallback; the spike does not prove capacity for the complete 20-service deployment. Docker Desktop currently has approximately 7.75 GiB allocated.
 - Promote the JT-29 transport spike into shared deployment wiring in the appropriate implementation tasks: durable broker storage, consumer idempotency, retry/dead-letter policy, operational health and credentials. Native RabbitMQSource needs additional topology CRDs/operators and was not selected. See `docs/deployment/jt-29-cluster-spike.md`.
