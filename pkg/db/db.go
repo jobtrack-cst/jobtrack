@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,6 +23,8 @@ func OpenPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, errors.New("invalid database configuration")
 	}
+	config.ConnConfig.RuntimeParams["timezone"] = "UTC"
+
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, safeError(ctx, "initialize database pool")
@@ -35,7 +36,7 @@ func OpenPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Migrate applies pending goose SQL migrations. The caller retains ownership of pool.
+// Migrate applies pending goose SQL migrations.
 func Migrate(ctx context.Context, pool *pgxpool.Pool, directory string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -46,28 +47,23 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, directory string) error {
 	if strings.TrimSpace(directory) == "" {
 		return errors.New("migration directory is required")
 	}
-	info, err := os.Stat(directory)
-	if err != nil || !info.IsDir() {
-		return errors.New("migration directory is not accessible")
+	if err := goose.SetDialect("postgres"); err != nil {
+		return errors.New("unsupported database dialect")
 	}
-	// The bridge returns acquired connections without closing the caller's pool.
-	sqlDB := stdlib.OpenDBFromPool(pool)
-	defer sqlDB.Close()
-	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, os.DirFS(directory),
-		goose.WithDisableGlobalRegistry(true), goose.WithLogger(goose.NopLogger()))
-	if err != nil {
-		return errors.New("load SQL migrations failed")
-	}
-	if _, err := provider.Up(ctx); err != nil {
-		return safeError(ctx, "apply SQL migrations")
+	// Isolate the global state for concurrent tests.
+	goose.SetBaseFS(nil)
+
+	db := stdlib.OpenDBFromPool(pool)
+	defer db.Close()
+	if err := goose.UpContext(ctx, db, directory); err != nil {
+		return safeError(ctx, "apply database migrations")
 	}
 	return nil
 }
 
-// Driver and migration errors can contain credentials or SQL literals.
 func safeError(ctx context.Context, operation string) error {
 	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("%s: %w", operation, err)
+		return err
 	}
 	return fmt.Errorf("%s failed", operation)
 }

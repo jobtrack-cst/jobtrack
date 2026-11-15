@@ -104,6 +104,20 @@ func (mr *MockJobRepositoryMockRecorder) ListClosingBetween(ctx, window, page an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClosingBetween", reflect.TypeOf((*MockJobRepository)(nil).ListClosingBetween), ctx, window, page)
 }
 
+// RecordJobRemoved mocks base method.
+func (m *MockJobRepository) RecordJobRemoved(ctx context.Context, eventID, jobID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordJobRemoved", ctx, eventID, jobID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordJobRemoved indicates an expected call of RecordJobRemoved.
+func (mr *MockJobRepositoryMockRecorder) RecordJobRemoved(ctx, eventID, jobID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordJobRemoved", reflect.TypeOf((*MockJobRepository)(nil).RecordJobRemoved), ctx, eventID, jobID)
+}
+
 // UpdateFields mocks base method.
 func (m *MockJobRepository) UpdateFields(ctx context.Context, job domain.Job, expected domain.Status) (domain.Job, error) {
 	m.ctrl.T.Helper()
