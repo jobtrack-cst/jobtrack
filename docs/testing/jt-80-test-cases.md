@@ -4,7 +4,7 @@ Traceability: [JT-80](https://jobtrack-cst.atlassian.net/browse/JT-80) (parent J
 
 ## Scope
 
-Interview consumes `application.submitted` to fill its `application_participants` projection, and publishes `interview.scheduled` when `ScheduleInterview` succeeds. It copies the JT-79 Review design and uses the existing contracts without changes. The public `InterviewService` RPCs and their JT-52 rules are unchanged; recording interview outcomes is still the open question in AGENTS.md Section 16.
+Interview consumes `application.submitted` to fill its `application_participants` projection, and publishes `interview.scheduled` when `ScheduleInterview` succeeds. It copies the JT-79 Review design and uses the existing contracts without changes. The public `InterviewService` RPCs and their JT-52 rules are unchanged; recording interview outcomes is still the open question in AGENTS.md Section 16. The microsecond defect found here (JT80-22) also existed in review's `CompleteReview` (JT-79); with the team's agreement it is fixed in this PR too (JT80-23).
 
 Rules agreed for JT-80 (AGENTS.md Section 15, approved by Phuntsho):
 
@@ -40,6 +40,7 @@ Rules agreed for JT-80 (AGENTS.md Section 15, approved by Phuntsho):
 | JT80-20 | AC4 | Real flow through the gateway: verified employer, published job, validated resume, application, two interviews | End to end | All 24 steps `ok`; applicant 403; past time 400; same time 409; `applicant_id` from the consumed event; list soonest first | Docker Compose (manual) | Pass |
 | JT80-21 | AC4 | Database and broker state after JT80-20 | End to end | Participants stored; two published `interview.scheduled` matching the interviews (`scheduled_at`, `occurred_at`, `event_id`); 0 unpublished; consumer ready; 0 dead messages | Docker Compose (manual) | Pass |
 | JT80-22 | AC2 | Clock time with nanoseconds (999 ns) | Boundary values | `created_at` and `updated_at` kept to the microsecond, so the stored, returned and published times are equal | Unit, `internal/app` | Pass |
+| JT80-23 | AC2 (JT-79 fix) | Review: clock time with nanoseconds (999 ns); review flow repeated in Docker Compose | Boundary values; end to end | `created_at` and `updated_at` kept to the microsecond; `review.completed` `occurred_at` equals the stored `created_at` | Unit, `services/review/internal/app`; Docker Compose (manual) | Pass |
 
 AC numbers follow the order of the acceptance criteria in JT-80: AC1 to AC4 are the task criteria, AC5 and AC6 the shared Sprint 3 criteria (AC5 AGENTS.md Sections 6, 9 and 10 with no new tools or contract changes, AC6 Docker Compose, PR, CI, merge and time logged).
 
