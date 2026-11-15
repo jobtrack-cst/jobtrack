@@ -32,6 +32,9 @@ export function ApplicationsPage() {
       <Typography>Application: {a.applicationId}</Typography><Typography>Job: {a.jobId}</Typography>
       <Typography>{a.withdrawn ? 'Withdrawn' : 'Submitted (submission record)'}</Typography>
       <Button component={Link} to={`${base}/messages/${a.applicationId}`}>Messages</Button>
+      <Button component={Link} to={`${base}/applications/${a.applicationId}/status`}>Status</Button>
+      <Button component={Link} to={`${base}/applications/${a.applicationId}/interviews`}>Interviews</Button>
+      {employer && <Button component={Link} to={`${base}/applications/${a.applicationId}/review`}>Review</Button>}
       {employer ? <Button component={Link} to={`${base}/offers/new/${a.applicationId}`}>Make offer</Button>
         : <Button disabled={busy || a.withdrawn} onClick={() => { setSelected(a); setError(''); }}>Withdraw</Button>}
     </Stack></CardContent></Card>)}

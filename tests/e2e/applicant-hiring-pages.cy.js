@@ -254,3 +254,183 @@ describe('JT-83 resume upload', () => {
     cy.contains('Validated').should('be.visible');
   });
 });
+
+describe('JT-83 application status, review and interviews', () => {
+  const applicationId = '44444444-4444-4444-8444-444444444444';
+  const application = { applicationId, jobId: '22222222-2222-4222-8222-222222222222', resumeId: '33333333-3333-4333-8333-333333333333', applicantId: userId, employerId: '66666666-6666-4666-8666-666666666666', withdrawn: false };
+  const statusUrl = `${gateway}/v1/applications/${applicationId}/status`;
+  const historyUrl = `${gateway}/v1/applications/${applicationId}/status-history?*`;
+  const reviewUrl = `${gateway}/v1/applications/${applicationId}/review`;
+  const reviewsUrl = `${gateway}/v1/applications/${applicationId}/reviews`;
+  const interviewsUrl = `${gateway}/v1/applications/${applicationId}/interviews`;
+  const pad = n => String(n).padStart(2, '0');
+  // datetime-local value for a time daysAhead from now, in the browser's zone.
+  const localInput = (daysAhead, hour = 10) => {
+    const d = new Date(Date.now() + daysAhead * 86400000);
+    d.setHours(hour, 0, 0, 0);
+    return { value: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(hour)}:00`, iso: d.toISOString() };
+  };
+  function openCard(role, button) {
+    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
+    login(role);
+    cy.contains('a', 'Applications').click();
+    cy.wait('@applications');
+    if (button) cy.contains('a', new RegExp(`^${button}$`)).click();
+  }
+
+  describe('status and history', () => {
+    it('shows the current status and paged history from the application card', () => {
+      cy.intercept('GET', statusUrl, { statusRecord: { applicationId, status: 'APPLICATION_STATUS_SHORTLISTED', timestamps: { updatedAt: '2026-11-15T10:00:00Z' } } });
+      cy.intercept('GET', historyUrl, req => {
+        expect(req.query['pagination.page_size']).to.eq('20');
+        req.reply(req.query['pagination.page_token'] === '20'
+          ? { entries: [{ previousStatus: 'APPLICATION_STATUS_UNDER_REVIEW', newStatus: 'APPLICATION_STATUS_SHORTLISTED', occurredAt: '2026-11-15T10:00:00Z' }], pagination: {} }
+          : { entries: [
+            { previousStatus: 'APPLICATION_STATUS_UNSPECIFIED', newStatus: 'APPLICATION_STATUS_SUBMITTED', occurredAt: '2026-11-14T10:00:00Z' },
+            { previousStatus: 'APPLICATION_STATUS_SUBMITTED', newStatus: 'APPLICATION_STATUS_UNDER_REVIEW', occurredAt: '2026-11-15T09:00:00Z' },
+          ], pagination: { nextPageToken: '20' } });
+      });
+      openCard('ROLE_APPLICANT', 'Status');
+      cy.location('pathname').should('eq', `/applicant/applications/${applicationId}/status`);
+      cy.contains('Current status:').parent().should('contain', 'Shortlisted');
+      cy.get('table[aria-label="Status history"] tbody tr').should('have.length', 2).first().should('contain', 'None').and('contain', 'Submitted');
+      cy.contains('button', 'Next page').click();
+      cy.get('table[aria-label="Status history"] tbody tr').should('have.length', 1).and('contain', 'Under review');
+    });
+
+    for (const [statusCode, code, message] of [[404, 5, 'has no status yet'], [403, 7, 'Only the applicant and the employer']]) {
+      it(`explains a ${statusCode} status response`, () => {
+        cy.intercept('GET', statusUrl, { statusCode, body: { code, message: 'private-input' } });
+        cy.intercept('GET', historyUrl, { statusCode, body: { code, message: 'private-input' } });
+        openCard('ROLE_EMPLOYER', 'Status');
+        cy.get('[role=alert]').should('have.length', 1).and('contain', message).and('not.contain', 'private-input');
+      });
+    }
+
+    it('rejects an application ID in the address that is not a UUID without calling the gateway', () => {
+      let called = false;
+      cy.intercept('GET', `${gateway}/v1/applications/not-a-uuid/**`, () => { called = true; });
+      login();
+      cy.window().then(win => { win.history.pushState({}, '', '/applicant/applications/not-a-uuid/status'); win.dispatchEvent(new PopStateEvent('popstate')); });
+      cy.contains('The application ID in the address is not valid.').should('be.visible');
+      cy.then(() => expect(called).to.eq(false));
+    });
+  });
+
+  describe('employer review', () => {
+    it('completes a review after confirmation and then shows it read-only', () => {
+      cy.intercept('GET', reviewUrl, { statusCode: 404, body: { code: 5 } });
+      openCard('ROLE_EMPLOYER', 'Review');
+      cy.contains('button', 'Complete review').should('be.disabled');
+      cy.contains('label', 'Score').parent().find('[role=combobox]').click();
+      cy.contains('[role=option]', /^4$/).click();
+      cy.contains('label', 'Shortlist').click();
+      cy.intercept('POST', reviewsUrl, req => {
+        expect(req.body).to.deep.eq({ score: 4, decision: 'REVIEW_DECISION_SHORTLISTED' });
+        req.reply({ review: { reviewId: '77777777-7777-4777-8777-777777777777', applicationId, score: 4, decision: 'REVIEW_DECISION_SHORTLISTED', timestamps: { createdAt: '2026-11-15T10:00:00Z' } } });
+      }).as('complete');
+      cy.contains('button', 'Complete review').click();
+      cy.contains('Shortlist this application?').should('be.visible');
+      cy.contains('button', 'Cancel').click();
+      cy.get('@complete.all').should('have.length', 0);
+      cy.contains('button', 'Complete review').click();
+      cy.contains('button', 'Confirm review').click();
+      cy.wait('@complete');
+      cy.contains('Review completed').should('be.visible');
+      cy.contains('Score: 4 of 5').should('be.visible');
+      cy.contains('button', 'Complete review').should('not.exist');
+    });
+
+    it('shows an existing review without the form', () => {
+      cy.intercept('GET', reviewUrl, { review: { reviewId: 'r', applicationId, score: 2, decision: 'REVIEW_DECISION_REJECTED', timestamps: { createdAt: '2026-11-15T10:00:00Z' } } });
+      openCard('ROLE_EMPLOYER', 'Review');
+      cy.contains('Decision: Rejected').should('be.visible');
+      cy.contains('button', 'Complete review').should('not.exist');
+    });
+
+    for (const [statusCode, code, message] of [[409, 6, 'already been reviewed'], [404, 5, 'not available for review yet'], [403, 7, 'Only the employer who posted'], [400, 3, 'Choose a score from 1 to 5']]) {
+      it(`explains a ${statusCode} answer to Complete review`, () => {
+        cy.intercept('GET', reviewUrl, { statusCode: 404, body: { code: 5 } });
+        cy.intercept('POST', reviewsUrl, { statusCode, body: { code, message: 'private-input' } });
+        openCard('ROLE_EMPLOYER', 'Review');
+        cy.contains('label', 'Score').parent().find('[role=combobox]').click();
+        cy.contains('[role=option]', /^1$/).click();
+        cy.contains('label', 'Reject').click();
+        cy.contains('button', 'Complete review').click();
+        cy.contains('button', 'Confirm review').click();
+        cy.get('[role=alert]').should('contain', message).and('not.contain', 'private-input');
+        cy.contains('button', 'Complete review').should('be.enabled');
+      });
+    }
+
+    it('gives applicants no review link or route', () => {
+      openCard('ROLE_APPLICANT');
+      cy.contains('a', 'Status').should('be.visible');
+      cy.contains('a', /^Review$/).should('not.exist');
+      cy.window().then(win => { win.history.pushState({}, '', `/applicant/applications/${applicationId}/review`); win.dispatchEvent(new PopStateEvent('popstate')); });
+      cy.location('pathname').should('eq', '/applicant');
+    });
+  });
+
+  describe('interviews', () => {
+    const interview = { interviewId: '88888888-8888-4888-8888-888888888888', applicationId, scheduledAt: '2026-11-20T04:00:00Z', details: 'Room 2\nBring your ID' };
+
+    it('lists interviews for the applicant without a schedule form', () => {
+      cy.intercept('GET', `${interviewsUrl}?*`, { interviews: [interview], pagination: {} });
+      openCard('ROLE_APPLICANT', 'Interviews');
+      cy.contains('Room 2').should('be.visible');
+      cy.contains('Schedule an interview').should('not.exist');
+    });
+
+    it('schedules an interview in UTC from the employer local time and refreshes the list', () => {
+      const when = localInput(3);
+      cy.intercept('GET', `${interviewsUrl}?*`, { interviews: [], pagination: {} });
+      openCard('ROLE_EMPLOYER', 'Interviews');
+      cy.contains('No interviews scheduled').should('be.visible');
+      field('Date and time').type(when.value);
+      field('Details').type('  Room 2  ');
+      cy.intercept('POST', interviewsUrl, req => {
+        expect(req.body).to.deep.eq({ scheduledAt: when.iso, details: 'Room 2' });
+        req.reply({ interview: { ...interview, scheduledAt: when.iso, details: 'Room 2' } });
+      }).as('schedule');
+      cy.intercept('GET', `${interviewsUrl}?*`, { interviews: [{ ...interview, scheduledAt: when.iso, details: 'Room 2' }], pagination: {} }).as('relist');
+      cy.contains('button', 'Schedule interview').click();
+      cy.wait(['@schedule', '@relist']);
+      cy.contains('Interview scheduled for').should('be.visible');
+      field('Date and time').should('have.value', '');
+    });
+
+    for (const [name, days, message] of [['in the past', -1, 'in the future'], ['more than 365 days ahead', 367, 'within 365 days']]) {
+      it(`blocks a time ${name}`, () => {
+        cy.intercept('GET', `${interviewsUrl}?*`, { interviews: [], pagination: {} });
+        openCard('ROLE_EMPLOYER', 'Interviews');
+        field('Date and time').type(localInput(days).value);
+        cy.get('[role=alert]').should('contain', message);
+        cy.contains('button', 'Schedule interview').should('be.disabled');
+      });
+    }
+
+    it('allows 1000 characters of details and blocks 1001', () => {
+      cy.intercept('GET', `${interviewsUrl}?*`, { interviews: [], pagination: {} });
+      openCard('ROLE_EMPLOYER', 'Interviews');
+      field('Date and time').type(localInput(2).value);
+      fill('Details', 'x'.repeat(1000));
+      cy.contains('button', 'Schedule interview').should('be.enabled');
+      fill('Details', 'x'.repeat(1001));
+      cy.get('[role=alert]').should('contain', 'at most 1000 characters');
+      cy.contains('button', 'Schedule interview').should('be.disabled');
+    });
+
+    for (const [statusCode, code, message] of [[409, 6, 'already scheduled at this time'], [400, 3, 'The interview was not scheduled'], [403, 7, 'Only the employer who posted'], [404, 5, 'not available yet']]) {
+      it(`explains a ${statusCode} answer to Schedule interview`, () => {
+        cy.intercept('GET', `${interviewsUrl}?*`, { interviews: [], pagination: {} });
+        cy.intercept('POST', interviewsUrl, { statusCode, body: { code, message: 'private-input' } });
+        openCard('ROLE_EMPLOYER', 'Interviews');
+        field('Date and time').type(localInput(2).value);
+        cy.contains('button', 'Schedule interview').click();
+        cy.get('[role=alert]').should('contain', message).and('not.contain', 'private-input');
+        cy.contains('button', 'Schedule interview').should('be.enabled');
+      });
+    }
+  });
+});

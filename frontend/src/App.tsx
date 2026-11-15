@@ -11,6 +11,9 @@ import { MessagesPage } from './features/messaging/MessagesPage';
 import { JobAlertsPage } from './features/job-alert/JobAlertsPage';
 import { ProfilePage } from './features/applicant-profile/ProfilePage';
 import { ResumesPage } from './features/resume/ResumesPage';
+import { StatusPage } from './features/application-status/StatusPage';
+import { ReviewPage } from './features/review/ReviewPage';
+import { InterviewsPage } from './features/interview/InterviewsPage';
 
 function Workspace({ role }: { role: Role }) {
   const { session } = useAuth();
@@ -48,6 +51,8 @@ export default function App() {
           <Route index element={<Typography variant="h4" component="h1">Applicant workspace</Typography>} />
           <Route path="apply" element={<ApplyPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="applications/:applicationId/status" element={<StatusPage />} />
+          <Route path="applications/:applicationId/interviews" element={<InterviewsPage />} />
           <Route path="offers" element={<OffersPage key="applicant-offers" />} />
           <Route path="messages/:applicationId" element={<MessagesPage />} />
           <Route path="job-alerts" element={<JobAlertsPage />} />
@@ -58,6 +63,9 @@ export default function App() {
         <Route path="/employer" element={<Workspace role="ROLE_EMPLOYER" />}>
           <Route index element={<Typography variant="h4" component="h1">Employer workspace</Typography>} />
           <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="applications/:applicationId/status" element={<StatusPage />} />
+          <Route path="applications/:applicationId/review" element={<ReviewPage />} />
+          <Route path="applications/:applicationId/interviews" element={<InterviewsPage />} />
           <Route path="offers" element={<OffersPage key="employer-offers" />} />
           <Route path="offers/new/:applicationId" element={<OffersPage key="make-offer" create />} />
           <Route path="messages/:applicationId" element={<MessagesPage />} />

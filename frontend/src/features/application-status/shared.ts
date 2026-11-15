@@ -26,3 +26,10 @@ export function formatTime(value?: string) {
 
 // Counts characters as the services do (code points, after trimming).
 export const length = (value: string) => Array.from(value.trim()).length;
+
+const statusLabels: Record<string, string> = {
+  APPLICATION_STATUS_SUBMITTED: 'Submitted', APPLICATION_STATUS_UNDER_REVIEW: 'Under review', APPLICATION_STATUS_SHORTLISTED: 'Shortlisted',
+  APPLICATION_STATUS_INTERVIEW: 'Interview', APPLICATION_STATUS_OFFERED: 'Offered', APPLICATION_STATUS_ACCEPTED: 'Accepted',
+  APPLICATION_STATUS_DECLINED: 'Declined', APPLICATION_STATUS_REJECTED: 'Rejected', APPLICATION_STATUS_WITHDRAWN: 'Withdrawn',
+};
+export const statusLabel = (status?: string) => (status && statusLabels[status]) || 'None';
