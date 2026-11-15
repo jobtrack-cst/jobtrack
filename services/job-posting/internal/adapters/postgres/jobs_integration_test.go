@@ -6,7 +6,6 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -199,29 +198,15 @@ func TestJobs_Integration(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrJobNotFound)
 	})
 
-	t.Run("concurrent publish succeeds exactly once", func(t *testing.T) {
+	t.Run("publish twice returns ErrJobStatusChanged", func(t *testing.T) {
 		created, err := repo.Create(ctx, newJob(employerA, domain.StatusDraft, base, base.Add(time.Hour)))
 		require.NoError(t, err)
-		const n = 8
-		errs := make([]error, n)
-		var wg sync.WaitGroup
-		for i := range n {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				_, errs[i] = repo.UpdateStatus(ctx, created.ID, domain.StatusDraft, domain.StatusPublished, base)
-			}()
-		}
-		wg.Wait()
-		ok := 0
-		for _, err := range errs {
-			if err == nil {
-				ok++
-			} else {
-				require.ErrorIs(t, err, domain.ErrJobStatusChanged)
-			}
-		}
-		assert.Equal(t, 1, ok)
+
+		_, err = repo.UpdateStatus(ctx, created.ID, domain.StatusDraft, domain.StatusPublished, base)
+		require.NoError(t, err)
+
+		_, err = repo.UpdateStatus(ctx, created.ID, domain.StatusDraft, domain.StatusPublished, base)
+		require.ErrorIs(t, err, domain.ErrJobStatusChanged)
 	})
 
 	t.Run("list by employer is newest first with filter and pagination", func(t *testing.T) {

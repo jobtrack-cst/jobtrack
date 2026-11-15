@@ -24,7 +24,6 @@ func OpenPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 		return nil, errors.New("invalid database configuration")
 	}
 	config.ConnConfig.RuntimeParams["timezone"] = "UTC"
-	config.ConnConfig.RuntimeParams["lock_timeout"] = "2000"
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
