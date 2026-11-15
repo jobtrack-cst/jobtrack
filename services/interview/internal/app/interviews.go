@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -49,10 +50,13 @@ func (s *Interviews) Schedule(ctx context.Context, caller domain.Caller, in doma
 	if err := participants.CheckOwningEmployer(caller); err != nil {
 		return domain.Interview{}, err
 	}
+	// PostgreSQL keeps microseconds, so the stored, returned and published
+	// times are the same value (JT-80).
+	stamp := now.Truncate(time.Microsecond)
 	interview := domain.Interview{
 		InterviewID: uuid.NewString(), ApplicationID: valid.ApplicationID,
 		EmployerID: caller.UserID, ApplicantID: participants.ApplicantID,
-		ScheduledAt: valid.ScheduledAt, Details: valid.Details, CreatedAt: now, UpdatedAt: now,
+		ScheduledAt: valid.ScheduledAt, Details: valid.Details, CreatedAt: stamp, UpdatedAt: stamp,
 	}
 	// Create stores interview.scheduled in the same transaction; the outbox
 	// relay publishes it after the commit (JT-80).

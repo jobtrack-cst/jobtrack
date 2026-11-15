@@ -38,7 +38,8 @@ Rules agreed for JT-80 (AGENTS.md Section 15, approved by Phuntsho):
 | JT80-18 | AC2 | Broker connection lost during a publish | State transition | Connection dropped and reopened on the next publish | Unit, `cmd/server` | Pass |
 | JT80-19 | AC2 | Server wiring: relay publishes through the opened connection; consumer and relay stop on shutdown; consumer stopping early is logged | State transition | One connection opened and closed after shutdown; workers stopped before return | Unit, `cmd/server` | Pass |
 | JT80-20 | AC4 | Real flow through the gateway: verified employer, published job, validated resume, application, two interviews | End to end | All 24 steps `ok`; applicant 403; past time 400; same time 409; `applicant_id` from the consumed event; list soonest first | Docker Compose (manual) | Pass |
-| JT80-21 | AC4 | Database and broker state after JT80-20 | End to end | Participants stored; two published `interview.scheduled` matching the interviews; 0 unpublished; consumer ready; 0 dead messages | Docker Compose (manual) | Pass |
+| JT80-21 | AC4 | Database and broker state after JT80-20 | End to end | Participants stored; two published `interview.scheduled` matching the interviews (`scheduled_at`, `occurred_at`, `event_id`); 0 unpublished; consumer ready; 0 dead messages | Docker Compose (manual) | Pass |
+| JT80-22 | AC2 | Clock time with nanoseconds (999 ns) | Boundary values | `created_at` and `updated_at` kept to the microsecond, so the stored, returned and published times are equal | Unit, `internal/app` | Pass |
 
 AC numbers follow the order of the acceptance criteria in JT-80: AC1 to AC4 are the task criteria, AC5 and AC6 the shared Sprint 3 criteria (AC5 AGENTS.md Sections 6, 9 and 10 with no new tools or contract changes, AC6 Docker Compose, PR, CI, merge and time logged).
 
@@ -54,8 +55,9 @@ Commands run on branch `JT-80-interview-events`:
 |---|---|
 | Unit and contract tests | Pass |
 | Integration tests (Testcontainers `postgres:18-alpine` and `rabbitmq:4.1-alpine`) | Pass, including `TestInterviewEvents_RealBrokerAndPostgres` |
-| Package coverage (unit) | `domain` 100%, `app` 98.6%, `adapters/grpc` 100%, `adapters/rabbitmq` 96.2%, `cmd/server` 87.4% |
-| Docker Compose end to end | Pass: application `1d9f52d4-a249-4a6f-be5b-3f2af84efd04`; `interview.applications` 1 consumer, 0 ready; `interview.applications.dead` 0; log "outbox events published" count 2 |
+| Package coverage (unit) | `domain` 100%, `app` 98.7%, `adapters/grpc` 100%, `adapters/rabbitmq` 96.2%, `cmd/server` 87.4% |
+| Docker Compose end to end | Pass: application `500e4045-8f7e-449b-ab7a-cf8ce065c2cb`; `interview.applications` 1 consumer, 0 ready; `interview.applications.dead` 0; log "outbox events published" count 2 |
+| Defect found and fixed | The first Compose run (application `1d9f52d4-a249-4a6f-be5b-3f2af84efd04`) showed one event whose `occurred_at` differed from the stored `created_at` below one microsecond: the clock has nanoseconds and PostgreSQL keeps microseconds. `Schedule` now keeps `created_at` and `updated_at` to the microsecond (JT80-22); the run was repeated after the fix |
 | CI on the pull request | CI_RUN_PLACEHOLDER |
 
 ## Acceptance criteria review
@@ -63,7 +65,7 @@ Commands run on branch `JT-80-interview-events`:
 | Acceptance criterion | Status | Evidence (case IDs) |
 |---|---|---|
 | Consumes `application.submitted` from `interview.applications` using `events.Consume` and stores the participants; idempotent on `event_id` | Met | JT80-01 to JT80-08 |
-| `ScheduleInterview` stores `interview.scheduled` in an outbox in the same transaction and publishes it through `pkg/events`; fixture added | Met | JT80-09 to JT80-19 |
+| `ScheduleInterview` stores `interview.scheduled` in an outbox in the same transaction and publishes it through `pkg/events`; fixture added | Met | JT80-09 to JT80-19, JT80-22 |
 | Unit tests; integration tests with Testcontainers PostgreSQL and RabbitMQ | Met | All JT80 cases |
 | Verified end to end in Docker Compose | Met | JT80-20, JT80-21 |
 | Follows AGENTS.md Sections 6, 9 and 10; no new tools or contract changes | Met | No `proto/` or `go.mod` changes; queue name, envelope, idempotency and outbox per Section 9 |
