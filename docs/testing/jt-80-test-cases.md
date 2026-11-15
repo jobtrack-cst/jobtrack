@@ -59,7 +59,7 @@ Commands run on branch `JT-80-interview-events`:
 | Package coverage (unit) | `domain` 100%, `app` 98.7%, `adapters/grpc` 100%, `adapters/rabbitmq` 96.2%, `cmd/server` 87.4% |
 | Docker Compose end to end | Pass: application `500e4045-8f7e-449b-ab7a-cf8ce065c2cb`; `interview.applications` 1 consumer, 0 ready; `interview.applications.dead` 0; log "outbox events published" count 2 |
 | Defect found and fixed | The first Compose run (application `1d9f52d4-a249-4a6f-be5b-3f2af84efd04`) showed one event whose `occurred_at` differed from the stored `created_at` below one microsecond: the clock has nanoseconds and PostgreSQL keeps microseconds. `Schedule` now keeps `created_at` and `updated_at` to the microsecond (JT80-22); the run was repeated after the fix |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Green, [CI run](https://github.com/jobtrack-cst/jobtrack/actions/runs/43725121934) |
 
 ## Acceptance criteria review
 
