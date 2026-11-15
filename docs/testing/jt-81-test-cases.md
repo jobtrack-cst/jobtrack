@@ -54,7 +54,7 @@ Commands run on branch `JT-81-hiring-events`:
 | Unit tests | Pass |
 | Integration tests (Testcontainers PostgreSQL and `rabbitmq:4.1-alpine`) | Pass, including `TestHiringEvents_RealBrokerAndPostgres` |
 | Package coverage (unit) | `domain` 100%, `app` 100%, `adapters/grpc` 100%, `adapters/rabbitmq` 97.9%, `cmd/server` 84.8% |
-| Service coverage, unit plus integration, excluding generated mocks (AC4 target 80%) | NN.N% of statements |
+| Service coverage, unit plus integration, excluding generated mocks (AC4 target 80%) | 91.0% of statements |
 | Docker Compose end to end | Pass: applications `e2f9afad-6e2f-4c6a-bd4b-253ba02468e1` (ACCEPTED) and `a94eb4d2-d08d-477c-93df-74ff4ffb1b5f` (skipped step, then REJECTED); log "event rejected by handler; dead-lettered" for the skipped `offer.made` |
 | CI on the pull request | CI_RUN_PLACEHOLDER |
 
