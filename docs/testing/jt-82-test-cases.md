@@ -49,7 +49,7 @@ Commands run on branch `JT-82-deadline-reminder`:
 | Unit and contract tests | Pass |
 | Package coverage (unit) | `domain` 100%, `app` 97.5%, `adapters/clients` 100%, `adapters/httpapi` 93.9%, `cmd/server` 80.0% |
 | Docker Compose end to end | Pass: job `132a2793-1e91-4c85-a334-e8936b9bfe82`, `event_id` values `23ed05c0-b8be-5cb6-9445-98bd3e220643` and `62490f4c-cae1-5732-8d3a-db2398822725` published by both runs; log "deadline reminders published" with jobs 1, reminders 2, published 2, failed 0, skipped 0 for each run |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Pass: [run 43735284967](https://github.com/jobtrack-cst/jobtrack/actions/runs/43735284967) on `226c6a4` |
 
 Known gaps (AGENTS.md Section 16):
 
