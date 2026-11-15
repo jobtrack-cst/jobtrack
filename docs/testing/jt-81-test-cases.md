@@ -56,7 +56,7 @@ Commands run on branch `JT-81-hiring-events`:
 | Package coverage (unit) | `domain` 100%, `app` 100%, `adapters/grpc` 100%, `adapters/rabbitmq` 97.9%, `cmd/server` 84.8% |
 | Service coverage, unit plus integration, excluding generated mocks (AC4 target 80%) | 91.0% of statements |
 | Docker Compose end to end | Pass: applications `e2f9afad-6e2f-4c6a-bd4b-253ba02468e1` (ACCEPTED) and `a94eb4d2-d08d-477c-93df-74ff4ffb1b5f` (skipped step, then REJECTED); log "event rejected by handler; dead-lettered" for the skipped `offer.made` |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Green, [CI run](https://github.com/jobtrack-cst/jobtrack/actions/runs/43730004776) |
 
 Known limitation (AGENTS.md Section 16): history is listed by each producer's `occurred_at`. The shared fixtures are dated out of order (`interview.scheduled.json` after `offer.made.json`), so the real-broker test reads history in write order. `application.status_changed` events always follow processing order.
 
