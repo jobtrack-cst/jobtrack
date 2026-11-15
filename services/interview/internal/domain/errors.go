@@ -30,4 +30,9 @@ var (
 
 	// ALREADY_EXISTS
 	ErrInterviewExists = errors.New("the application already has an interview at that time")
+
+	// Not a gRPC error: an application.submitted event whose participants
+	// differ from those already stored. The consumer sends it to the dead
+	// queue, because retrying can never apply it (JT-80).
+	ErrConflictingParticipants = errors.New("application participants differ from those already stored")
 )

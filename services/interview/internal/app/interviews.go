@@ -54,10 +54,11 @@ func (s *Interviews) Schedule(ctx context.Context, caller domain.Caller, in doma
 		EmployerID: caller.UserID, ApplicantID: participants.ApplicantID,
 		ScheduledAt: valid.ScheduledAt, Details: valid.Details, CreatedAt: now, UpdatedAt: now,
 	}
+	// Create stores interview.scheduled in the same transaction; the outbox
+	// relay publishes it after the commit (JT-80).
 	if err := s.interviews.Create(ctx, interview); err != nil {
 		return domain.Interview{}, err
 	}
-	// Sprint 2: publish interview.scheduled here, after the interview is stored.
 	return interview, nil
 }
 
