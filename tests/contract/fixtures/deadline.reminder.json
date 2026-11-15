@@ -1,0 +1,12 @@
+{
+  "event_id": "c9f7ca12-5db2-5d37-b133-1349f4c486dc",
+  "type": "deadline.reminder",
+  "producer": "deadline-reminder",
+  "occurred_at": "2026-11-16T02:00:00Z",
+  "data": {
+    "@type": "type.googleapis.com/jobtrack.events.v1.DeadlineReminder",
+    "job_id": "33333333-3333-4333-8333-333333333333",
+    "applicant_id": "22222222-2222-4222-8222-222222222222",
+    "deadline": "2026-11-17T12:00:00Z"
+  }
+}
