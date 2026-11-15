@@ -1,0 +1,13 @@
+{
+  "event_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3",
+  "type": "application.status_changed",
+  "producer": "application-status",
+  "occurred_at": "2026-11-12T12:05:00Z",
+  "data": {
+    "@type": "type.googleapis.com/jobtrack.events.v1.StatusChanged",
+    "application_id": "11111111-1111-4111-8111-111111111111",
+    "applicant_id": "22222222-2222-4222-8222-222222222222",
+    "previous_status": "SUBMITTED",
+    "new_status": "UNDER_REVIEW"
+  }
+}
