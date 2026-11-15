@@ -81,7 +81,7 @@ Commands run on branch `JT-83-frontend-applicant-hiring`, in `frontend`:
 | Cypress `applicant-hiring-pages.cy.js` | 47 passing |
 | Cypress `application-workflows.cy.js` and `auth.cy.js` | 34 and 19 passing |
 | Docker Compose browser check | Pass (JT83-21) |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Pass: [run 43743453164](https://github.com/jobtrack-cst/jobtrack/actions/runs/43743453164) on `1812596` |
 
 Notes:
 
