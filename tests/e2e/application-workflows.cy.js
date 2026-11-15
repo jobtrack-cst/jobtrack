@@ -2,9 +2,16 @@ const gateway = 'http://localhost:8000';
 beforeEach(() => {
   cy.intercept('GET', `${gateway}/v1/locations?*`, { locations: [{ locationId: '30000000-0000-4000-8000-000000000001', name: 'Thimphu' }] });
 });
+function locationSelect() {
+  return cy.contains('label', /^Location$/).parent().find('[role="combobox"]');
+}
 function selectLocation(name) {
-  cy.get('[role=combobox]').last().click();
-  cy.get('[role=option]').contains(new RegExp(`^${name}$`)).click();
+  // MUI's non-native select is a div; Cypress does not wait on aria-disabled.
+  locationSelect().should('be.visible').and('not.have.attr', 'aria-disabled', 'true').click();
+  locationSelect().should('have.attr', 'aria-expanded', 'true');
+  cy.get('[role="listbox"]').should('be.visible')
+    .contains('[role="option"]', new RegExp(`^${Cypress._.escapeRegExp(name)}$`)).click();
+  locationSelect().should('have.attr', 'aria-expanded', 'false');
 }
 const applicantId = '11111111-1111-4111-8111-111111111111';
 const jobId = '22222222-2222-4222-8222-222222222222';
@@ -300,6 +307,26 @@ describe('JT-78 boundaries and recovery', () => {
 
 
 describe('JT-78 location reference selection', () => {
+  it('waits for location references before opening the non-native select', () => {
+    cy.intercept('GET', `${gateway}/v1/categories?*`, { categories: [] });
+    cy.intercept('GET', `${gateway}/v1/tags?*`, { tags: [] });
+    cy.intercept('GET', `${gateway}/v1/job-alerts?*`, { jobAlerts: [] });
+    let releaseLocations;
+    const referencesReady = new Promise(resolve => { releaseLocations = resolve; });
+    cy.intercept('GET', `${gateway}/v1/locations?*`, req => referencesReady.then(() => {
+      req.reply({ locations: [{ locationId: 'slow', name: 'Thimphu' }] });
+    })).as('slowLocations');
+    login(); cy.contains('a', 'Job alerts').click();
+    // An early click is ignored, even though Cypress permits it on this div.
+    locationSelect().should('have.attr', 'aria-disabled', 'true').click();
+    locationSelect().should('have.attr', 'aria-expanded', 'false');
+    cy.get('[role="listbox"]').should('not.exist');
+    cy.then(() => releaseLocations());
+    selectLocation('Thimphu');
+    cy.wait('@slowLocations');
+    locationSelect().should('contain', 'Thimphu');
+    cy.contains('button', 'Create subscription').should('be.enabled');
+  });
   it('loads every location reference page and submits the exact returned name', () => {
     const name = 'Remote / Hybrid';
     cy.intercept('GET', `${gateway}/v1/categories?*`, { categories: [] });

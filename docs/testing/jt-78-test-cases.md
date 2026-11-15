@@ -215,3 +215,57 @@ Recorded the project member's 15 November 2026 live observations and the JT-76
 documents, dependencies, Jira or Git state. Prior automated results and warnings
 above are retained, not rerun or relabelled as live evidence. Changes are left
 uncommitted for review.
+
+## PR #57 Cypress readiness correction
+
+Reported CI failure: workflow run `43700558456`, Frontend checks job
+`132770534754`, commit `75ff5cb`: 52 tests, 49 passed and 3 failed. Location-only
+create/delete and alert constraint 6/9 timed out finding options after the
+`selectLocation` helper clicked the select. This is the supplied CI result,
+not a claim that a subsequent GitHub run has passed.
+
+Root cause reproduced locally with headless Cypress 16.2.0 / Electron 146,
+`CI=1`, and the default 1000×660 viewport. A temporary diagnostic spec held the
+location response until after an early click. It confirmed `aria-disabled=true`
+and `aria-expanded=false` at the click; after releasing the response the select
+became enabled but stayed closed, then the option lookup failed at 4000 ms just
+as reported. MUI's non-native Select is a `div`, so Cypress permits clicking it
+while `aria-disabled=true`; MUI removes the opening mouse handler while disabled.
+The reference loader waits for categories, tags and locations together, so the
+fixture response alone does not guarantee the control is ready. No evidence of
+a viewport defect or incorrect application behavior was found.
+
+The test-only fix locates the select within the Location-labelled field, waits
+for its visible and ARIA-enabled state, confirms `aria-expanded=true`, and selects
+an exact escaped option name within the visible listbox. It then confirms closure.
+A regression case gates the reference response to verify the ignored early click
+and subsequent successful selection with the helper. There are no arbitrary
+sleeps, force clicks or timeout increases. The location-only create/delete request
+assertions and alert constraint error assertions remain intact. Application code,
+fixtures' intended data, dependencies and workflow configuration are unchanged.
+The temporary diagnostic spec was removed after reproduction.
+
+Local correction verification:
+
+- `npm --prefix frontend run lint`: exit 0.
+- `npm --prefix frontend run typecheck`: exit 0.
+- `npm --prefix frontend run build`: exit 0; unchanged 560.41 kB minified main
+  chunk (176.62 kB gzip); Vite's >500 kB warning remains.
+- From `frontend`, `env -u ELECTRON_RUN_AS_NODE npm test`: exit 0,
+  **53 passing** (34 workflow tests, including the added regression, plus all
+  19 auth/client tests). The three CI-failing scenarios passed locally.
+- `git diff --check`: exit 0.
+
+The local runner is macOS with Node 26.13.0; GitHub's workflow uses Ubuntu and
+Node 22. CI mode and viewport reproduction do not replicate that OS/runtime.
+The existing Cypress Electron deprecation notice remains. No GitHub Actions
+rerun has been triggered or verified; this correction must not be described as
+CI green. Previously recorded live observations, the JT-76 dependency and all
+unverified live/manual scenarios retain their existing status. No commits,
+pushes, branch switches, PR mutations or Jira changes were performed.
+
+Additional verification from `frontend`:
+`env -u ELECTRON_RUN_AS_NODE CI=1 npm test -- --config viewportWidth=1000,viewportHeight=660`
+completed with exit 0 and **53 passing**, 0 failures, skips or pending tests.
+This rerun includes the final response-gated regression and all three originally
+failing scenarios. It is local evidence, not a GitHub CI result.
