@@ -25,10 +25,12 @@ func hiringEvent(appID string, kind domain.HiringKind, at time.Time) domain.Hiri
 	return e
 }
 
-// history returns the application's new_status values in order.
+// history returns the application's new_status values in the order they were
+// written. Producers' occurred_at values need not be in that order (the shared
+// fixtures are not), so the test does not sort by them.
 func history(t *testing.T, ctx context.Context, pool *pgxpool.Pool, appID string) []string {
 	t.Helper()
-	rows, err := pool.Query(ctx, `SELECT new_status FROM status_history WHERE application_id = $1 ORDER BY occurred_at, history_id`, appID)
+	rows, err := pool.Query(ctx, `SELECT new_status FROM status_history WHERE application_id = $1 ORDER BY history_id`, appID)
 	require.NoError(t, err)
 	defer rows.Close()
 	var out []string
