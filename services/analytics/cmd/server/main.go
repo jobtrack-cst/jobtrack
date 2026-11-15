@@ -18,6 +18,7 @@ import (
 	analyticsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/analytics/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/analytics/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/analytics/internal/adapters/postgres"
@@ -117,7 +118,12 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerAnalytics(d.outcomes), serverOpts...)
+					consume := func(ctx context.Context) error {
+						return events.Consume(ctx, rabbitmq.OutcomeConsumerConfig(cfg.rabbitMQURL, logger, app.NewAnalytics(d.outcomes)))
+					}
+					return runWithConsumer(ctx, consume, func(ctx context.Context) error {
+						return runServers(ctx, cfg, logger, d.checker, registerAnalytics(d.outcomes), serverOpts...)
+					})
 				})
 		})
 }
@@ -171,8 +177,8 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// analytics never publishes. The broker connection is kept, as in the
-	// template and audit-log, for the Sprint 2 event consumers.
+	// analytics never publishes. The publisher is kept, as in the template
+	// and audit-log; events arrive through the analytics.outcomes consumer (JT-85).
 	// Initialization must not publish events.
 	return start(ctx, cfg, logger, d)
 }

@@ -9,8 +9,8 @@ import (
 	"github.com/jobtrack-cst/jobtrack/services/analytics/internal/ports"
 )
 
-// Analytics holds the analytics use cases. Sprint 1 has only the two
-// summaries; recording events comes with the Sprint 2 event consumer.
+// Analytics holds the analytics use cases: the two summaries and
+// RecordEvent, which the analytics.outcomes consumer calls (JT-85).
 type Analytics struct {
 	repo ports.OutcomeRepository
 }

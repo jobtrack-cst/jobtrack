@@ -1,0 +1,10 @@
+{
+  "event_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+  "type": "job.closed",
+  "producer": "job-posting",
+  "occurred_at": "2026-11-13T09:00:00Z",
+  "data": {
+    "@type": "type.googleapis.com/jobtrack.events.v1.JobClosed",
+    "job_id": "33333333-3333-4333-8333-333333333333"
+  }
+}

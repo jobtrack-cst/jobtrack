@@ -18,3 +18,8 @@ var (
 	ErrInvalidStatus     = errors.New("new_status must be 1 to 32 characters for application.status_changed and empty for other events")
 	ErrInvalidOccurredAt = errors.New("occurred_at is required")
 )
+
+// ErrInvalidOutcomeEvent is never returned by an RPC. RecordEvent and the
+// consumer wrap it around an event that can never be counted, so the
+// consumer sends it to the dead queue instead of retrying it (JT-85).
+var ErrInvalidOutcomeEvent = errors.New("event cannot be counted by analytics")
