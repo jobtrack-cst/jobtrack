@@ -1,0 +1,74 @@
+# JT-86 weekly summary. The PingSource posts a CloudEvent to the function
+# every Monday at 08:00 Bhutan time; the function ignores its data.
+# INTERNAL_TOKEN comes from the Secret weekly-summary-credentials (key
+# internal-token), created by hand as in functions/weekly-summary/README.md.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: weekly-summary
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+    spec:
+      # One run at a time, so admins are not emailed twice.
+      containerConcurrency: 1
+      # Above the 4 minute run limit in the function.
+      timeoutSeconds: 300
+      containers:
+        - image: jobtrack-weekly-summary:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVICE_NAME
+              value: weekly-summary
+            - name: HTTP_PORT
+              value: "8080"
+            - name: ANALYTICS_ADDR
+              value: analytics:9090
+            - name: AUTH_ADDR
+              value: auth:9090
+            # The email-sender Knative Service in the same namespace.
+            - name: EMAIL_SENDER_URL
+              value: http://email-sender/send-email
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: weekly-summary-credentials
+                  key: internal-token
+          readinessProbe:
+            httpGet:
+              path: /healthz
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: sources.knative.dev/v1
+kind: PingSource
+metadata:
+  name: weekly-summary-schedule
+spec:
+  schedule: "0 8 * * 1"
+  timezone: Asia/Thimphu
+  contentType: application/json
+  data: '{"trigger":"weekly-summary"}'
+  sink:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: weekly-summary
