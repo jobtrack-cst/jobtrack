@@ -12,13 +12,11 @@ import (
 
 func testEnvelope(t *testing.T) *eventsv1.EventEnvelope {
 	t.Helper()
-	data, err := anypb.New(&eventsv1.ResumeUploaded{
-		ResumeId: "22222222-2222-4222-8222-222222222222", ApplicantId: "33333333-3333-4333-8333-333333333333",
-	})
+	data, err := anypb.New(&eventsv1.JobPublished{JobId: "55555555-5555-4555-8555-555555555555"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &eventsv1.EventEnvelope{EventId: "11111111-1111-4111-8111-111111111111", Type: "resume.uploaded", Producer: "resume", OccurredAt: &timestamppb.Timestamp{Seconds: 1793685600}, Data: data}
+	return &eventsv1.EventEnvelope{EventId: "11111111-1111-4111-8111-111111111111", Type: "job.published", Producer: "job-posting", OccurredAt: &timestamppb.Timestamp{Seconds: 1793685600}, Data: data}
 }
 
 type stubPublisher struct {

@@ -1,0 +1,16 @@
+{
+  "event_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+  "type": "job.updated",
+  "producer": "job-posting",
+  "occurred_at": "2026-11-12T10:00:00Z",
+  "data": {
+    "@type": "type.googleapis.com/jobtrack.events.v1.JobUpdated",
+    "job_id": "33333333-3333-4333-8333-333333333333",
+    "employer_id": "55555555-5555-4555-8555-555555555555",
+    "title": "Mid-level Go Developer",
+    "category_id": "10000000-0000-4000-8000-000000000001",
+    "tag_ids": ["20000000-0000-4000-8000-000000000001"],
+    "location": "Thimphu",
+    "deadline": "2026-12-15T12:00:00Z"
+  }
+}
