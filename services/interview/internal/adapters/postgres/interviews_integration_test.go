@@ -58,7 +58,8 @@ func startInterviewDB(t *testing.T) (context.Context, *pgxpool.Pool) {
 	return ctx, pool
 }
 
-// seedParticipants stands in for the Sprint 2 application.submitted consumer.
+// seedParticipants writes the projection directly; RecordApplication is
+// tested in events_integration_test.go.
 func seedParticipants(t *testing.T, ctx context.Context, pool *pgxpool.Pool) domain.ApplicationParticipants {
 	t.Helper()
 	p := domain.ApplicationParticipants{ApplicationID: uuid.NewString(), ApplicantID: uuid.NewString(), EmployerID: uuid.NewString()}

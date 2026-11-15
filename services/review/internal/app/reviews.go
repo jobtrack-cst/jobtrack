@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -36,7 +37,9 @@ func (r *Reviews) Complete(ctx context.Context, caller domain.Caller, in domain.
 	if err := r.checkOwner(ctx, caller, valid.ApplicationID); err != nil {
 		return domain.Review{}, err
 	}
-	now := r.clock.Now().UTC()
+	// PostgreSQL keeps microseconds, so the stored, returned and published
+	// times are the same value (fixed in JT-80).
+	now := r.clock.Now().UTC().Truncate(time.Microsecond)
 	review := domain.Review{
 		ReviewID: uuid.NewString(), ApplicationID: valid.ApplicationID, EmployerID: caller.UserID,
 		Score: valid.Score, Decision: valid.Decision, CreatedAt: now, UpdatedAt: now,

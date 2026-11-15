@@ -83,6 +83,23 @@ func TestInterviews_Schedule(t *testing.T) {
 		assert.Equal(t, appID, got.ApplicationID)
 	})
 
+	t.Run("created_at is kept to the microsecond, as PostgreSQL stores it", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		clock := mocks.NewMockClock(ctrl)
+		clock.EXPECT().Now().Return(nowUTC.Add(999 * time.Nanosecond)).AnyTimes()
+		f := fixture{participants: mocks.NewMockParticipantRepository(ctrl), interviews: mocks.NewMockInterviewRepository(ctrl)}
+		f.svc = app.NewInterviews(f.participants, f.interviews, clock)
+		f.participants.EXPECT().GetByApplicationID(gomock.Any(), appID).Return(participants, nil)
+		f.interviews.EXPECT().Create(gomock.Any(), gomock.Any()).Return(nil)
+		got, err := f.svc.Schedule(context.Background(), owner, scheduleIn(nowUTC.Add(time.Hour)))
+		require.NoError(t, err)
+		assert.Equal(t, nowUTC, got.CreatedAt)
+		assert.Equal(t, nowUTC, got.UpdatedAt)
+		e, err := app.InterviewScheduledEvent(got, "event-1")
+		require.NoError(t, err)
+		assert.Equal(t, got.CreatedAt, e.GetOccurredAt().AsTime(), "occurred_at equals the stored created_at")
+	})
+
 	tests := []struct {
 		name    string
 		caller  domain.Caller

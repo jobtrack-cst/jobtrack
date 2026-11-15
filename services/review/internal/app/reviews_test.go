@@ -75,6 +75,23 @@ func TestReviews_Complete(t *testing.T) {
 		assert.Equal(t, employerID, got.EmployerID)
 	})
 
+	t.Run("created_at is kept to the microsecond, as PostgreSQL stores it", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		clock := mocks.NewMockClock(ctrl)
+		clock.EXPECT().Now().Return(now.Add(999 * time.Nanosecond)).AnyTimes()
+		f := fixture{participants: mocks.NewMockParticipantRepository(ctrl), reviews: mocks.NewMockReviewRepository(ctrl)}
+		f.svc = app.NewReviews(f.participants, f.reviews, clock)
+		f.participants.EXPECT().GetByApplicationID(gomock.Any(), appID).Return(participants, nil)
+		f.reviews.EXPECT().Create(gomock.Any(), gomock.Any()).Return(nil)
+		got, err := f.svc.Complete(context.Background(), owner, validInput())
+		require.NoError(t, err)
+		assert.Equal(t, now.UTC(), got.CreatedAt)
+		assert.Equal(t, now.UTC(), got.UpdatedAt)
+		e, err := app.ReviewCompletedEvent(got, "event-1")
+		require.NoError(t, err)
+		assert.Equal(t, got.CreatedAt, e.GetOccurredAt().AsTime(), "occurred_at equals the stored created_at")
+	})
+
 	tests := []struct {
 		name    string
 		caller  domain.Caller

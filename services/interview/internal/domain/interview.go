@@ -14,7 +14,7 @@ const (
 )
 
 // ApplicationParticipants is the trusted local projection of
-// application.submitted (filled by the Sprint 2 consumer), the same design as
+// application.submitted (filled by the JT-80 consumer), the same design as
 // Review, Offer and Messaging. IDs are user IDs from auth.
 type ApplicationParticipants struct {
 	ApplicationID string
