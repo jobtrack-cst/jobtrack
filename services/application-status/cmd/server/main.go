@@ -97,6 +97,7 @@ type deps struct {
 	statuses  ports.StatusRepository
 	outbox    ports.OutboxRepository
 	inputs    ports.ApplicationEventRepository
+	hiring    ports.HiringEventRepository
 	publisher ports.EventPublisher
 }
 
@@ -157,6 +158,7 @@ type databaseHandle struct {
 	statuses  ports.StatusRepository
 	outbox    ports.OutboxRepository
 	inputs    ports.ApplicationEventRepository
+	hiring    ports.HiringEventRepository
 	migrate   func(context.Context, string) error
 	close     func()
 }
@@ -171,6 +173,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 		statuses:  postgres.NewStatuses(pool),
 		outbox:    postgres.NewOutbox(pool),
 		inputs:    postgres.NewStatuses(pool),
+		hiring:    postgres.NewStatuses(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
 	}, nil
@@ -197,7 +200,10 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), statuses: database.statuses, outbox: database.outbox, inputs: database.inputs})
+	return start(ctx, cfg, logger, deps{
+		checker: app.NewHealthWithReadiness(database.readiness), statuses: database.statuses,
+		outbox: database.outbox, inputs: database.inputs, hiring: database.hiring,
+	})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
@@ -277,14 +283,25 @@ func shutdown(ctx context.Context, grpcServer *grpc.Server, httpServer *http.Ser
 	return shutdownErr
 }
 
+// consumerConfigs are the event consumers runWorkers starts: application
+// events (JT-60) and hiring events (JT-81), each on its own queue.
+func consumerConfigs(cfg config, logger *slog.Logger, d deps) []events.ConsumerConfig {
+	return []events.ConsumerConfig{
+		rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.inputs),
+		rabbitmq.HiringConsumerConfig(cfg.rabbitMQURL, logger, d.hiring),
+	}
+}
+
 // runWorkers joins workers before closing the publisher and database.
 func runWorkers(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	done := make(chan error, 2)
-	go func() {
-		done <- events.Consume(ctx, rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.inputs))
-	}()
+	consumers := consumerConfigs(cfg, logger, d)
+	workers := len(consumers) + 1
+	done := make(chan error, workers)
+	for _, consumer := range consumers {
+		go func() { done <- events.Consume(ctx, consumer) }()
+	}
 	go func() {
 		relay := app.NewOutboxRelay(d.outbox, d.publisher, time.Now)
 		ticker := time.NewTicker(time.Second)
@@ -307,11 +324,14 @@ func runWorkers(ctx context.Context, cfg config, logger *slog.Logger, d deps) er
 	select {
 	case err = <-server:
 		cancel()
-		<-done
-		<-done
+		for range workers {
+			<-done
+		}
 	case err = <-done:
 		cancel()
-		<-done
+		for range workers - 1 {
+			<-done
+		}
 		serverErr := <-server
 		err = errors.Join(err, serverErr)
 	}
