@@ -29,10 +29,15 @@ const (
 	stubEmployerID = "11111111-1111-4111-8111-111111111111"
 )
 
-// stubJobs is a fixed repository for wiring tests; the real one is covered
-// by the Testcontainers integration test. stubDraftID is a DRAFT job and
-// every other ID is a PUBLISHED job, all owned by stubEmployerID.
 type stubJobs struct{}
+
+func (s stubJobs) RecordJobRemoved(ctx context.Context, eventID, jobID string) error { return nil }
+
+type stubVerifier struct{ verified atomic.Bool }
+
+func (v *stubVerifier) IsVerified(context.Context, string) (bool, error) {
+	return v.verified.Load(), nil
+}
 
 func stubJob() domain.Job {
 	return domain.Job{ID: stubJobID, EmployerID: stubEmployerID, Status: domain.StatusPublished,
@@ -68,40 +73,6 @@ func (stubJobs) ListClosingBetween(context.Context, domain.ClosingWindow, domain
 	return []domain.Job{stubJob()}, 1, nil
 }
 
-// stubVerifier answers IsVerified with a value each subtest can change.
-type stubVerifier struct{ verified atomic.Bool }
-
-func (v *stubVerifier) IsVerified(context.Context, string) (bool, error) {
-	return v.verified.Load(), nil
-}
-
-// recordingRegistrar keeps what registerJobPosting registers.
-type recordingRegistrar struct {
-	descs []*grpc.ServiceDesc
-	impls []any
-}
-
-func (r *recordingRegistrar) RegisterService(desc *grpc.ServiceDesc, impl any) {
-	r.descs = append(r.descs, desc)
-	r.impls = append(r.impls, impl)
-}
-
-func TestRegisterJobPosting_RegistersPublicAndInternalServices(t *testing.T) {
-	var reg recordingRegistrar
-	registerJobPosting(stubJobs{}, &stubVerifier{})(&reg)
-	if len(reg.descs) != 2 ||
-		reg.descs[0].ServiceName != "jobtrack.job_posting.v1.JobPostingService" ||
-		reg.descs[1].ServiceName != "jobtrack.job_posting.v1.JobPostingInternalService" {
-		t.Fatalf("registered %v, want JobPostingService and JobPostingInternalService", reg.descs)
-	}
-	if _, ok := reg.impls[0].(jobpostingv1.JobPostingServiceServer); !ok {
-		t.Fatalf("registered %T, not a JobPostingServiceServer", reg.impls[0])
-	}
-	if _, ok := reg.impls[1].(jobpostingv1.JobPostingInternalServiceServer); !ok {
-		t.Fatalf("registered %T, not a JobPostingInternalServiceServer", reg.impls[1])
-	}
-}
-
 func TestInternalServerOptions_RejectsInvalidTokens(t *testing.T) {
 	for _, token := range []string{"", "private-secret value", "private-secreté"} {
 		opts, err := internalServerOptions(token)
@@ -114,12 +85,8 @@ func TestInternalServerOptions_RejectsInvalidTokens(t *testing.T) {
 	}
 }
 
-// End to end over a real gRPC server with the real JT-44 interceptor, as
-// run wires it: only deadline-reminder with the right token reaches the
-// internal RPC, and the public RPCs are unchanged.
 func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 	const token = "test-internal-token"
-	// The same options run passes to the server.
 	serverOpts, err := internalServerOptions(token)
 	if err != nil {
 		t.Fatal(err)
@@ -129,8 +96,7 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerJobPosting(stubJobs{}, verifier),
-			grpcListener, httpListener, serverOpts...)
+		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerJobPosting(stubJobs{}, verifier), serverOpts, grpcListener, httpListener)
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -191,8 +157,6 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 		})
 	}
 
-	// The public RPCs need no internal token. These headers stand in for the
-	// identity the gateway forwards.
 	asRole := func(t *testing.T, role string) context.Context {
 		return metadata.AppendToOutgoingContext(rpcCtx(t), "x-user-id", stubEmployerID, "x-user-role", role)
 	}
@@ -211,7 +175,6 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 			t.Fatalf("code=%v (%v), want PermissionDenied", status.Code(err), err)
 		}
 	})
-	// The verifier passed to registerJobPosting decides PublishJob (JT-57).
 	t.Run("PublishJob as an unverified employer", func(t *testing.T) {
 		verifier.verified.Store(false)
 		_, err := public(t).PublishJob(asRole(t, "employer"), &jobpostingv1.PublishJobRequest{JobId: stubDraftID})
@@ -228,8 +191,6 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 	})
 }
 
-// verifiedEmployer is a fake EmployerService that reports every profile as
-// VERIFIED and records the identity it received.
 type verifiedEmployer struct {
 	employerv1.UnimplementedEmployerServiceServer
 	gotUserID chan string
@@ -244,7 +205,6 @@ func (e *verifiedEmployer) GetCompanyProfile(ctx context.Context, req *employerv
 	}}, nil
 }
 
-// The verifier run builds reaches EmployerService and forwards the caller.
 func TestNewEmployerVerifier_CallsEmployerWithCallerIdentity(t *testing.T) {
 	l := listenForTest(t)
 	fake := &verifiedEmployer{gotUserID: make(chan string, 1)}

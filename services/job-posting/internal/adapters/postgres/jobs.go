@@ -3,40 +3,84 @@ package postgres
 import (
 	"context"
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/domain"
-	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/ports"
 )
 
-const jobColumns = "job_id, employer_id, title, description, category_id, tag_ids, location, deadline, status, created_at, updated_at"
+const jobColumns = "job_id, employer_id, title, description, coalesce(category_id::text, ''), coalesce(tag_ids::text[], '{}'), location, deadline, status, created_at, updated_at"
 
-// Jobs stores jobs in the job_posting database. The adapter never owns the pool.
-type Jobs struct{ pool *pgxpool.Pool }
+type Jobs struct {
+	pool *pgxpool.Pool
+}
 
-var _ ports.JobRepository = (*Jobs)(nil)
-
-func NewJobs(pool *pgxpool.Pool) *Jobs { return &Jobs{pool: pool} }
+func NewJobs(pool *pgxpool.Pool) *Jobs {
+	return &Jobs{pool: pool}
+}
 
 func (r *Jobs) Create(ctx context.Context, j domain.Job) (domain.Job, error) {
-	if _, ok := domain.ParseStatus(j.Status.String()); !ok {
-		return domain.Job{}, errors.New("job status is not valid")
-	}
 	created, err := scanJob(r.pool.QueryRow(ctx,
-		`INSERT INTO jobs (employer_id, title, description, category_id, tag_ids, location,
-		     deadline, status, created_at, updated_at)
+		`INSERT INTO jobs (employer_id, title, description, category_id, tag_ids, location, deadline, status, created_at, updated_at)
 		 VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5::uuid[], $6, $7, $8, $9, $10)
 		 RETURNING `+jobColumns,
-		j.EmployerID, j.Title, j.Description, j.CategoryID, tagIDsParam(j.TagIDs), j.Location,
-		j.Deadline, j.Status.String(), j.CreatedAt, j.UpdatedAt))
+		j.EmployerID, j.Title, j.Description, j.CategoryID, tagIDsParam(j.TagIDs),
+		j.Location, j.Deadline, j.Status.String(), j.CreatedAt, j.UpdatedAt))
 	if err != nil {
-		// Driver errors can contain SQL literals, so return a fixed message.
 		return domain.Job{}, hideDriverError(ctx, "create job failed")
 	}
 	return created, nil
+}
+
+func (r *Jobs) UpdateFields(ctx context.Context, j domain.Job, expected domain.Status) (domain.Job, error) {
+	return r.write(ctx, "job.updated", func(tx pgx.Tx) (domain.Job, error) {
+		updated, err := scanJob(tx.QueryRow(ctx,
+			`UPDATE jobs
+			 SET title = $3, description = $4, category_id = NULLIF($5, '')::uuid, tag_ids = $6::uuid[],
+			     location = $7, deadline = $8, updated_at = $9
+			 WHERE job_id = $1 AND status = $2
+			 RETURNING `+jobColumns,
+			j.ID, expected.String(), j.Title, j.Description, j.CategoryID, tagIDsParam(j.TagIDs),
+			j.Location, j.Deadline, j.UpdatedAt))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Job{}, r.missOrConflict(ctx, j.ID)
+		}
+		if err != nil {
+			return domain.Job{}, hideDriverError(ctx, "update job failed")
+		}
+		return updated, nil
+	})
+}
+
+func (r *Jobs) UpdateStatus(ctx context.Context, jobID string, from, to domain.Status, updatedAt time.Time) (domain.Job, error) {
+	if _, ok := domain.ParseStatus(to.String()); !ok {
+		return domain.Job{}, errors.New("job status is not valid")
+	}
+
+	routingKey := ""
+	if to == domain.StatusPublished {
+		routingKey = "job.published"
+	} else if to == domain.StatusClosed {
+		routingKey = "job.closed"
+	} else {
+		return domain.Job{}, errors.New("unexpected status transition")
+	}
+
+	return r.write(ctx, routingKey, func(tx pgx.Tx) (domain.Job, error) {
+		updated, err := scanJob(tx.QueryRow(ctx,
+			`UPDATE jobs SET status = $3, updated_at = $4
+			 WHERE job_id = $1 AND status = $2
+			 RETURNING `+jobColumns,
+			jobID, from.String(), to.String(), updatedAt))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Job{}, r.missOrConflict(ctx, jobID)
+		}
+		if err != nil {
+			return domain.Job{}, hideDriverError(ctx, "update job status failed")
+		}
+		return updated, nil
+	})
 }
 
 func (r *Jobs) GetByID(ctx context.Context, jobID string) (domain.Job, error) {
@@ -50,50 +94,117 @@ func (r *Jobs) GetByID(ctx context.Context, jobID string) (domain.Job, error) {
 	return job, nil
 }
 
-// UpdateFields never writes status, employer_id or created_at, and only
-// updates a row still in the expected status.
-func (r *Jobs) UpdateFields(ctx context.Context, j domain.Job, expected domain.Status) (domain.Job, error) {
-	updated, err := scanJob(r.pool.QueryRow(ctx,
-		`UPDATE jobs
-		 SET title = $3, description = $4, category_id = NULLIF($5, '')::uuid, tag_ids = $6::uuid[],
-		     location = $7, deadline = $8, updated_at = $9
-		 WHERE job_id = $1 AND status = $2
-		 RETURNING `+jobColumns,
-		j.ID, expected.String(), j.Title, j.Description, j.CategoryID, tagIDsParam(j.TagIDs),
-		j.Location, j.Deadline, j.UpdatedAt))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Job{}, r.missOrConflict(ctx, j.ID)
+func (r *Jobs) ListByEmployer(ctx context.Context, employerID string, status domain.Status, page domain.Page) ([]domain.Job, int, error) {
+	where := `WHERE employer_id = $1`
+	args := []any{employerID}
+	if status != domain.StatusUnspecified {
+		where += ` AND status = $2`
+		args = append(args, status.String())
 	}
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT count(*) FROM jobs `+where, args...).Scan(&total); err != nil {
+		return nil, 0, hideDriverError(ctx, "list jobs failed")
+	}
+
+	args = append(args, page.Limit, page.Offset)
+	rows, err := r.pool.Query(ctx, `SELECT `+jobColumns+` FROM jobs `+where+
+		` ORDER BY created_at DESC, job_id DESC LIMIT $`+itoa(len(args)-1)+` OFFSET $`+itoa(len(args)), args...)
 	if err != nil {
-		return domain.Job{}, hideDriverError(ctx, "update job failed")
+		return nil, 0, hideDriverError(ctx, "list jobs failed")
 	}
-	return updated, nil
+	defer rows.Close()
+
+	var out []domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, 0, hideDriverError(ctx, "list jobs failed")
+		}
+		out = append(out, j)
+	}
+	return out, total, rows.Err()
 }
 
-// UpdateStatus is one conditional UPDATE, so of two concurrent requests only
-// one can move the job out of the from status.
-func (r *Jobs) UpdateStatus(ctx context.Context, jobID string, from, to domain.Status, updatedAt time.Time) (domain.Job, error) {
-	if _, ok := domain.ParseStatus(to.String()); !ok {
-		return domain.Job{}, errors.New("job status is not valid")
+func (r *Jobs) ListClosingBetween(ctx context.Context, window domain.ClosingWindow, page domain.Page) ([]domain.Job, int, error) {
+	where := `WHERE status = 'published' AND deadline >= $1 AND deadline < $2`
+	args := []any{window.Start, window.End}
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT count(*) FROM jobs `+where, args...).Scan(&total); err != nil {
+		return nil, 0, hideDriverError(ctx, "list closing jobs failed")
 	}
-	updated, err := scanJob(r.pool.QueryRow(ctx,
-		`UPDATE jobs SET status = $3, updated_at = $4
-		 WHERE job_id = $1 AND status = $2
-		 RETURNING `+jobColumns,
-		jobID, from.String(), to.String(), updatedAt))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Job{}, r.missOrConflict(ctx, jobID)
-	}
+
+	args = append(args, page.Limit, page.Offset)
+	rows, err := r.pool.Query(ctx, `SELECT `+jobColumns+` FROM jobs `+where+
+		` ORDER BY deadline ASC, job_id ASC LIMIT $`+itoa(len(args)-1)+` OFFSET $`+itoa(len(args)), args...)
 	if err != nil {
-		return domain.Job{}, hideDriverError(ctx, "update job status failed")
+		return nil, 0, hideDriverError(ctx, "list closing jobs failed")
 	}
-	return updated, nil
+	defer rows.Close()
+
+	var out []domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, 0, hideDriverError(ctx, "list closing jobs failed")
+		}
+		out = append(out, j)
+	}
+	return out, total, rows.Err()
 }
 
-// missOrConflict tells a missing job apart from one whose status changed.
-func (r *Jobs) missOrConflict(ctx context.Context, jobID string) error {
+// RecordJobRemoved implements the moderation consumer. It updates the job
+// to REMOVED and stores the event ID in processed_events in a single transaction.
+func (r *Jobs) RecordJobRemoved(ctx context.Context, eventID, jobID string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(context.Background())
+
+	// 1. Check if already processed (idempotency)
 	var exists bool
-	if err := r.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM jobs WHERE job_id = $1)`, jobID).Scan(&exists); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM processed_events WHERE event_id = $1)`, eventID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return nil // Already processed, ignore
+	}
+
+	// 2. Mark as processed
+	if _, err := tx.Exec(ctx, `INSERT INTO processed_events (event_id) VALUES ($1)`, eventID); err != nil {
+		return err
+	}
+
+	// 3. Update job status to REMOVED (only if it's not already removed)
+	_, err = tx.Exec(ctx, `UPDATE jobs SET status = 'removed', updated_at = now() WHERE job_id = $1 AND status != 'REMOVED'`, jobID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// Helpers
+func scanJob(row pgx.Row) (domain.Job, error) {
+	var j domain.Job
+	var statusStr string
+	err := row.Scan(
+		&j.ID, &j.EmployerID, &j.Title, &j.Description, &j.CategoryID, &j.TagIDs,
+		&j.Location, &j.Deadline, &statusStr, &j.CreatedAt, &j.UpdatedAt)
+	if err != nil {
+		return domain.Job{}, err
+	}
+	status, _ := domain.ParseStatus(statusStr)
+	j.Status = status
+	return j, nil
+}
+
+func (r *Jobs) missOrConflict(ctx context.Context, id string) error {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM jobs WHERE job_id = $1)`, id).Scan(&exists)
+	if err != nil {
 		return hideDriverError(ctx, "check job failed")
 	}
 	if !exists {
@@ -102,80 +213,6 @@ func (r *Jobs) missOrConflict(ctx context.Context, jobID string) error {
 	return domain.ErrJobStatusChanged
 }
 
-func (r *Jobs) ListByEmployer(ctx context.Context, employerID string, status domain.Status, page domain.Page) ([]domain.Job, int, error) {
-	// An empty status matches every status (StatusUnspecified means all).
-	return r.list(ctx,
-		`FROM jobs WHERE employer_id = $1 AND ($2 = '' OR status = $2)`,
-		`ORDER BY created_at DESC, job_id DESC`,
-		page, employerID, status.String())
-}
-
-func (r *Jobs) ListClosingBetween(ctx context.Context, w domain.ClosingWindow, page domain.Page) ([]domain.Job, int, error) {
-	return r.list(ctx,
-		`FROM jobs WHERE status = 'published' AND deadline >= $1 AND deadline < $2`,
-		`ORDER BY deadline, job_id`,
-		page, w.Start, w.End)
-}
-
-// list runs the count and the page in one read-only snapshot, so total_count
-// matches the rows returned.
-func (r *Jobs) list(ctx context.Context, from, order string, page domain.Page, args ...any) (jobs []domain.Job, total int, err error) {
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
-	if err != nil {
-		return nil, 0, hideDriverError(ctx, "list jobs failed")
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	if err := tx.QueryRow(ctx, `SELECT count(*) `+from, args...).Scan(&total); err != nil {
-		return nil, 0, hideDriverError(ctx, "count jobs failed")
-	}
-	n := len(args)
-	query := `SELECT ` + jobColumns + ` ` + from + ` ` + order +
-		` LIMIT $` + strconv.Itoa(n+1) + ` OFFSET $` + strconv.Itoa(n+2)
-	rows, err := tx.Query(ctx, query, append(args, page.Limit, page.Offset)...)
-	if err != nil {
-		return nil, 0, hideDriverError(ctx, "list jobs failed")
-	}
-	defer rows.Close()
-	jobs = []domain.Job{}
-	for rows.Next() {
-		job, err := scanJob(rows)
-		if err != nil {
-			return nil, 0, hideDriverError(ctx, "list jobs failed")
-		}
-		jobs = append(jobs, job)
-	}
-	if rows.Err() != nil {
-		return nil, 0, hideDriverError(ctx, "list jobs failed")
-	}
-	return jobs, total, nil
-}
-
-func scanJob(row pgx.Row) (domain.Job, error) {
-	var j domain.Job
-	var categoryID *string
-	var status string
-	if err := row.Scan(&j.ID, &j.EmployerID, &j.Title, &j.Description, &categoryID, &j.TagIDs,
-		&j.Location, &j.Deadline, &status, &j.CreatedAt, &j.UpdatedAt); err != nil {
-		return domain.Job{}, err
-	}
-	parsed, ok := domain.ParseStatus(status)
-	if !ok {
-		return domain.Job{}, errors.New("stored job status is not valid")
-	}
-	j.Status = parsed
-	if categoryID != nil {
-		j.CategoryID = *categoryID
-	}
-	if j.TagIDs == nil {
-		j.TagIDs = []string{}
-	}
-	// Store and return UTC, as AGENTS.md Section 9 requires.
-	j.Deadline, j.CreatedAt, j.UpdatedAt = j.Deadline.UTC(), j.CreatedAt.UTC(), j.UpdatedAt.UTC()
-	return j, nil
-}
-
-// tagIDsParam sends an empty array instead of NULL for a nil slice.
 func tagIDsParam(ids []string) []string {
 	if ids == nil {
 		return []string{}
@@ -183,10 +220,20 @@ func tagIDsParam(ids []string) []string {
 	return ids
 }
 
-// hideDriverError keeps context cancellation visible but hides driver details.
-func hideDriverError(ctx context.Context, message string) error {
-	if err := ctx.Err(); err != nil {
-		return errors.Join(errors.New(message), err)
+func hideDriverError(_ context.Context, msg string) error {
+	return errors.New(msg)
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
 	}
-	return errors.New(message)
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(buf[i:])
 }

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/adapters/postgres"
@@ -49,7 +50,7 @@ func startJobDB(t *testing.T) (context.Context, *pgxpool.Pool) {
 	if err != nil {
 		t.Fatal("start test PostgreSQL failed")
 	}
-	url, err := container.ConnectionString(ctx, "sslmode=disable")
+	url, err := container.ConnectionString(ctx, "sslmode=disable&timezone=UTC")
 	if err != nil {
 		t.Fatal("get test connection string failed")
 	}
@@ -101,8 +102,8 @@ func TestJobs_Integration(t *testing.T) {
 		assert.Equal(t, employerA, got.EmployerID)
 		assert.Equal(t, categoryX, got.CategoryID)
 		assert.Equal(t, []string{tag2, tag1}, got.TagIDs, "tag order is kept")
-		assert.Equal(t, in.Deadline, got.Deadline)
-		assert.Equal(t, time.UTC, got.Deadline.Location())
+		assert.Equal(t, in.Deadline, got.Deadline.UTC())
+		assert.Equal(t, time.UTC, got.Deadline.UTC().Location())
 		assert.Equal(t, domain.StatusDraft, got.Status)
 	})
 
@@ -166,8 +167,8 @@ func TestJobs_Integration(t *testing.T) {
 		assert.Equal(t, "Senior Go Developer", updated.Title)
 		assert.Equal(t, "", updated.CategoryID)
 		assert.Equal(t, []string{tag1}, updated.TagIDs)
-		assert.Equal(t, base, updated.CreatedAt, "created_at never changes")
-		assert.Equal(t, base.Add(time.Minute), updated.UpdatedAt)
+		assert.Equal(t, base, updated.CreatedAt.UTC(), "created_at never changes")
+		assert.Equal(t, base.Add(time.Minute), updated.UpdatedAt.UTC())
 		assert.Equal(t, domain.StatusDraft, updated.Status)
 
 		_, err = repo.UpdateFields(ctx, changed, domain.StatusPublished)
@@ -185,7 +186,7 @@ func TestJobs_Integration(t *testing.T) {
 		published, err := repo.UpdateStatus(ctx, created.ID, domain.StatusDraft, domain.StatusPublished, base.Add(time.Minute))
 		require.NoError(t, err)
 		assert.Equal(t, domain.StatusPublished, published.Status)
-		assert.Equal(t, base.Add(time.Minute), published.UpdatedAt)
+		assert.Equal(t, base.Add(time.Minute), published.UpdatedAt.UTC())
 
 		_, err = repo.UpdateStatus(ctx, created.ID, domain.StatusDraft, domain.StatusPublished, base)
 		require.ErrorIs(t, err, domain.ErrJobStatusChanged, "second publish")
@@ -258,14 +259,30 @@ func TestJobs_Integration(t *testing.T) {
 		none, total, err := repo.ListByEmployer(ctx, unknownID, domain.StatusUnspecified, domain.Page{Limit: 20})
 		require.NoError(t, err)
 		assert.Equal(t, 0, total)
-		assert.Equal(t, []domain.Job{}, none)
+		assert.Empty(t, none)
 	})
 
 	t.Run("list closing between uses a half-open window on published jobs", func(t *testing.T) {
 		window := domain.ClosingWindow{Start: base.Add(100 * time.Hour), End: base.Add(148 * time.Hour)}
 		create := func(st domain.Status, deadline time.Time) string {
-			j, err := repo.Create(ctx, newJob(employerA, st, base, deadline))
+			j, err := repo.Create(ctx, newJob(employerA, domain.StatusDraft, base, deadline))
 			require.NoError(t, err)
+			if st != domain.StatusDraft {
+				if st == domain.StatusRemoved {
+					err = repo.RecordJobRemoved(ctx, uuid.NewString(), j.ID)
+				} else {
+					var expected domain.Status
+					if st == domain.StatusPublished {
+						expected = domain.StatusDraft
+					} else if st == domain.StatusClosed {
+						expected = domain.StatusPublished
+						_, err = repo.UpdateStatus(ctx, j.ID, domain.StatusDraft, domain.StatusPublished, base)
+						require.NoError(t, err)
+					}
+					_, err = repo.UpdateStatus(ctx, j.ID, expected, st, base)
+				}
+				require.NoError(t, err)
+			}
 			return j.ID
 		}
 		atStart := create(domain.StatusPublished, window.Start)

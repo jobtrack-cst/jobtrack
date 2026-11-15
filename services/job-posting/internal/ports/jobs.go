@@ -29,6 +29,7 @@ type JobRepository interface {
 	// ListClosingBetween lists PUBLISHED jobs with Start <= deadline < End,
 	// ordered by deadline then job_id. It also returns the total count.
 	ListClosingBetween(ctx context.Context, window domain.ClosingWindow, page domain.Page) ([]domain.Job, int, error)
+	RecordJobRemoved(ctx context.Context, eventID, jobID string) error
 }
 
 // EmployerVerifier checks whether an employer's company profile is VERIFIED.

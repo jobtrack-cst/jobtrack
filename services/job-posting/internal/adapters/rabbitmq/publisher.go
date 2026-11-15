@@ -5,18 +5,16 @@ import (
 
 	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/events"
-	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/ports"
 )
 
-type publisherBackend interface {
-	ports.EventPublisher
+type eventPublisher interface {
+	Publish(ctx context.Context, envelope *eventsv1.EventEnvelope) error
 	Close() error
 }
 
-// Publisher delegates transport and confirmations to the shared event publisher.
-type Publisher struct{ backend publisherBackend }
-
-var _ ports.EventPublisher = (*Publisher)(nil)
+type Publisher struct {
+	backend eventPublisher
+}
 
 func NewPublisher(rabbitMQURL string) (*Publisher, error) {
 	backend, err := events.NewPublisher(rabbitMQURL)
@@ -30,5 +28,6 @@ func (p *Publisher) Publish(ctx context.Context, envelope *eventsv1.EventEnvelop
 	return p.backend.Publish(ctx, envelope)
 }
 
-// Close releases the owned shared publisher, whose Close method is idempotent.
-func (p *Publisher) Close() error { return p.backend.Close() }
+func (p *Publisher) Close() error {
+	return p.backend.Close()
+}
