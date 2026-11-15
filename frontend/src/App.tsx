@@ -10,6 +10,7 @@ import { OffersPage } from './features/offer/OffersPage';
 import { MessagesPage } from './features/messaging/MessagesPage';
 import { JobAlertsPage } from './features/job-alert/JobAlertsPage';
 import { ProfilePage } from './features/applicant-profile/ProfilePage';
+import { ResumesPage } from './features/resume/ResumesPage';
 
 function Workspace({ role }: { role: Role }) {
   const { session } = useAuth();
@@ -23,6 +24,7 @@ function Workspace({ role }: { role: Role }) {
       <Button component={Link} to={`${base}/offers`}>Offers</Button>
       {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/job-alerts`}>Job alerts</Button>}
       {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/profile`}>Profile</Button>}
+      {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/resumes`}>Resumes</Button>}
     </Stack>}
     <Outlet />
   </Stack>;
@@ -50,6 +52,7 @@ export default function App() {
           <Route path="messages/:applicationId" element={<MessagesPage />} />
           <Route path="job-alerts" element={<JobAlertsPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="resumes" element={<ResumesPage />} />
           <Route path="*" element={<Navigate to="/applicant" replace />} />
         </Route>
         <Route path="/employer" element={<Workspace role="ROLE_EMPLOYER" />}>

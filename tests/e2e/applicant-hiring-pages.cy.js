@@ -152,3 +152,105 @@ describe('JT-83 applicant profile', () => {
     cy.contains('a', 'Profile').should('not.exist');
   });
 });
+
+describe('JT-83 resume upload', () => {
+  const resumeId = '33333333-3333-4333-8333-333333333333';
+  const pending = { resumeId, fileName: 'cv.pdf', contentType: 'application/pdf', sizeBytes: '9', validationStatus: 'RESUME_VALIDATION_STATUS_PENDING', timestamps: { createdAt: '2026-11-15T10:00:00Z' } };
+  const pdf = (size = 9) => Cypress.Buffer.concat([Cypress.Buffer.from('%PDF-1.7\n'), Cypress.Buffer.alloc(Math.max(0, size - 9), 0x20)]).subarray(0, size);
+  function openResumes(resumes = []) {
+    cy.intercept('GET', `${gateway}/v1/resumes?*`, { resumes, pagination: {} }).as('list');
+    login();
+    cy.contains('a', 'Resumes').click();
+    cy.wait('@list');
+  }
+  function choose(contents, fileName = 'cv.pdf', mimeType = 'application/pdf') {
+    cy.get('input[type=file][name=resume]').selectFile({ contents, fileName, mimeType }, { force: true });
+  }
+
+  it('uploads a PDF as base64 and lists it as pending', () => {
+    openResumes();
+    cy.contains('No resumes on this page.').should('be.visible');
+    cy.intercept('POST', `${gateway}/v1/resumes`, req => {
+      expect(req.body).to.deep.eq({ fileName: 'cv.pdf', contentType: 'application/pdf', content: pdf().toString('base64') });
+      req.reply({ resume: pending });
+    }).as('upload');
+    cy.intercept('GET', `${gateway}/v1/resumes?*`, req => {
+      expect(req.query['pagination.page_token']).to.eq('');
+      req.reply({ resumes: [pending], pagination: {} });
+    }).as('relist');
+    choose(pdf());
+    cy.wait('@upload');
+    cy.wait('@relist');
+    cy.contains('cv.pdf uploaded').should('be.visible');
+    cy.contains('Pending validation').should('be.visible');
+  });
+
+  it('accepts a file of exactly 2,000,000 bytes', () => {
+    openResumes();
+    cy.intercept('POST', `${gateway}/v1/resumes`, req => {
+      expect(Cypress.Buffer.from(req.body.content, 'base64').length).to.eq(2000000);
+      req.reply({ resume: { ...pending, sizeBytes: '2000000' } });
+    }).as('upload');
+    choose(pdf(2000000));
+    cy.wait('@upload');
+    cy.contains('uploaded').should('be.visible');
+  });
+
+  for (const [name, contents, fileName, mimeType, message] of [
+    ['a file over 2,000,000 bytes', () => pdf(2000001), 'big.pdf', 'application/pdf', 'larger than 2 MB'],
+    ['a file that is not a PDF', () => Cypress.Buffer.from('hello'), 'cv.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Only PDF files'],
+    ['an empty file', () => Cypress.Buffer.alloc(0), 'empty.pdf', 'application/pdf', 'The file is empty'],
+    ['a PDF type without the %PDF- signature', () => Cypress.Buffer.from('not really a pdf'), 'fake.pdf', 'application/pdf', 'not a valid PDF'],
+    ['a file name over 255 characters', () => pdf(), `${'n'.repeat(252)}.pdf`, 'application/pdf', 'file name must have 1 to 255'],
+  ]) {
+    it(`rejects ${name} before uploading`, () => {
+      let posted = false;
+      cy.intercept('POST', `${gateway}/v1/resumes`, () => { posted = true; });
+      openResumes();
+      choose(contents(), fileName, mimeType);
+      cy.get('[role=alert]').should('contain', message);
+      cy.then(() => expect(posted, 'upload request sent').to.eq(false));
+      cy.contains('label', 'Upload PDF resume').should('not.have.attr', 'aria-disabled');
+    });
+  }
+
+  for (const [statusCode, body, message] of [
+    [400, { code: 3, message: 'private-input' }, 'The resume was not accepted'],
+    [413, 'request body too large private-input', 'The file is too large'],
+    [403, { code: 7, message: 'private-input' }, 'Only applicants can upload'],
+    [503, {}, 'The request failed'],
+  ]) {
+    it(`shows a clear message when the gateway answers ${statusCode}`, () => {
+      openResumes();
+      cy.intercept('POST', `${gateway}/v1/resumes`, { statusCode, body });
+      choose(pdf());
+      cy.get('[role=alert]').should('contain', message).and('not.contain', 'private-input');
+    });
+  }
+
+  it('shows each validation status, the rejection reason and pages through resumes', () => {
+    const validated = { ...pending, resumeId: '33333333-3333-4333-8333-333333333334', fileName: 'good.pdf', validationStatus: 'RESUME_VALIDATION_STATUS_VALIDATED' };
+    const rejected = { ...pending, resumeId: '33333333-3333-4333-8333-333333333335', fileName: 'bad.pdf', validationStatus: 'RESUME_VALIDATION_STATUS_REJECTED', rejectionReason: 'File signature is not a PDF' };
+    cy.intercept('GET', `${gateway}/v1/resumes?*`, req => {
+      expect(req.query['pagination.page_size']).to.eq('20');
+      req.reply(req.query['pagination.page_token'] === '20' ? { resumes: [rejected], pagination: {} } : { resumes: [pending, validated], pagination: { nextPageToken: '20' } });
+    });
+    login();
+    cy.contains('a', 'Resumes').click();
+    cy.contains('Pending validation').should('be.visible');
+    cy.contains('Validated').should('be.visible');
+    cy.contains('button', 'Next page').click();
+    cy.contains('bad.pdf').should('be.visible');
+    cy.contains('Reason: File signature is not a PDF').should('be.visible');
+    cy.contains('button', 'First page').click();
+    cy.contains('good.pdf').should('be.visible');
+  });
+
+  it('refreshes to show a resume that was validated after upload', () => {
+    openResumes([pending]);
+    cy.intercept('GET', `${gateway}/v1/resumes?*`, { resumes: [{ ...pending, validationStatus: 'RESUME_VALIDATION_STATUS_VALIDATED' }], pagination: {} }).as('again');
+    cy.contains('button', 'Refresh resumes').click();
+    cy.wait('@again');
+    cy.contains('Validated').should('be.visible');
+  });
+});
