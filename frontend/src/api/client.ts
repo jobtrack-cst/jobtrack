@@ -9,7 +9,7 @@ export function configureAuth(token: string | null, onUnauthorized: () => void) 
 }
 
 export class ApiError extends Error {
-  constructor(public readonly status: number) {
+  constructor(public readonly status: number, public readonly code?: number) {
     // Do not display arbitrary server bodies, which may contain sensitive input.
     super(status === 401 ? 'Invalid credentials or session expired. Please log in.'
       : status === 409 ? 'An account with this email already exists.'
@@ -38,7 +38,12 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   if (!response.ok) {
     // A late response from an old session must not log out a newer login.
     if (response.status === 401 && !options.public && token === accessToken) unauthorized();
-    throw new ApiError(response.status);
+    let code: number | undefined;
+    try {
+      const body: unknown = await response.json();
+      if (body && typeof body === 'object' && 'code' in body && typeof body.code === 'number') code = body.code;
+    } catch { /* HTTP status remains usable without a JSON body. */ }
+    throw new ApiError(response.status, code);
   }
   if (response.status === 204) return undefined as T;
   try { return await response.json() as T; }
