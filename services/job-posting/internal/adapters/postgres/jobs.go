@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/domain"
 )
@@ -47,6 +48,9 @@ func (r *Jobs) UpdateFields(ctx context.Context, j domain.Job, expected domain.S
 			return domain.Job{}, r.missOrConflict(ctx, j.ID)
 		}
 		if err != nil {
+			if isLockTimeout(err) {
+				return domain.Job{}, domain.ErrJobStatusChanged
+			}
 			return domain.Job{}, hideDriverError(ctx, "update job failed")
 		}
 		return updated, nil
@@ -77,6 +81,9 @@ func (r *Jobs) UpdateStatus(ctx context.Context, jobID string, from, to domain.S
 			return domain.Job{}, r.missOrConflict(ctx, jobID)
 		}
 		if err != nil {
+			if isLockTimeout(err) {
+				return domain.Job{}, domain.ErrJobStatusChanged
+			}
 			return domain.Job{}, hideDriverError(ctx, "update job status failed")
 		}
 		return updated, nil
@@ -236,4 +243,12 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(buf[i:])
+}
+
+func isLockTimeout(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "55P03" // lock_not_available
+	}
+	return false
 }

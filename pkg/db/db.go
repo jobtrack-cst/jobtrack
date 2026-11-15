@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,8 +23,8 @@ func OpenPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, errors.New("invalid database configuration")
 	}
-	// Force UTC to prevent timezone mismatches in tests and production.
 	config.ConnConfig.RuntimeParams["timezone"] = "UTC"
+	config.ConnConfig.RuntimeParams["lock_timeout"] = "2000"
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
@@ -38,7 +37,7 @@ func OpenPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Migrate applies pending goose SQL migrations. The caller retains ownership of pool.
+// Migrate applies pending goose SQL migrations.
 func Migrate(ctx context.Context, pool *pgxpool.Pool, directory string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -52,6 +51,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, directory string) error {
 	if err := goose.SetDialect("postgres"); err != nil {
 		return errors.New("unsupported database dialect")
 	}
+	// Isolate the global state for concurrent tests.
+	goose.SetBaseFS(nil)
+
 	db := stdlib.OpenDBFromPool(pool)
 	defer db.Close()
 	if err := goose.UpContext(ctx, db, directory); err != nil {
@@ -66,5 +68,3 @@ func safeError(ctx context.Context, operation string) error {
 	}
 	return fmt.Errorf("%s failed", operation)
 }
-
-var _ = os.Getenv // keep os import if needed
