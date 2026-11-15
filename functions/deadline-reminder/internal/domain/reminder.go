@@ -59,3 +59,9 @@ func (r Reminder) EventID() string {
 	name := r.JobID + "/" + r.ApplicantID + "/" + r.Deadline.UTC().Format(time.RFC3339Nano)
 	return uuid.NewSHA1(eventIDNamespace, []byte(name)).String()
 }
+
+// ClosingJob is one published job whose deadline falls inside the window.
+type ClosingJob struct {
+	ID       string
+	Deadline time.Time
+}
