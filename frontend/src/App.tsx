@@ -1,18 +1,28 @@
 import { AppBar, Button, Container, Stack, Toolbar, Typography } from '@mui/material';
-import { Navigate, Route, Routes } from 'react-router';
+import { Link, Navigate, Outlet, Route, Routes } from 'react-router';
 import type { Role } from './api/auth';
 import { AuthPage } from './features/auth/AuthPage';
 import { useAuth } from './features/auth/AuthProvider';
 import { landingPath } from './features/auth/routes';
+import { ApplicationsPage } from './features/application/ApplicationsPage';
+import { ApplyPage } from './features/application/ApplyPage';
+import { OffersPage } from './features/offer/OffersPage';
+import { MessagesPage } from './features/messaging/MessagesPage';
+import { JobAlertsPage } from './features/job-alert/JobAlertsPage';
 
-function Landing({ role, title }: { role: Role; title: string }) {
+function Workspace({ role }: { role: Role }) {
   const { session } = useAuth();
   if (!session || session.expiresAt <= Date.now()) return <Navigate to="/login" replace />;
   if (session.user.role !== role) return <Navigate to={landingPath(session.user.role)} replace />;
-  return <Stack spacing={2}>
-    <Typography variant="h4" component="h1">{title}</Typography>
-    <Typography>Welcome, {session.user.fullName}.</Typography>
-    <Typography>Your JobTrack workspace is ready. Feature pages will be added here.</Typography>
+  const base = landingPath(role);
+  return <Stack spacing={3}>
+    {role !== 'ROLE_ADMIN' && <Stack component="nav" aria-label="Workspace" direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+      <Button component={Link} to={`${base}/applications`}>Applications</Button>
+      {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/apply`}>Apply</Button>}
+      <Button component={Link} to={`${base}/offers`}>Offers</Button>
+      {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/job-alerts`}>Job alerts</Button>}
+    </Stack>}
+    <Outlet />
   </Stack>;
 }
 function Home() {
@@ -30,9 +40,26 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<AuthPage key="login" />} />
         <Route path="/register" element={<AuthPage key="register" registration />} />
-        <Route path="/applicant/*" element={<Landing role="ROLE_APPLICANT" title="Applicant workspace" />} />
-        <Route path="/employer/*" element={<Landing role="ROLE_EMPLOYER" title="Employer workspace" />} />
-        <Route path="/admin/*" element={<Landing role="ROLE_ADMIN" title="Admin workspace" />} />
+        <Route path="/applicant" element={<Workspace role="ROLE_APPLICANT" />}>
+          <Route index element={<Typography variant="h4" component="h1">Applicant workspace</Typography>} />
+          <Route path="apply" element={<ApplyPage />} />
+          <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="offers" element={<OffersPage key="applicant-offers" />} />
+          <Route path="messages/:applicationId" element={<MessagesPage />} />
+          <Route path="job-alerts" element={<JobAlertsPage />} />
+          <Route path="*" element={<Navigate to="/applicant" replace />} />
+        </Route>
+        <Route path="/employer" element={<Workspace role="ROLE_EMPLOYER" />}>
+          <Route index element={<Typography variant="h4" component="h1">Employer workspace</Typography>} />
+          <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="offers" element={<OffersPage key="employer-offers" />} />
+          <Route path="offers/new/:applicationId" element={<OffersPage key="make-offer" create />} />
+          <Route path="messages/:applicationId" element={<MessagesPage />} />
+          <Route path="*" element={<Navigate to="/employer" replace />} />
+        </Route>
+        <Route path="/admin/*" element={<Workspace role="ROLE_ADMIN" />}>
+          <Route path="*" element={<Typography variant="h4" component="h1">Admin workspace</Typography>} />
+        </Route>
         <Route path="*" element={<Home />} />
       </Routes>
     </Container>

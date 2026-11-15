@@ -24,8 +24,15 @@ Logout, the server's `expiresAt`, and protected HTTP 401 responses clear the
 session. There is no refresh flow. Public login/registration failures stay on
 the form, avoiding redirect loops. Client routing is a UI convenience; the
 gateway and services remain responsible for authentication and authorization.
-Feature directories reserve space for service owners; no service pages are
-implemented beyond the role landing pages.
+JT-78 adds applicant application, offer, message and job-alert pages and employer
+application, offer and message pages. Open the workspace navigation after login.
+Apply accepts a job ID (or `/applicant/apply?jobId=<UUID>`) and lists validated
+resumes. Offer viewing requires an offer ID because the public contract has no
+list endpoint; employers can share the ID returned by Make offer through the
+application message thread. No feature session or token is persisted.
+
+See [JT-78 test cases](../docs/testing/jt-78-test-cases.md) for routes, public API
+constraints, acceptance coverage and manual integration steps.
 
 Validation:
 
@@ -39,7 +46,8 @@ npm test
 
 `lint` uses TypeScript's unused-local, unused-parameter, and switch fallthrough
 checks, alongside strict type checking. It introduces no separate lint tool.
-Cypress tests live in `tests/e2e/auth.cy.js` and stub gateway responses; they do
+Cypress tests live in `tests/e2e/auth.cy.js` and
+`tests/e2e/application-workflows.cy.js` and stub gateway responses; they do
 not prove live backend connectivity or CORS. For a manual integration check,
 register synthetic applicant and employer accounts, log in with each and the
 seeded admin, verify each landing page, then log out. In browser Network tools,
