@@ -16,6 +16,7 @@ import (
 	"time"
 
 	authv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/auth/v1"
+	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/auth/internal/adapters/grpc"
@@ -41,6 +42,8 @@ type config struct {
 	jwtSecret     string
 	adminEmail    string
 	adminPassword string
+	// auth serves AuthInternalService (AGENTS.md Section 6). Never logged.
+	internalToken string
 }
 
 func main() {
@@ -108,6 +111,12 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if err := domain.ValidateAdminPassword(cfg.adminPassword); err != nil {
 		return config{}, errors.New("ADMIN_PASSWORD must be set, not the placeholder, and 12 to 72 bytes")
 	}
+	// auth serves AuthInternalService, so it needs INTERNAL_TOKEN
+	// (AGENTS.md Section 6). The error never contains the value.
+	cfg.internalToken = getenv("INTERNAL_TOKEN")
+	if !authctx.ValidInternalToken(cfg.internalToken) {
+		return config{}, errors.New("INTERNAL_TOKEN must contain nonempty visible ASCII without whitespace")
+	}
 	return cfg, nil
 }
 
@@ -118,6 +127,12 @@ type deps struct {
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
+	// Build the interceptor before opening anything, so a bad token stops
+	// startup at once (JT-44 internal-call wiring).
+	serverOpts, err := internalServerOptions(cfg.internalToken)
+	if err != nil {
+		return err
+	}
 	return runWithDatabase(ctx, cfg, logger, openDatabase,
 		func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
 			return runWithPublisher(ctx, cfg, logger, d,
@@ -127,9 +142,20 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 					if err != nil {
 						return err
 					}
-					return runServers(ctx, cfg, logger, d.checker, register)
+					return runServers(ctx, cfg, logger, d.checker, register, serverOpts...)
 				})
 		})
+}
+
+// internalServerOptions adds the pkg/authctx interceptor, which checks
+// INTERNAL_TOKEN and the Section 6 caller allowlist on internal RPCs and lets
+// public RPCs through unchanged. The error never contains the token.
+func internalServerOptions(token string) ([]grpc.ServerOption, error) {
+	internalAuth, err := authctx.InternalUnaryServerInterceptor(token)
+	if err != nil {
+		return nil, errors.New("INTERNAL_TOKEN is invalid")
+	}
+	return []grpc.ServerOption{grpc.ChainUnaryInterceptor(internalAuth)}, nil
 }
 
 type systemClock struct{}
@@ -159,7 +185,7 @@ func setupAuth(ctx context.Context, cfg config, logger *slog.Logger, users ports
 	logger.Info("admin seed checked", "created", created)
 	return func(s grpc.ServiceRegistrar) {
 		authv1.RegisterAuthServiceServer(s, grpcadapter.NewAuthHandler(auth))
-		// TODO(JT-44): wrap with the internal-token interceptor once it is merged.
+		// The internal interceptor passed to serve guards AuthInternalService.
 		authv1.RegisterAuthInternalServiceServer(s, grpcadapter.NewInternalHandler(auth))
 	}, nil
 }
@@ -237,7 +263,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), users: database.users})
 }
 
-func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar)) error {
+func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar), opts ...grpc.ServerOption) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -251,14 +277,14 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, register, grpcListener, httpListener)
+	return serve(ctx, logger, checker, register, grpcListener, httpListener, opts...)
 }
 
 // serve owns both listeners and stops the other server when either one fails.
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar), grpcListener, httpListener net.Listener) error {
+func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, register func(grpc.ServiceRegistrar), grpcListener, httpListener net.Listener, opts ...grpc.ServerOption) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(opts...)
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
 	if register != nil {
 		register(grpcServer)

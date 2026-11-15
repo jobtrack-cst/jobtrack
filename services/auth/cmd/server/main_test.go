@@ -91,11 +91,14 @@ func TestLoadConfig(t *testing.T) {
 		{"missing admin password", map[string]string{"SERVICE_NAME": "test", "ADMIN_PASSWORD": ""}, config{}, "ADMIN_PASSWORD"},
 		{"placeholder admin password", map[string]string{"SERVICE_NAME": "test", "ADMIN_PASSWORD": "change-me"}, config{}, "ADMIN_PASSWORD"},
 		{"11 character admin password", map[string]string{"SERVICE_NAME": "test", "ADMIN_PASSWORD": "private-sec"}, config{}, "ADMIN_PASSWORD"},
+		{"missing internal token", map[string]string{"SERVICE_NAME": "test", "INTERNAL_TOKEN": ""}, config{}, "INTERNAL_TOKEN"},
+		{"internal token with space", map[string]string{"SERVICE_NAME": "test", "INTERNAL_TOKEN": "private-secret value"}, config{}, "INTERNAL_TOKEN"},
+		{"non-ASCII internal token", map[string]string{"SERVICE_NAME": "test", "INTERNAL_TOKEN": "private-secret\u00e9"}, config{}, "INTERNAL_TOKEN"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			defaults := map[string]string{
 				"DATABASE_URL": "caller-supplied-url", "RABBITMQ_URL": "caller-supplied-url",
-				"JWT_SECRET": testJWTSecret, "ADMIN_EMAIL": "coordinator@cst.edu.bt", "ADMIN_PASSWORD": testAdminPassword,
+				"JWT_SECRET": testJWTSecret, "ADMIN_EMAIL": "coordinator@cst.edu.bt", "ADMIN_PASSWORD": testAdminPassword, "INTERNAL_TOKEN": testInternalToken,
 			}
 			got, err := loadConfig(func(key string) string {
 				if value, ok := tt.env[key]; ok {
@@ -110,6 +113,7 @@ func TestLoadConfig(t *testing.T) {
 				tt.want.jwtSecret = testJWTSecret
 				tt.want.adminEmail = "coordinator@cst.edu.bt"
 				tt.want.adminPassword = testAdminPassword
+				tt.want.internalToken = testInternalToken
 			}
 			if tt.errField != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.errField) || strings.Contains(err.Error(), "private-secret") {
