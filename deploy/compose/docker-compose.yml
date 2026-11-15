@@ -68,6 +68,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set in .env}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?set in .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set in .env}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
     depends_on:
       postgres:
         condition: service_healthy
