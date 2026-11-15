@@ -76,17 +76,36 @@ one "JobTrack weekly summary" email per admin. The seeded admin is
 ## k3d (Knative)
 
 `deploy/knative/weekly-summary.yaml` holds the Knative Service and a PingSource
-that runs every Monday at 08:00 Asia/Thimphu. Create the token Secret first:
+that runs every Monday at 08:00 Asia/Thimphu. The Service is `cluster-local`,
+so it has no public route. Deploy into the namespace that already runs
+analytics, auth and email-sender:
 
 ```bash
-kubectl create secret generic weekly-summary-credentials \
+NS=<project-namespace>
+k3d image import jobtrack-weekly-summary:local -c <existing-cluster-name>
+kubectl -n "$NS" create secret generic weekly-summary-credentials \
   --from-literal=internal-token="$INTERNAL_TOKEN"
-kubectl apply -f deploy/knative/weekly-summary.yaml
+EMAIL_URL="$(kubectl -n "$NS" get ksvc email-sender -o jsonpath='{.status.address.url}')/send-email"
+echo "$EMAIL_URL"   # for example http://email-sender.<ns>.svc.cluster.local/send-email
+sed "s#set-at-deploy-time#${EMAIL_URL}#" deploy/knative/weekly-summary.yaml | kubectl -n "$NS" apply -f -
+kubectl -n "$NS" get ksvc weekly-summary
+kubectl -n "$NS" get pingsource weekly-summary-schedule
 ```
 
-The function needs analytics, auth and email-sender reachable in the same
-namespace. Email delivery in the cluster also needs Mailpit there (AGENTS.md
-Section 16).
+`EMAIL_SENDER_URL` must be the email-sender address that Knative reports,
+because Kourier routes by host name and Knative registers only
+namespace-qualified host names, not the bare name `email-sender`. If the placeholder is applied unreplaced, the function does not
+start.
+
+To run once without waiting for Monday, call it from inside the cluster:
+
+```bash
+kubectl -n "$NS" run weekly-summary-trigger --rm -i --restart=Never \
+  --image=curlimages/curl -- curl -si -X POST \
+  "http://weekly-summary.$NS.svc.cluster.local/"
+```
+
+Email delivery in the cluster also needs Mailpit there (AGENTS.md Section 16).
 
 ## Tests
 

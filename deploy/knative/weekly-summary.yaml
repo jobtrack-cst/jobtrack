@@ -1,11 +1,15 @@
 # JT-86 weekly summary. The PingSource posts a CloudEvent to the function
 # every Monday at 08:00 Bhutan time; the function ignores its data.
 # INTERNAL_TOKEN comes from the Secret weekly-summary-credentials (key
-# internal-token), created by hand as in functions/weekly-summary/README.md.
+# internal-token), and EMAIL_SENDER_URL is set at deploy time from the
+# email-sender Knative Service address; see functions/weekly-summary/README.md.
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
   name: weekly-summary
+  labels:
+    # No public route: only the PingSource and pods in the cluster can trigger a run.
+    networking.knative.dev/visibility: cluster-local
 spec:
   template:
     metadata:
@@ -30,9 +34,12 @@ spec:
               value: analytics:9090
             - name: AUTH_ADDR
               value: auth:9090
-            # The email-sender Knative Service in the same namespace.
+            # Replaced at deploy time with the email-sender Knative Service
+            # address plus /send-email. Kourier routes by host, and the bare
+            # name "email-sender" is not one of its hosts. Left unreplaced,
+            # this value has no scheme, so startup fails at once.
             - name: EMAIL_SENDER_URL
-              value: http://email-sender/send-email
+              value: set-at-deploy-time
             - name: INTERNAL_TOKEN
               valueFrom:
                 secretKeyRef:
