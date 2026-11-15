@@ -25,6 +25,8 @@ func newHandler(api http.Handler, verifier middleware.TokenVerifier, logger *slo
 			"# TYPE jobtrack_service_ready gauge\n"+
 			"jobtrack_service_ready 1\n")
 	})
-	mux.Handle("/", middleware.Authenticate(verifier, logger, api))
+	// JT-54: the body limit sits after authentication, so anonymous requests get 401
+	// without the gateway reading a large body; register and login still pass through it.
+	mux.Handle("/", middleware.Authenticate(verifier, logger, middleware.LimitBody(middleware.MaxBodyBytes, api)))
 	return mux
 }

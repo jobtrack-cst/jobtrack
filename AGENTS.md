@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 15 Nov 2026 (JT-79 review events)
+- Last updated: 15 Nov 2026 (JT-54 gateway body size limit)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -151,6 +151,7 @@ Contracts written in JT-23: `proto/jobtrack/<service_snake>/v1/<service_snake>.p
 - Folder: `gateway`. Owner: Jigden. Backup: Sangay.
 - Built with grpc-gateway from the HTTP annotations in each service's `.proto`. It registers only public services, never `*InternalService`.
 - Verifies the JWT on every request (except register and login, and CORS preflight requests from `CORS_ALLOWED_ORIGIN`, which the gateway answers itself, JT-53), then forwards `x-user-id` and `x-user-role` as gRPC metadata.
+- Rejects request bodies larger than 3 MiB (3,145,728 bytes) with HTTP 413 before they reach any service (JT-54, Section 15).
 
 ### JWT claims format
 
@@ -661,6 +662,8 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 14 Nov 2026 | In Sprint 3, a consumer whose producer is not ready builds and tests against the shared fixtures in `tests/contract/fixtures/<routing key>.json`, and is verified end to end in Docker Compose once the producer is merged (JT-89) | No task waits for another to merge; follows the R4 retrospective action |
 | 14 Nov 2026 | No sub-tasks in Sprint 3 (JT-89) | Short sprint; acceptance criteria already work as the checklist |
 | 14 Nov 2026 | JT-77 email-sender accepts direct HTTP JSON requests at `POST /send-email` with `recipient`, `subject` and `body`; Phuntsho, Sangay (Notification Dispatcher) and Jigden (Weekly Summary) agreed to this request format. Returns 204 after SMTP acceptance, 4xx for invalid requests and 503 for SMTP failures. The [shared HTTP contract](docs/deployment/email-sender-http-contract.md) documents the interface and retry limits: lost SMTP acceptance replies or HTTP responses leave delivery uncertain, so retries can duplicate email; there is no idempotent delivery guarantee | Gives both calling functions one written interface while preserving the JT-29/JT-61 transport for event-triggered functions |
+| 15 Nov 2026 | Gateway limits every request body to 3 MiB (3,145,728 bytes), agreed by Kinley as resume owner on 15 Nov 2026 (JT-54). The largest valid `UploadResume` request (`body: "*"`: 2,000,000 bytes of content as base64, a 255 character file name and `application/pdf`) is about 2.67 MB | Every valid resume upload fits with about 475 KB to spare, larger bodies stop at the gateway, and the limit stays below gRPC's 4 MiB default |
+| 15 Nov 2026 | Gateway body limit behaviour: `middleware.LimitBody` sits after `Authenticate` and before grpc-gateway, so a request without a valid token gets 401 before its body is read, and register and login are limited too. A `Content-Length` above the limit is rejected without reading the body; other bodies, including chunked ones, are read through `http.MaxBytesReader`. A body over the limit gets HTTP 413 with `{"code":3,"message":"request body exceeds 3145728 bytes","details":[]}` (code 3 is `INVALID_ARGUMENT`, since grpc-gateway maps no gRPC code to 413); an unreadable body gets HTTP 400 with code 3. `GET /healthz` and `GET /metrics` have no body and are not limited (JT-54) | One clear error on every route, and anonymous clients cannot make the gateway read large bodies |
 
 ---
 
