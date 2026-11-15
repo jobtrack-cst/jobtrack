@@ -10,7 +10,8 @@ import (
 )
 
 // ParticipantRepository reads the local trusted projection of
-// application.submitted. The Sprint 2 consumer adds the method that fills it.
+// application.submitted, filled by the JT-80 consumer through
+// postgres.Participants.RecordApplication.
 type ParticipantRepository interface {
 	// GetByApplicationID returns domain.ErrApplicationNotFound for an unknown
 	// or not yet processed application.
@@ -19,8 +20,9 @@ type ParticipantRepository interface {
 
 // InterviewRepository stores interviews, several per application.
 type InterviewRepository interface {
-	// Create stores the interview, or returns domain.ErrInterviewExists if
-	// the application already has one at the same scheduled_at.
+	// Create stores the interview and its interview.scheduled outbox event in
+	// one transaction, or returns domain.ErrInterviewExists if the application
+	// already has one at the same scheduled_at (then nothing is stored).
 	Create(ctx context.Context, interview domain.Interview) error
 	// Get returns the interview, or domain.ErrInterviewNotFound.
 	Get(ctx context.Context, interviewID string) (domain.Interview, error)

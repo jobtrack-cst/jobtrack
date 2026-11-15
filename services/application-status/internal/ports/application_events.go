@@ -9,3 +9,10 @@ import (
 type ApplicationEventRepository interface {
 	ApplyEvent(context.Context, domain.ApplicationEvent) error
 }
+
+// HiringEventRepository applies one review, interview or offer event: the
+// event_id claim, status, history and one application.status_changed per step
+// commit together (JT-81).
+type HiringEventRepository interface {
+	ApplyHiringEvent(context.Context, domain.HiringEvent) error
+}

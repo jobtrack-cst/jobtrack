@@ -56,6 +56,7 @@ Commands run on branch `JT-79-review-events`:
 | Integration tests (Testcontainers `postgres:18-alpine` and `rabbitmq:4.1-alpine`) | Pass, including `TestReviewEvents_RealBrokerAndPostgres` |
 | Package coverage (unit) | `domain` 100%, `app` 98.2%, `adapters/grpc` 98.4%, `adapters/rabbitmq` 96.2%, `cmd/server` 86.0% |
 | Docker Compose end to end | Pass: application `c5ba671e-12a1-497c-b827-d0decf7f64ca`; `review.applications` 1 consumer, 0 ready; `review.applications.dead` 0; log "outbox events published" |
+| Defect found later and fixed in JT-80 | `occurred_at` could differ from the stored `created_at` below one microsecond (the clock has nanoseconds, PostgreSQL keeps microseconds); the JT-79 Compose check passed by chance. `Complete` now keeps `created_at` and `updated_at` to the microsecond, covered by a unit test with a 999 ns clock, and the Compose check was repeated (see `jt-80-test-cases.md`) |
 | CI on the pull request | Green, [CI run](https://github.com/jobtrack-cst/jobtrack/actions/runs/43632892754) |
 
 ## Acceptance criteria review

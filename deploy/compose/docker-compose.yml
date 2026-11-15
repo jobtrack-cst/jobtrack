@@ -420,6 +420,31 @@ services:
     stop_grace_period: 35s
     restart: unless-stopped
 
+  deadline-reminder:
+    profiles: [functions]
+    image: ${DEADLINE_REMINDER_IMAGE:-jobtrack-deadline-reminder:local}
+    build:
+      context: ../..
+      dockerfile: functions/deadline-reminder/Dockerfile
+    environment:
+      SERVICE_NAME: deadline-reminder
+      HTTP_PORT: "8080"
+      JOB_POSTING_ADDR: job-posting:9090
+      SAVED_JOBS_ADDR: saved-jobs:9090
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?set in .env}:${RABBITMQ_PASSWORD:?set in .env}@rabbitmq:5672/
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    # No host port. Trigger a run by hand (JT-61 execution decision):
+    # docker compose --profile functions exec deadline-reminder wget -S -O- --post-data='' http://localhost:8080/
+    depends_on:
+      job-posting:
+        condition: service_healthy
+      saved-jobs:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    stop_grace_period: 35s
+    restart: unless-stopped
+
   # JT-62 real validator, using the JT-61 transport.
   resume-validator:
     profiles: [functions]
