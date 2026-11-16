@@ -62,7 +62,7 @@ All commands ran on 16 November 2026 on Jigden's laptop (WSL Ubuntu, Docker Desk
 | Coverage (unit run) | `internal/app` 97.4%, `internal/domain` 98.4%, `internal/adapters/grpc` 97.3%, `cmd/server` 85.9%, `internal/adapters/rabbitmq` 83.3%; `internal/adapters/postgres` is covered by the integration tests |
 | Compose | `00003_create_outbox_events.sql` applied, database at version 3; moderation and job-posting healthy |
 | End to end (JT87-15) | Pass, job `12c406e5-d54b-4439-9bf1-df2749e5b125`, event `59405c85-dfa5-4044-81bd-fcd94e237856` created at 14:51:15.004 UTC and published at 14:51:15.918 UTC; job-posting `updated_at` 14:51:15.920 UTC |
-| CI on the pull request | To be added after the PR run |
+| CI on the pull request | Green, all checks passed on PR #67 (https://github.com/jobtrack-cst/jobtrack/pull/67) |
 
 ## Acceptance criteria review
 
