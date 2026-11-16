@@ -14,12 +14,13 @@ import (
 // checks the role first, then the input, then stored state, so a caller with
 // the wrong role learns nothing else.
 type Reports struct {
-	repo  ports.ReportRepository
-	clock ports.Clock
+	repo       ports.ReportRepository
+	clock      ports.Clock
+	newEventID func() string
 }
 
 func NewReports(repo ports.ReportRepository, clock ports.Clock) *Reports {
-	return &Reports{repo: repo, clock: clock}
+	return &Reports{repo: repo, clock: clock, newEventID: uuid.NewString}
 }
 
 // ListResult is one page of reports with the values the proto pagination needs.
@@ -89,7 +90,8 @@ func (s *Reports) Dismiss(ctx context.Context, caller domain.Caller, reportID st
 }
 
 // RemoveJob takes a job down and returns its normalized ID. A job with no
-// reports can still be removed. Publishing moderation.job_removed is Sprint 2.
+// reports can still be removed. moderation.job_removed is stored in the same
+// transaction as the removal; the outbox relay publishes it after the commit.
 func (s *Reports) RemoveJob(ctx context.Context, caller domain.Caller, jobID, reason string) (string, error) {
 	if err := caller.RequireAdmin(); err != nil {
 		return "", err
@@ -102,7 +104,12 @@ func (s *Reports) RemoveJob(ctx context.Context, caller domain.Caller, jobID, re
 	if err != nil {
 		return "", err
 	}
-	if err := s.repo.RemoveJob(ctx, domain.NewRemoval(job, caller.UserID, text, s.clock.Now())); err != nil {
+	rm := domain.NewRemoval(job, caller.UserID, text, s.clock.Now())
+	event, err := JobRemovedEvent(rm, s.newEventID())
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.RemoveJob(ctx, rm, event); err != nil {
 		return "", err
 	}
 	return job, nil
