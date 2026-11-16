@@ -21,7 +21,10 @@ spec:
       # Above the 4 minute run limit in the function.
       timeoutSeconds: 300
       containers:
-        - image: jobtrack-weekly-summary:local
+        # dev.local/ tells Knative not to resolve the tag in a registry, so the
+        # image imported with k3d is used (a plain local name fails with a
+        # Docker Hub 401).
+        - image: dev.local/jobtrack-weekly-summary:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

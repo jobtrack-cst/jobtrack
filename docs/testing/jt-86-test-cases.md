@@ -1,6 +1,6 @@
 # JT-86 weekly-summary test cases
 
-Traceability: [JT-86](https://jobtrack-cst.atlassian.net/browse/JT-86). Owner: Jigden Shakya. Verification date: 15 November 2026.
+Traceability: [JT-86](https://jobtrack-cst.atlassian.net/browse/JT-86). Owner: Jigden Shakya. Verification date: 15 November 2026 (Docker Compose), 16 November 2026 (k3d).
 
 ## Scope
 
@@ -47,7 +47,8 @@ AC1: triggered weekly by a PingSource in k3d, and by an HTTP call in Docker Comp
 | JT86-23 | AC4 | Email content: subject across months and years; body with every count; no status changes; control characters, invalid UTF-8 and line breaks in a status name | Equivalence partitioning | Exact subject and body; `none` when empty; unsafe characters replaced with `?` | Unit, `internal/domain` | Pass |
 | JT86-24 | AC1, AC5 | Docker Compose: trigger with `wget --post-data=''` | End to end | `HTTP/1.1 204 No Content`; log `"admins":1,"sent":1,"failed":0`; email "JobTrack weekly summary (8 Nov 2026 to 15 Nov 2026)" to `admin@jobtrack.test` in Mailpit with real counts (2 jobs published, 1 `UNDER_REVIEW`) | Docker Compose (manual, screenshot in PR #56) | Pass |
 | JT86-25 | AC4 | Docker Compose with analytics stopped | End to end | `HTTP/1.1 503 Service Unavailable`; log `"reason":"statistics unavailable"`; no email | Docker Compose (manual) | Pass |
-| JT86-26 | AC1 | PingSource in k3d triggers the Knative Service | End to end | Weekly run reaches `POST /` and emails admins | k3d | Not run: analytics, auth, email-sender and Mailpit are not deployed in the cluster yet (AGENTS.md Section 16) |
+| JT86-26 | AC1 | PingSource in k3d triggers the Knative Service (schedule temporarily `* * * * *`, test namespace `jt86-check` without analytics) | End to end | Revision Ready; each minute the CloudEvent reaches `POST /`; log `weekly summary failed` with a `request_id` and `"reason":"statistics unavailable"` (expected without analytics); redelivered after the 503 | k3d cluster `jobtrack-jt29`, run by Phuntsho on 16 Nov 2026 (revision `weekly-summary-00002`, request_id `0cdca354-e756-4895-a49d-4c9c9f9a8cd5`) | Pass |
+| JT86-27 | AC1 | Knative image name | Equivalence partitioning | Plain `jobtrack-weekly-summary:local` fails with a Docker Hub 401; `dev.local/jobtrack-weekly-summary:local` imported with k3d is used | k3d, `jobtrack-jt29` (16 Nov 2026) | Pass after fix |
 
 ## Verification
 
@@ -64,13 +65,14 @@ Commands run on commit `703db76`:
 | Unit tests | Pass |
 | Integration tests (auth) | Pass |
 | Coverage | app 100%, domain 100%, adapters/clients 100%, adapters/httpapi 93.9%, adapters/emailsender 90.0%, cmd/server 78.7% |
-| CI on the pull request | See PR #56 |
+| CI on the pull request | Green, PR #56 |
+| k3d PingSource | Pass, 16 Nov 2026 (JT86-26) |
 
 ## Acceptance criteria review
 
 | Acceptance criterion | Status | Evidence (case IDs) |
 |---|---|---|
-| AC1: Triggered weekly by a PingSource in k3d; in Docker Compose by an HTTP call | Partly met: Compose verified; PingSource manifest ready, k3d not run | JT86-19 to JT86-22, JT86-24, JT86-26 |
+| AC1: Triggered weekly by a PingSource in k3d; in Docker Compose by an HTTP call | Met: Compose verified; PingSource trigger verified in k3d (email delivery in k3d waits for analytics, auth, email-sender and Mailpit there) | JT86-19 to JT86-22, JT86-24, JT86-26, JT86-27 |
 | AC2: Last 7 days through `GetInternalSummary`, admin emails through `ListUsersByRole`, paging through all admins | Met | JT86-01 to JT86-09 |
 | AC3: `InternalUnaryClientInterceptor` with `INTERNAL_TOKEN`; analytics and auth allow the caller | Met | JT86-10 to JT86-13, JT86-24 |
 | AC4: One summary email per admin through email-sender; a failure returns non-2xx | Met | JT86-14 to JT86-18, JT86-23, JT86-25 |
