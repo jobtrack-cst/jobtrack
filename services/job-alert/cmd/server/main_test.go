@@ -73,19 +73,19 @@ func TestLoadConfig(t *testing.T) {
 		errField string
 	}{
 		{"defaults", map[string]string{"SERVICE_NAME": "job-alert"}, config{serviceName: "job-alert", grpcPort: 9090, httpPort: 8080}, ""},
-		{"custom", map[string]string{"SERVICE_NAME": "job-posting", "GRPC_PORT": "19090", "HTTP_PORT": "18080"}, config{serviceName: "job-posting", grpcPort: 19090, httpPort: 18080}, ""},
-		{"boundary ports", map[string]string{"SERVICE_NAME": "test", "GRPC_PORT": "1", "HTTP_PORT": "65535"}, config{serviceName: "test", grpcPort: 1, httpPort: 65535}, ""},
+		{"custom", map[string]string{"SERVICE_NAME": "job-alert", "GRPC_PORT": "19090", "HTTP_PORT": "18080"}, config{serviceName: "job-alert", grpcPort: 19090, httpPort: 18080}, ""},
+		{"boundary ports", map[string]string{"SERVICE_NAME": "job-alert", "GRPC_PORT": "1", "HTTP_PORT": "65535"}, config{serviceName: "job-alert", grpcPort: 1, httpPort: 65535}, ""},
 		{"missing name", nil, config{}, "SERVICE_NAME"},
 		{"invalid name", map[string]string{"SERVICE_NAME": "Invalid Name"}, config{}, "SERVICE_NAME"},
-		{"invalid gRPC port", map[string]string{"SERVICE_NAME": "test", "GRPC_PORT": "private-secret"}, config{}, "GRPC_PORT"},
-		{"zero port", map[string]string{"SERVICE_NAME": "test", "GRPC_PORT": "0"}, config{}, "GRPC_PORT"},
-		{"negative port", map[string]string{"SERVICE_NAME": "test", "HTTP_PORT": "-1"}, config{}, "HTTP_PORT"},
-		{"overflow port", map[string]string{"SERVICE_NAME": "test", "HTTP_PORT": "65536"}, config{}, "HTTP_PORT"},
-		{"same ports", map[string]string{"SERVICE_NAME": "test", "HTTP_PORT": "9090"}, config{}, "must differ"},
-		{"missing database URL", map[string]string{"SERVICE_NAME": "test", "DATABASE_URL": ""}, config{}, "DATABASE_URL"},
-		{"blank database URL", map[string]string{"SERVICE_NAME": "test", "DATABASE_URL": " \t"}, config{}, "DATABASE_URL"},
-		{"missing RabbitMQ URL", map[string]string{"SERVICE_NAME": "test", "RABBITMQ_URL": ""}, config{}, "RABBITMQ_URL"},
-		{"blank RabbitMQ URL", map[string]string{"SERVICE_NAME": "test", "RABBITMQ_URL": " \t"}, config{}, "RABBITMQ_URL"},
+		{"invalid gRPC port", map[string]string{"SERVICE_NAME": "job-alert", "GRPC_PORT": "private-secret"}, config{}, "GRPC_PORT"},
+		{"zero port", map[string]string{"SERVICE_NAME": "job-alert", "GRPC_PORT": "0"}, config{}, "GRPC_PORT"},
+		{"negative port", map[string]string{"SERVICE_NAME": "job-alert", "HTTP_PORT": "-1"}, config{}, "HTTP_PORT"},
+		{"overflow port", map[string]string{"SERVICE_NAME": "job-alert", "HTTP_PORT": "65536"}, config{}, "HTTP_PORT"},
+		{"same ports", map[string]string{"SERVICE_NAME": "job-alert", "HTTP_PORT": "9090"}, config{}, "must differ"},
+		{"missing database URL", map[string]string{"SERVICE_NAME": "job-alert", "DATABASE_URL": ""}, config{}, "DATABASE_URL"},
+		{"blank database URL", map[string]string{"SERVICE_NAME": "job-alert", "DATABASE_URL": " \t"}, config{}, "DATABASE_URL"},
+		{"missing RabbitMQ URL", map[string]string{"SERVICE_NAME": "job-alert", "RABBITMQ_URL": ""}, config{}, "RABBITMQ_URL"},
+		{"blank RabbitMQ URL", map[string]string{"SERVICE_NAME": "job-alert", "RABBITMQ_URL": " \t"}, config{}, "RABBITMQ_URL"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := loadConfig(func(key string) string {
@@ -93,14 +93,25 @@ func TestLoadConfig(t *testing.T) {
 					if value, ok := tt.env[key]; ok {
 						return value
 					}
+					if key == "RABBITMQ_URL" {
+						return "amqp://localhost:5672"
+					}
 					return "caller-supplied-url"
+				}
+				if key == "CATEGORY_TAG_ADDR" {
+					return "category-tag:9090"
+				}
+				if key == "INTERNAL_TOKEN" {
+					return "synthetic-token"
 				}
 				return tt.env[key]
 			})
 			if tt.errField == "" {
 				tt.want.databaseURL = "caller-supplied-url"
 				tt.want.migrationsDir = "services/job-alert/migrations"
-				tt.want.rabbitMQURL = "caller-supplied-url"
+				tt.want.rabbitMQURL = "amqp://localhost:5672"
+				tt.want.categoryTagAddr = "category-tag:9090"
+				tt.want.internalToken = "synthetic-token"
 			}
 			if tt.errField != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.errField) || strings.Contains(err.Error(), "private-secret") {
@@ -153,7 +164,7 @@ func TestStartup_RabbitMQOrderFailuresAndCleanup(t *testing.T) {
 						},
 						close: func() { calls = append(calls, "close database") },
 					}, nil
-				}, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository) error {
+				}, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository, _ ports.JobRepository, _ ports.OutboxRepository) error {
 					return runWithPublisher(ctx, cfg, logger, checker, func(url string) (publisherResource, error) {
 						calls = append(calls, "open RabbitMQ")
 						if url != cfg.rabbitMQURL {
@@ -167,7 +178,7 @@ func TestStartup_RabbitMQOrderFailuresAndCleanup(t *testing.T) {
 							p.closeErr = errors.New("private close error")
 						}
 						return p, nil
-					}, func(context.Context, config, *slog.Logger, ports.HealthChecker) error {
+					}, func(context.Context, config, *slog.Logger, ports.HealthChecker, ports.EventPublisher) error {
 						calls = append(calls, "start servers")
 						if stage == "listener failure" {
 							return errors.New("bind failed")
@@ -241,7 +252,7 @@ func TestRunWithDatabase_OrdersStartupAndCleansUp(t *testing.T) {
 						},
 						close: func() { calls = append(calls, "close") },
 					}, nil
-				}, func(got context.Context, _ config, _ *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository) error {
+				}, func(got context.Context, _ config, _ *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository, _ ports.JobRepository, _ ports.OutboxRepository) error {
 					calls = append(calls, "start")
 					if stage == "listener failure" {
 						return errors.New("bind failed")
