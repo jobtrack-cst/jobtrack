@@ -115,6 +115,8 @@ func loadConfig(getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
+var categoryHostLabel = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`)
+
 func validCategoryHost(host string) bool {
 	if net.ParseIP(host) != nil {
 		return true
@@ -123,7 +125,7 @@ func validCategoryHost(host string) bool {
 		return false
 	}
 	for _, label := range strings.Split(host, ".") {
-		if len(label) == 0 || len(label) > 63 || !regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`).MatchString(label) {
+		if len(label) == 0 || len(label) > 63 || !categoryHostLabel.MatchString(label) {
 			return false
 		}
 	}
@@ -131,7 +133,7 @@ func validCategoryHost(host string) bool {
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
-	return runWithDatabase(ctx, cfg, logger, openDatabase, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, repo ports.AlertRepository) error {
+	return runWithDatabase(ctx, cfg, logger, openDatabase, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, repo ports.AlertRepository, jobs ports.JobRepository, outbox ports.OutboxRepository) error {
 		interceptor, err := grpcclient.InternalUnaryClientInterceptor(cfg.internalToken, cfg.serviceName)
 		if err != nil {
 			return errors.New("invalid internal client configuration")
@@ -143,12 +145,12 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		defer conn.Close()
 		alerts := app.NewAlerts(repo, clients.NewNames(categoryv1.NewCategoryTagInternalServiceClient(conn)), nil)
 		return runWithPublisher(ctx, cfg, logger, checker, func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, publisher ports.EventPublisher) error {
-			store := repo.(*postgres.Alerts)
-			relay := app.NewOutboxRelay(store.Outbox(), publisher, wallClock{})
+			recorder := app.NewJobs(jobs, wallClock{})
+			relay := app.NewOutboxRelay(outbox, publisher, wallClock{})
 			workerCtx, stop := context.WithCancel(ctx)
 			consumerDone := make(chan error, 1)
 			go func() {
-				err := events.Consume(workerCtx, rabbitmq.JobConsumerConfig(cfg.rabbitMQURL, logger, store))
+				err := events.Consume(workerCtx, rabbitmq.JobConsumerConfig(cfg.rabbitMQURL, logger, recorder))
 				consumerDone <- err
 				stop()
 			}()
@@ -198,6 +200,8 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
 	alerts    ports.AlertRepository
+	jobs      ports.JobRepository
+	outbox    ports.OutboxRepository
 	readiness ports.Readiness
 	migrate   func(context.Context, string) error
 	close     func()
@@ -210,6 +214,8 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 	}
 	return &databaseHandle{
 		alerts:    postgres.NewAlerts(pool),
+		jobs:      postgres.NewJobs(pool),
+		outbox:    postgres.NewOutbox(pool),
 		readiness: postgres.NewReadiness(pool),
 		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
 		close:     pool.Close,
@@ -218,7 +224,7 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 
 func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	open func(context.Context, string) (*databaseHandle, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker, ports.AlertRepository) error,
+	start func(context.Context, config, *slog.Logger, ports.HealthChecker, ports.AlertRepository, ports.JobRepository, ports.OutboxRepository) error,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -237,7 +243,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness), database.alerts)
+	return start(ctx, cfg, logger, app.NewHealthWithReadiness(database.readiness), database.alerts, database.jobs, database.outbox)
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, alerts ...*app.Alerts) error {

@@ -20,9 +20,10 @@ type Alert struct {
 }
 type Names struct{ Categories, Tags map[string]string }
 
-func NormalizeFilters(categories, tags []string, location string) ([]string, []string, error) {
+func NormalizeFilters(categories, tags []string, location string) ([]string, []string, string, error) {
+	location = strings.TrimSpace(location)
 	if len(categories) > 20 || len(tags) > 20 || !utf8.ValidString(location) || strings.ContainsRune(location, 0) || utf8.RuneCountInString(location) > MaxLocationCharacters {
-		return nil, nil, ErrInvalid
+		return nil, nil, "", ErrInvalid
 	}
 	normalize := func(ids []string) ([]string, error) {
 		out := make([]string, 0, len(ids))
@@ -38,16 +39,16 @@ func NormalizeFilters(categories, tags []string, location string) ([]string, []s
 	}
 	c, err := normalize(categories)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	t, err := normalize(tags)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	if len(c) == 0 && len(t) == 0 && location == "" {
-		return nil, nil, ErrInvalid
+		return nil, nil, "", ErrInvalid
 	}
-	return c, t, nil
+	return c, t, location, nil
 }
 func (n Names) Validate(categories, tags []string) error {
 	for _, id := range categories {

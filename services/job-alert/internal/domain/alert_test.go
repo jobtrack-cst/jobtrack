@@ -25,7 +25,7 @@ func TestFilters_BoundariesAndNormalization(t *testing.T) {
 		{"20 tags", nil, repeat(id, 20), "", false}, {"21 tags", nil, repeat(id, 21), "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := domain.NormalizeFilters(tc.c, tc.t, tc.l)
+			_, _, _, err := domain.NormalizeFilters(tc.c, tc.t, tc.l)
 			if tc.bad {
 				require.ErrorIs(t, err, domain.ErrInvalid)
 			} else {
@@ -33,7 +33,7 @@ func TestFilters_BoundariesAndNormalization(t *testing.T) {
 			}
 		})
 	}
-	c, tags, err := domain.NormalizeFilters([]string{"AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", id, id}, []string{id, id}, "")
+	c, tags, _, err := domain.NormalizeFilters([]string{"AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", id, id}, []string{id, id}, "")
 	require.NoError(t, err)
 	require.Equal(t, []string{id, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}, c)
 	require.Equal(t, []string{id}, tags)
@@ -100,5 +100,27 @@ func TestResolvedNames_RequiresEverySuppliedID(t *testing.T) {
 				require.NoError(t, err)
 			}
 		})
+	}
+}
+
+func TestFilters_TrimsLocationBeforeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		raw, want  string
+		categories []string
+		bad        bool
+	}{
+		{" \tThimphu\n", "Thimphu", nil, false},
+		{" \t\n", "", nil, true},
+		{" \t\n", "", []string{id}, false},
+		{" " + strings.Repeat("ཀ", 100) + " ", strings.Repeat("ཀ", 100), nil, false},
+		{" " + strings.Repeat("ཀ", 101) + " ", "", nil, true},
+	} {
+		_, _, location, err := domain.NormalizeFilters(tc.categories, nil, tc.raw)
+		if tc.bad {
+			require.ErrorIs(t, err, domain.ErrInvalid)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, tc.want, location)
+		}
 	}
 }

@@ -48,6 +48,7 @@ func TestAlerts_CreateResolvesNormalizedFiltersAndPersistsNames(t *testing.T) {
 	clock.EXPECT().Now().Return(now)
 	repo.EXPECT().Create(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, a domain.Alert) (domain.Alert, error) {
 		require.Equal(t, owner, a.ApplicantID)
+		require.Equal(t, "Thimphu", a.Location)
 		require.Equal(t, names, a.Names)
 		require.Equal(t, now.UTC(), a.CreatedAt)
 		require.Equal(t, a.CreatedAt, a.UpdatedAt)
@@ -55,7 +56,7 @@ func TestAlerts_CreateResolvesNormalizedFiltersAndPersistsNames(t *testing.T) {
 		require.NoError(t, err)
 		return a, nil
 	})
-	a, err := app.NewAlerts(repo, resolver, clock).Create(ctx, domain.Caller{UserID: owner, Role: "applicant"}, []string{category, category}, []string{owner}, "Thimphu")
+	a, err := app.NewAlerts(repo, resolver, clock).Create(ctx, domain.Caller{UserID: owner, Role: "applicant"}, []string{category, category}, []string{owner}, " \tThimphu\n")
 	require.NoError(t, err)
 	require.Equal(t, []string{category}, a.CategoryIDs)
 }

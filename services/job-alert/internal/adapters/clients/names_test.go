@@ -6,9 +6,12 @@ import (
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/clients"
+	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/domain"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"net"
 	"testing"
@@ -42,4 +45,20 @@ func TestNames_AuthenticatedInternalRPCAndMissingIDs(t *testing.T) {
 	require.Equal(t, "Engineering", names.Categories[id])
 	require.NoError(t, names.Validate([]string{id}, nil))
 	require.Error(t, names.Validate(nil, []string{id}))
+}
+
+// A late or unavailable Category Tag service must fail closed for filtered alerts.
+type unavailableCategory struct {
+	categoryv1.CategoryTagInternalServiceClient
+}
+
+func (unavailableCategory) ResolveNames(context.Context, *categoryv1.ResolveNamesRequest, ...grpc.CallOption) (*categoryv1.ResolveNamesResponse, error) {
+	return nil, status.Error(codes.Unavailable, "private backend details")
+}
+func TestNames_UnavailableResolverFailsClosed(t *testing.T) {
+	resolver := clients.NewNames(unavailableCategory{})
+	names, err := resolver.ResolveNames(context.Background(), []string{"10000000-0000-4000-8000-000000000001"}, nil)
+	require.ErrorIs(t, err, domain.ErrResolverUnavailable)
+	require.Empty(t, names)
+	require.NotContains(t, err.Error(), "private")
 }

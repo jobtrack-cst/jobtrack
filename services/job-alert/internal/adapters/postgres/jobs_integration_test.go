@@ -16,6 +16,7 @@ import (
 	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/app"
+	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/domain"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/require"
 )
@@ -25,6 +26,8 @@ func TestJobs_MatchingCombinationsDuplicatesAndRollback(t *testing.T) {
 	repo := postgres.NewAlerts(pool)
 	category, tag, other := uuid.NewString(), uuid.NewString(), uuid.NewString()
 	job := &eventsv1.JobPublished{JobId: uuid.NewString(), CategoryId: category, TagIds: []string{tag}, Location: "Thimphu"}
+	allAlerts := []domain.Alert{}
+	expectedIDs := []string{}
 	for _, tc := range []struct {
 		name             string
 		categories, tags []string
@@ -51,28 +54,48 @@ func TestJobs_MatchingCombinationsDuplicatesAndRollback(t *testing.T) {
 		}
 		_, err := repo.Create(ctx, a)
 		require.NoError(t, err)
+		allAlerts = append(allAlerts, a)
+		if tc.want {
+			expectedIDs = append(expectedIDs, a.ID)
+		}
 	}
 	id := uuid.NewString()
-	require.NoError(t, repo.RecordJob(ctx, id, job))
-	require.NoError(t, repo.RecordJob(ctx, id, job))
+	require.NoError(t, app.NewJobs(postgres.NewJobs(pool), integrationClock{}).RecordJob(ctx, id, job))
+	require.NoError(t, app.NewJobs(postgres.NewJobs(pool), integrationClock{}).RecordJob(ctx, id, job))
 	var count int
 	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM matched_subscriptions").Scan(&count))
 	require.Equal(t, 7, count)
-	pending, err := repo.Outbox().Pending(ctx, 50)
+	plannedIDs := []string{}
+	for _, m := range domain.PlanMatches(domain.PublishedJob{ID: job.JobId, CategoryID: category, TagIDs: job.TagIds, Location: job.Location}, allAlerts) {
+		plannedIDs = append(plannedIDs, m.AlertID)
+	}
+	require.ElementsMatch(t, expectedIDs, plannedIDs)
+	rows, err := pool.Query(ctx, "SELECT alert_id::text FROM matched_subscriptions WHERE source_event_id=$1 ORDER BY alert_id", id)
+	require.NoError(t, err)
+	actualIDs := []string{}
+	for rows.Next() {
+		var id string
+		require.NoError(t, rows.Scan(&id))
+		actualIDs = append(actualIDs, id)
+	}
+	require.NoError(t, rows.Err())
+	rows.Close()
+	require.Equal(t, plannedIDs, actualIDs, "SQL candidates must preserve the domain's matching set and order")
+	pending, err := postgres.NewOutbox(pool).Pending(ctx, 50)
 	require.NoError(t, err)
 	require.Len(t, pending, 7)
 	// A failure after claiming and inserting a match must roll back all effects.
 	_, err = pool.Exec(ctx, "ALTER TABLE outbox_events ADD CONSTRAINT fail_test CHECK (false) NOT VALID")
 	require.NoError(t, err)
 	retryID := uuid.NewString()
-	require.Error(t, repo.RecordJob(ctx, retryID, job))
+	require.Error(t, app.NewJobs(postgres.NewJobs(pool), integrationClock{}).RecordJob(ctx, retryID, job))
 	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM processed_events WHERE event_id=$1", retryID).Scan(&count))
 	require.Zero(t, count)
 	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM matched_subscriptions WHERE source_event_id=$1", retryID).Scan(&count))
 	require.Zero(t, count)
 	_, err = pool.Exec(ctx, "ALTER TABLE outbox_events DROP CONSTRAINT fail_test")
 	require.NoError(t, err)
-	require.NoError(t, repo.RecordJob(ctx, retryID, job))
+	require.NoError(t, app.NewJobs(postgres.NewJobs(pool), integrationClock{}).RecordJob(ctx, retryID, job))
 	job.Location = "Paro"
 	job.CategoryId = other
 	job.TagIds = []string{other}
@@ -80,7 +103,7 @@ func TestJobs_MatchingCombinationsDuplicatesAndRollback(t *testing.T) {
 	_, err = pool.Exec(ctx, "DELETE FROM job_alerts")
 	require.NoError(t, err)
 	emptyID := uuid.NewString()
-	require.NoError(t, repo.RecordJob(ctx, emptyID, job))
+	require.NoError(t, app.NewJobs(postgres.NewJobs(pool), integrationClock{}).RecordJob(ctx, emptyID, job))
 	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM processed_events WHERE event_id=$1", emptyID).Scan(&count))
 	require.Equal(t, 1, count)
 	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM matched_subscriptions WHERE source_event_id=$1", emptyID).Scan(&count))
@@ -101,12 +124,12 @@ func TestJobs_OutboxConfirmedDeliveryAndRetry(t *testing.T) {
 	repo := postgres.NewAlerts(pool)
 	_, err := repo.Create(ctx, syntheticAlert(uuid.NewString(), "Thimphu"))
 	require.NoError(t, err)
-	require.NoError(t, repo.RecordJob(ctx, uuid.NewString(), &eventsv1.JobPublished{JobId: uuid.NewString(), CategoryId: uuid.NewString(), TagIds: []string{}, Location: "Thimphu"}))
-	pending, err := repo.Outbox().Pending(ctx, 50)
+	require.NoError(t, app.NewJobs(postgres.NewJobs(pool), integrationClock{}).RecordJob(ctx, uuid.NewString(), &eventsv1.JobPublished{JobId: uuid.NewString(), CategoryId: uuid.NewString(), TagIds: []string{}, Location: "Thimphu"}))
+	pending, err := postgres.NewOutbox(pool).Pending(ctx, 50)
 	require.NoError(t, err)
 	require.Len(t, pending, 1)
 	id := pending[0].EventId
-	relay := app.NewOutboxRelay(repo.Outbox(), failingPublisher{}, integrationClock{})
+	relay := app.NewOutboxRelay(postgres.NewOutbox(pool), failingPublisher{}, integrationClock{})
 	n, err := relay.PublishPending(ctx)
 	require.Error(t, err)
 	require.Zero(t, n)
@@ -123,7 +146,7 @@ func TestJobs_OutboxConfirmedDeliveryAndRetry(t *testing.T) {
 	q, err := ch.QueueDeclare("", false, true, true, false, nil)
 	require.NoError(t, err)
 	require.NoError(t, ch.QueueBind(q.Name, "job_alert.matched", "jobtrack.events", false, nil))
-	relay = app.NewOutboxRelay(repo.Outbox(), publisher, integrationClock{})
+	relay = app.NewOutboxRelay(postgres.NewOutbox(pool), publisher, integrationClock{})
 	n, err = relay.PublishPending(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, n)
@@ -139,7 +162,7 @@ func TestJobs_OutboxConfirmedDeliveryAndRetry(t *testing.T) {
 	require.NoError(t, e.Data.UnmarshalTo(&data))
 	require.NotEmpty(t, data.JobId)
 	require.NotEmpty(t, data.ApplicantId)
-	pending, err = repo.Outbox().Pending(ctx, 50)
+	pending, err = postgres.NewOutbox(pool).Pending(ctx, 50)
 	require.NoError(t, err)
 	require.Empty(t, pending)
 }
@@ -188,7 +211,7 @@ func TestJobs_CategorylessEventsMatchOnlyUnrestrictedCategories(t *testing.T) {
 	}
 	e.Data, err = anypb.New(&job)
 	require.NoError(t, err)
-	handler := rabbitmq.JobHandler(repo)
+	handler := rabbitmq.JobHandler(app.NewJobs(postgres.NewJobs(pool), integrationClock{}))
 	require.NoError(t, handler(ctx, e))
 	require.NoError(t, handler(ctx, e))
 	rows, err := pool.Query(ctx, "SELECT alert_id::text FROM matched_subscriptions WHERE source_event_id=$1", e.EventId)
@@ -202,7 +225,7 @@ func TestJobs_CategorylessEventsMatchOnlyUnrestrictedCategories(t *testing.T) {
 	require.NoError(t, rows.Err())
 	rows.Close()
 	require.ElementsMatch(t, expectedAlerts, actualAlerts)
-	pending, err := repo.Outbox().Pending(ctx, 50)
+	pending, err := postgres.NewOutbox(pool).Pending(ctx, 50)
 	require.NoError(t, err)
 	actualApplicants := []string{}
 	for _, event := range pending {
@@ -221,7 +244,101 @@ func TestJobs_CategorylessEventsMatchOnlyUnrestrictedCategories(t *testing.T) {
 	var count int
 	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM processed_events WHERE event_id=$1", e.EventId).Scan(&count))
 	require.Zero(t, count)
-	pending, err = repo.Outbox().Pending(ctx, 50)
+	pending, err = postgres.NewOutbox(pool).Pending(ctx, 50)
 	require.NoError(t, err)
 	require.Len(t, pending, len(expectedApplicants))
+}
+
+func TestJobs_PreservesEveryMatchNotifiesEachApplicantOnceAndRollsBack(t *testing.T) {
+	ctx, pool := startAlertsDB(t)
+	alerts := postgres.NewAlerts(pool)
+	jobs := app.NewJobs(postgres.NewJobs(pool), integrationClock{})
+	first, second := "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
+	category, tag := uuid.NewString(), uuid.NewString()
+	expected := []string{}
+	for _, a := range []domain.Alert{
+		{ApplicantID: first, CategoryIDs: []string{category}, Location: ""},
+		{ApplicantID: first, TagIDs: []string{tag}, Location: ""},
+		{ApplicantID: first, Location: "Thimphu"},
+		{ApplicantID: second, Location: "Thimphu"},
+	} {
+		stored := syntheticAlert(a.ApplicantID, a.Location)
+		if a.CategoryIDs != nil {
+			stored.CategoryIDs = a.CategoryIDs
+		}
+		if a.TagIDs != nil {
+			stored.TagIDs = a.TagIDs
+		}
+		_, err := alerts.Create(ctx, stored)
+		require.NoError(t, err)
+		expected = append(expected, stored.ID)
+	}
+	job := &eventsv1.JobPublished{JobId: uuid.NewString(), CategoryId: category, TagIds: []string{tag}, Location: "Thimphu"}
+	source := uuid.NewString()
+	// Concurrent redeliveries serialize on the unique event claim.
+	results := make(chan error, 2)
+	for range 2 {
+		go func() { results <- jobs.RecordJob(ctx, source, job) }()
+	}
+	for range 2 {
+		require.NoError(t, <-results)
+	}
+	rows, err := pool.Query(ctx, "SELECT alert_id::text FROM matched_subscriptions WHERE source_event_id=$1 ORDER BY alert_id", source)
+	require.NoError(t, err)
+	actual := []string{}
+	for rows.Next() {
+		var id string
+		require.NoError(t, rows.Scan(&id))
+		actual = append(actual, id)
+	}
+	require.NoError(t, rows.Err())
+	rows.Close()
+	require.ElementsMatch(t, expected, actual)
+	pending, err := postgres.NewOutbox(pool).Pending(ctx, 50)
+	require.NoError(t, err)
+	require.Len(t, pending, 2)
+	applicants := []string{}
+	eventIDs := []string{}
+	for _, e := range pending {
+		var data eventsv1.JobAlertMatched
+		require.NoError(t, e.Data.UnmarshalTo(&data))
+		require.Equal(t, job.JobId, data.JobId)
+		applicants = append(applicants, data.ApplicantId)
+		eventIDs = append(eventIDs, e.EventId)
+	}
+	require.Equal(t, []string{first, second}, applicants)
+	// A later matching subscription is not backfilled on a duplicate source event.
+	late := syntheticAlert(first, "Thimphu")
+	late.TagIDs = []string{tag}
+	_, err = alerts.Create(ctx, late)
+	require.NoError(t, err)
+	require.NoError(t, jobs.RecordJob(ctx, source, job))
+	repeated, err := postgres.NewOutbox(pool).Pending(ctx, 50)
+	require.NoError(t, err)
+	require.Len(t, repeated, 2)
+	require.Equal(t, eventIDs[0], repeated[0].EventId)
+	require.Equal(t, eventIDs[1], repeated[1].EventId)
+	var count int
+	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM matched_subscriptions WHERE source_event_id=$1", source).Scan(&count))
+	require.Equal(t, 4, count)
+	// Fail the second applicant's event, after matches and the first event were inserted.
+	_, err = pool.Exec(ctx, `ALTER TABLE outbox_events ADD CONSTRAINT fail_second_applicant
+ CHECK (payload::jsonb->'data'->>'applicant_id' <> '22222222-2222-4222-8222-222222222222') NOT VALID`)
+	require.NoError(t, err)
+	retryID := uuid.NewString()
+	job.JobId = uuid.NewString()
+	require.Error(t, jobs.RecordJob(ctx, retryID, job))
+	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM processed_events WHERE event_id=$1", retryID).Scan(&count))
+	require.Zero(t, count)
+	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM matched_subscriptions WHERE source_event_id=$1", retryID).Scan(&count))
+	require.Zero(t, count)
+	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM outbox_events WHERE payload::jsonb->'data'->>'job_id'=$1", job.JobId).Scan(&count))
+	require.Zero(t, count)
+	_, err = pool.Exec(ctx, "ALTER TABLE outbox_events DROP CONSTRAINT fail_second_applicant")
+	require.NoError(t, err)
+	require.NoError(t, jobs.RecordJob(ctx, retryID, job))
+	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM matched_subscriptions WHERE source_event_id=$1", retryID).Scan(&count))
+	require.Equal(t, 5, count)
+	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM outbox_events WHERE payload::jsonb->'data'->>'job_id'=$1", job.JobId).Scan(&count))
+	require.Equal(t, 2, count)
 }

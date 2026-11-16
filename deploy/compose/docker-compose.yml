@@ -344,8 +344,6 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      category-tag:
-        condition: service_healthy
     healthcheck:
       # busybox wget ships with the alpine runtime image.
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]

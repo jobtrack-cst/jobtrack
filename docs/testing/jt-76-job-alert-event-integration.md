@@ -12,12 +12,14 @@ implementations changed.
 |---|---|
 | 1 | Production `ports.NameResolver` uses Category Tag's `ResolveNames`. The configured internal interceptor supplies token and caller `job-alert`. Startup requires that exact service name, a valid DNS/IP host and numeric port in `CATEGORY_TAG_ADDR`, and a valid `INTERNAL_TOKEN`; errors omit values. The connection closes after workers and servers stop. The bufconn client test uses the real server auth interceptor. Public subscription validation, ownership, limits and APIs remain unchanged. |
 | 2 | `events.Consume`, queue `job-alert.jobs`, binding `job.published`; shared envelope validation, exact producer `job-posting`, typed payload, mandatory UUID job/employer IDs, UUID tag IDs, an empty or UUID category ID and valid deadline. Invalid input returns `events.Permanent`; database failures retry. Matching uses category membership AND any tag overlap AND exact location; each empty filter is unrestricted. |
-| 3 | One PostgreSQL transaction claims `processed_events.event_id`, snapshots and records matched subscriptions, and writes all outgoing envelopes. Duplicates return successfully without rematching, including jobs with no matches. Failure rolls back the claim, matches and events. A single relay reads batches of 50 in sequence order, publishes with a 10-second confirmation timeout and marks only confirmed rows. Failed publishes reconnect on the next attempt; publish/mark failures retain the original event ID. Workers stop and join before publisher, gRPC connection and database close. |
+| 3 | The app use case claims `processed_events.event_id`, plans and records every matching subscription, and writes one outgoing envelope per unique applicant inside a PostgreSQL transaction. Duplicates return successfully without rematching, including jobs with no matches. Failure rolls back the claim, matches and events. A single relay reads batches of 50 in sequence order, publishes with a 10-second confirmation timeout and marks only confirmed rows. Failed publishes reconnect on the next attempt; publish/mark failures retain the original event ID. Workers stop and join before publisher, gRPC connection and database close. |
 | 4 | Shared `job_alert.matched.json` fixture and contract round trip; resolver, startup, consumer and relay unit tests; real PostgreSQL and RabbitMQ Testcontainers tests. Cases below. |
 | 5 | Focused unit, integration, contract and vet checks passed. The real public API flow passed on 17 November: registered employer/applicant, public admin verification approval, real PublishJob through the gateway, observed job.published and job_alert.matched, and matching persisted claim/match/confirmed outbox rows. The earlier direct-event transport smoke remains documented separately below. |
 
-Each matching subscription records one match and one outgoing event, even when
-several subscriptions belong to one applicant. Events contain only the approved
+Each matching subscription records one match. All subscriptions for the same
+applicant/job share one outgoing event, as approved in the PR #68 review.
+The original per-subscription notification behavior is superseded; historical
+evidence below is retained, and existing outbox rows are not rewritten. Events contain only the approved
 `job_id` and `applicant_id` fields, producer `job-alert`, and a new UUID stored
 once in the outbox. Matches retain subscription IDs after subscription deletion.
 No matching event is backfilled for subscriptions created after a source event
@@ -44,6 +46,10 @@ same stored event ID, which downstream consumers must deduplicate.
 | JT-76-13 | Shared notification contract | Fixture decodes as `JobAlertMatched`, correct producer/type/UUID payload, lossless envelope round trip. `TestJobAlertFixtures_SharedEnvelope`. |
 | JT-76-14 | Published job omits category; malformed nonempty category; required IDs/tags | `TestJobHandler_CategorylessJobsValidateRemainingIDs` loads the shared fixture with category_id omitted and verifies it is recorded; malformed/whitespace categories, empty or malformed job/employer IDs, and empty/malformed tag entries are permanent errors without recording. No tags is valid. |
 | JT-76-15 | Categoryless event through handler and PostgreSQL | `TestJobs_CategorylessEventsMatchOnlyUnrestrictedCategories` verifies tag-only, location-only and combined tag/location subscriptions match, category-only and combined category filters do not, tag/location misses do not match, duplicate delivery preserves exactly the expected matches/outbox recipients, and a malformed category creates no processed-event claim or outgoing event. |
+| JT-76-16 | Several matches for one applicant, another applicant, concurrency and partial-write failure | `TestJobs_PreservesEveryMatchNotifiesEachApplicantOnceAndRollsBack`: three alerts for A and one for B give four persisted matches and two deterministically ordered notifications. Concurrent duplicate deliveries do not add rows; a later subscription is not backfilled. Injected failure on B's event rolls back the claim, all matches and A's already-inserted event; retry succeeds. |
+| JT-76-17 | Whitespace and resolver unavailability | Domain/app tests verify trimmed storage, whitespace-only rejection with no other filter, unrestricted whitespace location with another filter, and the 100-character boundary after trimming. Client adapter test maps backend unavailability to the fixed resolver error without details. Compose smoke rejects the normalized duplicate with HTTP 409. |
+| JT-76-18 | Domain policy and SQL candidate parity | Domain unit tests cover all seven filter combinations, categoryless input, misses, deterministic ordering and applicant deduplication. The PostgreSQL matching test checks the exact expected alert IDs and order against the domain plan, not just counts. |
+
 
 
 ## Commands and results
@@ -73,8 +79,9 @@ Full-repository unit tests (`go test ./...`), integration tests (`go test -tags=
 ## Compose evidence and reproduction
 
 Required running dependencies: PostgreSQL, RabbitMQ and Category Tag with its
-internal token configured. Compose now gives Job Alert `CATEGORY_TAG_ADDR` and
-`INTERNAL_TOKEN` and waits for Category Tag health. Secrets remain in the existing
+internal token configured. Compose gives Job Alert `CATEGORY_TAG_ADDR` and
+`INTERNAL_TOKEN`. The original health dependency on Category Tag was removed in
+the PR #68 follow-up; resolver calls fail closed if Category Tag is unavailable. Secrets remain in the existing
 local environment; no values are recorded here. Only Job Alert was rebuilt and
 recreated; running dependencies were preserved.
 
@@ -613,3 +620,384 @@ backfilled or republished. All synthetic records and existing data remain.
 Remaining action: review this evidence and the existing JT-76 diff. No remaining
 end-to-end blocker was observed after refreshing the stale container. No commits,
 pushes, PRs, Jira transitions or time logs were performed.
+
+
+## PR #68 review fixes — 17 November 2026
+
+### Baseline and scope
+
+At the start of this review-fix session, `git status --short --branch` showed a
+clean tree on `JT-76-job-alert-event-integration`, tracking the same origin branch.
+`git fetch origin main` succeeded; `git diff origin/main -- AGENTS.md` was empty.
+The verified origin/main commit was `28d4eaf` (JT-75, PR #66). Root AGENTS.md was
+read before editing. GitHub's connected PR timeline and review-thread reads
+returned empty lists; the detailed Jigden findings and approved decision supplied
+in the task were used. No branch switch, merge, commit, push, PR mutation, Jira
+transition or time log was performed.
+
+The approved policy preserves EVERY matching subscription row while producing
+ONE `job_alert.matched` event per unique applicant for the published job. The
+payload and all public RPC contracts remain unchanged.
+
+### Architecture and implementation choices
+
+- Domain `Alert.Matches` owns the exact AND/empty-filter rules. `PlanMatches`
+  preserves matching subscription IDs in sorted order; `MatchApplicants`
+  sorts and deduplicates recipient IDs without dropping matches.
+- App `Jobs.RecordJob` orchestrates claiming, reading candidates, domain planning,
+  storing all matches and constructing one envelope per unique applicant.
+- `ports.JobRepository.WithinTransaction` and `ports.JobTransaction` let the
+  use case perform these operations atomically without importing pgx, PostgreSQL
+  or RabbitMQ. PostgreSQL implements the transaction and persistence only.
+- SQL retains equivalent category/tag/location predicates as a candidate
+  optimization so processing does not load every subscription. Domain rechecks
+  all returned candidates, and exact-set integration tests cover the SQL/domain
+  equivalence. The single SELECT supplies one coherent subscription snapshot.
+  This choice is now explicit in AGENTS.md Section 15; Section 9 is not replaced
+  or silently overridden.
+- Explicit subscription/job/outbox repository wiring replaces the unchecked
+  `repo.(*postgres.Alerts)` assertion and the concrete Outbox convenience method.
+- `NormalizeFilters` returns the trimmed location, which the app stores. Length
+  and all-empty checks apply after trimming; existing stored subscriptions are
+  not automatically rewritten. The hostname label regex is compiled once at
+  package scope.
+- Compose keeps `CATEGORY_TAG_ADDR` and `INTERNAL_TOKEN` but removes the Category
+  Tag startup dependency. Missing or invalid configuration still stops startup;
+  backend failures during ResolveNames remain fixed `UNAVAILABLE` responses.
+- Root AGENTS.md Sections 6, 15 and 16 now record caller wiring, event validation,
+  queue/dead-queue handling, domain/app/SQL responsibilities, snapshot/no-backfill,
+  unique applicant notifications, outbox retries, fixture and retained rows.
+  Unrelated decision history and contracts were preserved.
+
+The duplicate guarantee is based on the source publication's `event_id`.
+Redelivery of that event cannot recompute matches or create notifications;
+existing matched/outbox history is not migrated or deduplicated retroactively.
+
+### Automated verification
+
+All commands ran from the repository root. Go's temporary cache avoids the
+sandboxed default macOS cache; listener and Docker suites ran with the required
+local access. Full integration ran one package at a time to limit Docker memory
+use. Unchanged packages may use Go's existing successful cache entries.
+
+```sh
+GOCACHE=/private/tmp/jobtrack-go-cache go generate ./services/job-alert/internal/ports/...
+# PASS; generated jobs_mock.go included in the review diff, no new dependency.
+GOCACHE=/private/tmp/jobtrack-go-cache go test ./services/job-alert/... ./tests/contract
+# PASS.
+GOCACHE=/private/tmp/jobtrack-go-cache go test -count=1 -tags=integration ./services/job-alert/... ./tests/contract
+# PASS; fresh focused run including multiple matches/recipients and rollback.
+GOCACHE=/private/tmp/jobtrack-go-cache go test ./...
+# PASS (exit 0).
+GOCACHE=/private/tmp/jobtrack-go-cache GOFLAGS=-p=1 go test -tags=integration ./... > /private/tmp/jt76-full-integration.log 2>&1
+# PASS (exit 0); includes final SQL/domain exact-set parity assertions.
+GOCACHE=/private/tmp/jobtrack-go-cache go vet ./... > /private/tmp/jt76-full-vet.log 2>&1
+# PASS (exit 0; no findings).
+git diff --check
+# PASS.
+```
+
+The focused PostgreSQL suite passed in 20.925 s and in the final full suite in
+22.720 s. The full log contains no FAIL or panic entries. The tests include
+categoryless input, retry-safe relay, permanent dead-queue handling and the new
+app/domain policy tests alongside the cases listed above.
+
+### Revised policy in real Docker Compose flow
+
+Only Job Alert was rebuilt. The earlier public-API harness was reused with two
+applicants; the first creates four distinct matching subscriptions (all filters,
+category-only, tag-only and location-only), and the second a location-only
+subscription. The all-filter location is submitted with leading/trailing
+whitespace, returned as `Thimphu`, and an otherwise identical canonical
+subscription correctly returns HTTP 409.
+
+The employer was registered and legitimately verified by an authenticated admin
+through public APIs. Real CreateJob returned DRAFT; real PublishJob through the
+gateway returned PUBLISHED. The read-only observer saw the producer's
+`job.published` and the target applicant's `job_alert.matched`. Database reads
+verified all four target matches, the second applicant's match and only one
+confirmed outbox row for each of those applicants. Other existing subscribers
+were preserved and may also match the job.
+
+Exact runtime commands:
+
+```sh
+docker compose -f deploy/compose/docker-compose.yml up -d --build --no-deps job-alert
+docker compose -f deploy/compose/docker-compose.yml cp /private/tmp/jt76-observe job-alert:/tmp/jt76-observe
+python3 /private/tmp/jt76-review-e2e.py
+docker compose -f deploy/compose/docker-compose.yml ps job-alert --format '{{.Service}} {{.State}} {{.Health}}'
+```
+
+Result: PASS; Job Alert running healthy. Sanitized evidence:
+
+```json
+{
+  "result": "PASS",
+  "run_id": "a138a7dfba82",
+  "employer_id": "6a8b6145-faa6-41b8-a533-bdd31862cea4",
+  "applicant_id": "677e7d54-6dae-4d71-9dbf-5bb14029bafe",
+  "second_applicant_id": "d9e18805-02ac-4152-aa4d-967e179ebcc5",
+  "verification_request_id": "4a8ee492-1dab-4e6a-972b-1886d5bc3a33",
+  "reviewed_by": "0b13c9be-7e47-444b-8ce7-3489c46060ef",
+  "employer_status": "VERIFICATION_STATUS_VERIFIED",
+  "alert_id": "b4701c44-2037-4b01-9918-eb6cf6f03c1d",
+  "job_id": "1cef1d57-f239-4883-aa41-ef824477fb5e",
+  "draft_status": "JOB_STATUS_DRAFT",
+  "published_status": "JOB_STATUS_PUBLISHED",
+  "events": {
+    "job.published": {
+      "event_id": "426985fb-8360-48d1-a519-390418540bd6",
+      "type": "job.published",
+      "occurred_at": "2026-11-16T19:23:24.539548Z",
+      "producer": "job-posting",
+      "data": {
+        "@type": "type.googleapis.com/jobtrack.events.v1.JobPublished",
+        "job_id": "1cef1d57-f239-4883-aa41-ef824477fb5e",
+        "employer_id": "6a8b6145-faa6-41b8-a533-bdd31862cea4",
+        "title": "JT76 real PublishJob a138a7dfba82",
+        "category_id": "10000000-0000-4000-8000-000000000001",
+        "tag_ids": [
+          "20000000-0000-4000-8000-000000000001"
+        ],
+        "location": "Thimphu",
+        "deadline": "2026-11-18T19:23:24.100707Z"
+      }
+    },
+    "job_alert.matched": {
+      "event_id": "8d21c4f5-4abf-4dcc-897f-4cf7bcce26cc",
+      "type": "job_alert.matched",
+      "occurred_at": "2026-11-16T19:23:24.570591678Z",
+      "producer": "job-alert",
+      "data": {
+        "@type": "type.googleapis.com/jobtrack.events.v1.JobAlertMatched",
+        "job_id": "1cef1d57-f239-4883-aa41-ef824477fb5e",
+        "applicant_id": "677e7d54-6dae-4d71-9dbf-5bb14029bafe"
+      }
+    }
+  },
+  "persisted": {
+    "processed": 1,
+    "matches": 1,
+    "confirmed": 1,
+    "all_target_matches": 4,
+    "target_notifications": 1,
+    "second_matches": 1,
+    "second_notifications": 1
+  }
+}
+```
+
+
+Additional read-only confirmation:
+
+```sh
+docker compose -f deploy/compose/docker-compose.yml exec -T postgres psql -U postgres -d job_alert <<'SQL'
+SELECT applicant_id,count(*) AS matched_subscriptions
+FROM matched_subscriptions
+WHERE source_event_id='426985fb-8360-48d1-a519-390418540bd6'
+AND applicant_id IN ('677e7d54-6dae-4d71-9dbf-5bb14029bafe','d9e18805-02ac-4152-aa4d-967e179ebcc5')
+GROUP BY applicant_id ORDER BY applicant_id;
+SELECT event_id,payload::jsonb->'data'->>'applicant_id' AS applicant_id,
+ published_at IS NOT NULL AS confirmed
+FROM outbox_events
+WHERE payload::jsonb->'data'->>'job_id'='1cef1d57-f239-4883-aa41-ef824477fb5e'
+AND payload::jsonb->'data'->>'applicant_id' IN ('677e7d54-6dae-4d71-9dbf-5bb14029bafe','d9e18805-02ac-4152-aa4d-967e179ebcc5')
+ORDER BY applicant_id;
+SQL
+```
+
+Observed match counts: 4 and 1. Confirmed events:
+`8d21c4f5-4abf-4dcc-897f-4cf7bcce26cc` for the first applicant,
+`ae6c2f72-b96b-492d-8c12-4975111dd1e2` for the second.
+The source time `2026-11-16T19:23:24.539548Z` is
+17 November 2026 at 01:23:24 Asia/Thimphu.
+
+The earlier observer source is unchanged. To reproduce the revised public-API
+harness, save this temporary script; it prints no passwords or access tokens:
+
+<details>
+<summary>Public API review smoke harness</summary>
+
+```sh
+cat > /private/tmp/jt76-review-e2e.py <<'PYTHON'
+import datetime, json, secrets, subprocess, sys, time, urllib.request, urllib.error, uuid
+COMPOSE = ["docker", "compose", "-f", "deploy/compose/docker-compose.yml"]
+BASE = "http://localhost:8000"
+stage = "initialization"
+def api(method, path, body=None, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    req = urllib.request.Request(BASE + path, data=None if body is None else json.dumps(body).encode(),
+                                 headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"{method} {path}: HTTP {error.code}") from None
+def login(email, password):
+    return api("POST", "/v1/auth/login", {"email": email, "password": password})
+def db(sql):
+    raw = subprocess.check_output(COMPOSE + ["exec", "-T", "postgres", "psql", "-U", "postgres",
+                                            "-d", "job_alert", "-At", "-c", sql], text=True)
+    return json.loads(raw)
+try:
+    stage = "legitimate admin authentication"
+    credentials = subprocess.check_output(COMPOSE + ["exec", "-T", "auth", "printenv",
+                                                     "ADMIN_EMAIL", "ADMIN_PASSWORD"], text=True).splitlines()
+    if len(credentials) != 2:
+        raise RuntimeError("configured admin credentials unavailable")
+    admin = login(*credentials)
+    if admin["user"]["role"] != "ROLE_ADMIN":
+        raise RuntimeError("login did not return an admin")
+    admin_token = admin["accessToken"]
+    del credentials, admin
+    run_id = uuid.uuid4().hex[:12]
+    accounts = {}
+    stage = "public synthetic account registration"
+    for role in ("EMPLOYER", "APPLICANT", "APPLICANT2"):
+        password = secrets.token_urlsafe(24)
+        email = f"jt76-{run_id}-{role.lower()}@example.test"
+        api("POST", "/v1/auth/register", {"email": email, "password": password,
+            "fullName": "JT76 synthetic " + role.lower(), "role": "ROLE_EMPLOYER" if role == "EMPLOYER" else "ROLE_APPLICANT"})
+        accounts[role] = login(email, password)
+    employer = accounts["EMPLOYER"]["user"]["userId"]
+    applicant = accounts["APPLICANT"]["user"]["userId"]
+    employer_token = accounts["EMPLOYER"]["accessToken"]
+    applicant_token = accounts["APPLICANT"]["accessToken"]
+    second_applicant = accounts["APPLICANT2"]["user"]["userId"]
+    second_token = accounts["APPLICANT2"]["accessToken"]
+    stage = "seeded reference data"
+    category = "10000000-0000-4000-8000-000000000001"
+    tag = "20000000-0000-4000-8000-000000000001"
+    categories = api("GET", "/v1/categories?pagination.page_size=100", token=applicant_token)["categories"]
+    tags = api("GET", "/v1/tags?pagination.page_size=100", token=applicant_token)["tags"]
+    locations = api("GET", "/v1/locations?pagination.page_size=100", token=applicant_token)["locations"]
+    assert any(c["categoryId"] == category for c in categories)
+    assert any(t["tagId"] == tag for t in tags)
+    assert any(loc["name"] == "Thimphu" for loc in locations)
+    stage = "public employer profile and verification request"
+    api("POST", "/v1/employer/profile", {"companyName": "JT76 synthetic " + run_id,
+        "description": "Synthetic end-to-end verification", "website": "https://example.test",
+        "location": "Thimphu"}, employer_token)
+    verification = api("POST", "/v1/verification/requests", {"registrationNumber": "JT76-" + run_id,
+        "notes": "Synthetic JT-76 end-to-end verification"}, employer_token)["request"]
+    request_id = verification["requestId"]
+    stage = "public admin approval"
+    approved = api("POST", f"/v1/verification/requests/{request_id}/approve", {}, admin_token)["request"]
+    assert approved["status"] == "REQUEST_STATUS_APPROVED"
+    stage = "employer verification event propagation"
+    until = time.monotonic() + 30
+    while True:
+        profile = api("GET", "/v1/employer/profile", token=employer_token)["profile"]
+        if profile["verificationStatus"] == "VERIFICATION_STATUS_VERIFIED":
+            break
+        if time.monotonic() > until:
+            raise RuntimeError("approved employer did not become VERIFIED within 30s")
+        time.sleep(0.25)
+    stage = "public applicant subscription"
+    alert = api("POST", "/v1/job-alerts", {"categoryIds": [category], "tagIds": [tag],
+        "location": " \tThimphu\n"}, applicant_token)["jobAlert"]
+    assert alert["location"] == "Thimphu"
+    alert_id = alert["alertId"]
+    for filters in ({"categoryIds": [category]}, {"tagIds": [tag]}, {"location": "Thimphu"}):
+        api("POST", "/v1/job-alerts", filters, applicant_token)
+    api("POST", "/v1/job-alerts", {"location": "Thimphu"}, second_token)
+    try:
+        api("POST", "/v1/job-alerts", {"categoryIds": [category], "tagIds": [tag], "location": "Thimphu"}, applicant_token)
+    except RuntimeError as error:
+        assert str(error).endswith("HTTP 409"), str(error)
+    else:
+        raise RuntimeError("trimmed duplicate subscription was accepted")
+    stage = "public CreateJob"
+    deadline = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=2)).isoformat().replace("+00:00", "Z")
+    job = api("POST", "/v1/jobs", {"title": "JT76 real PublishJob " + run_id,
+        "description": "Synthetic job for JT-76 public API end-to-end verification",
+        "categoryId": category, "tagIds": [tag], "location": "Thimphu", "deadline": deadline}, employer_token)["job"]
+    job_id = job["jobId"]
+    assert job["status"] == "JOB_STATUS_DRAFT"
+    stage = "start read-only AMQP observer"
+    observer = subprocess.Popen(COMPOSE + ["exec", "-T", "-e", "JT76_JOB_ID=" + job_id,
+                                          "-e", "JT76_APPLICANT_ID=" + applicant, "job-alert", "/tmp/jt76-observe"],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if observer.stdout.readline().strip() != "READY":
+        raise RuntimeError("observer did not become ready")
+    stage = "real PublishJob through gateway"
+    published = api("POST", f"/v1/jobs/{job_id}/publish", {}, employer_token)["job"]
+    assert published["status"] == "JOB_STATUS_PUBLISHED"
+    assert published["employerId"] == employer
+    stage = "observe job.published and job_alert.matched"
+    raw, errors = observer.communicate(timeout=65)
+    if observer.returncode != 0:
+        raise RuntimeError("observer failed to receive both events")
+    observed = {e["type"]: e for e in map(json.loads, raw.splitlines())}
+    source, matched = observed["job.published"], observed["job_alert.matched"]
+    assert source["producer"] == "job-posting"
+    assert source["data"]["job_id"] == job_id and source["data"]["employer_id"] == employer
+    assert source["data"]["category_id"] == category and tag in source["data"]["tag_ids"]
+    assert source["data"]["location"] == "Thimphu"
+    assert matched["producer"] == "job-alert"
+    assert matched["data"]["job_id"] == job_id and matched["data"]["applicant_id"] == applicant
+    stage = "persisted claim, match and confirmed outbox"
+    sql = f"""SELECT json_build_object(
+      'processed', (SELECT count(*) FROM processed_events WHERE event_id='{source["event_id"]}'),
+      'matches', (SELECT count(*) FROM matched_subscriptions WHERE source_event_id='{source["event_id"]}'
+                   AND alert_id='{alert_id}' AND job_id='{job_id}' AND applicant_id='{applicant}'),
+      'confirmed', (SELECT count(*) FROM outbox_events WHERE event_id='{matched["event_id"]}'
+                     AND published_at IS NOT NULL AND payload::jsonb->'data'->>'job_id'='{job_id}'
+                     AND payload::jsonb->'data'->>'applicant_id'='{applicant}'),
+      'all_target_matches', (SELECT count(*) FROM matched_subscriptions WHERE source_event_id='{source["event_id"]}' AND applicant_id='{applicant}'),
+      'target_notifications', (SELECT count(*) FROM outbox_events WHERE payload::jsonb->'data'->>'job_id'='{job_id}' AND payload::jsonb->'data'->>'applicant_id'='{applicant}'),
+      'second_matches', (SELECT count(*) FROM matched_subscriptions WHERE source_event_id='{source["event_id"]}' AND applicant_id='{second_applicant}'),
+      'second_notifications', (SELECT count(*) FROM outbox_events WHERE payload::jsonb->'data'->>'job_id'='{job_id}' AND payload::jsonb->'data'->>'applicant_id'='{second_applicant}' AND published_at IS NOT NULL))"""
+    until = time.monotonic() + 10
+    while True:
+        persisted = db(sql)
+        if persisted == {"processed": 1, "matches": 1, "confirmed": 1, "all_target_matches": 4, "target_notifications": 1, "second_matches": 1, "second_notifications": 1}:
+            break
+        if time.monotonic() > until:
+            raise RuntimeError("persisted evidence did not reach expected counts")
+        time.sleep(0.1)
+    evidence = {"result": "PASS", "run_id": run_id, "employer_id": employer, "applicant_id": applicant, "second_applicant_id": second_applicant,
+                "verification_request_id": request_id, "reviewed_by": approved["reviewedBy"],
+                "employer_status": profile["verificationStatus"], "alert_id": alert_id,
+                "job_id": job_id, "draft_status": job["status"], "published_status": published["status"],
+                "events": observed, "persisted": persisted}
+    with open("/private/tmp/jt76-review-e2e-evidence.json", "w") as output:
+        json.dump(evidence, output, indent=2)
+    print(json.dumps(evidence, indent=2))
+except Exception as error:
+    print("BLOCKED at " + stage + ": " + str(error), file=sys.stderr)
+    sys.exit(1)
+PYTHON
+```
+
+</details>
+
+
+### Review-fix changed files and remaining actions
+
+- Root `AGENTS.md`, this test document and Job Alert's block in
+  `deploy/compose/docker-compose.yml`.
+- `cmd/server/main.go`, `main_test.go`: explicit repository wiring and cached regex.
+- `internal/domain/alert.go`, `alert_test.go`: trimmed filter value/validation.
+- New `internal/domain/matching.go`, `matching_test.go`: matching and unique-recipient policy.
+- `internal/app/alerts.go`, `alerts_test.go`; new `jobs.go`, `jobs_test.go`:
+  normalization and atomic matching/event orchestration.
+- New `internal/ports/jobs.go` and generated `internal/ports/mocks/jobs_mock.go`.
+- `internal/adapters/postgres/jobs.go`, `jobs_integration_test.go`,
+  `consumer_integration_test.go`, `alerts.go`: persistence transaction port,
+  updated app wiring, SQL/domain parity, concurrency/no-backfill/rollback tests.
+- `internal/adapters/clients/names_test.go`: unavailable resolver fails closed.
+
+No new dependencies, services, event fields, protobufs, shared pkg code or other
+team-owned service implementations changed. No database migration was needed.
+Synthetic smoke records remain; no existing data or queues were deleted.
+Old whitespace subscriptions, if any, retain their stored value and can be
+deleted/recreated through the public API when appropriate; no automatic data
+rewrite was attempted.
+
+No test/environment blocker remains for the requested checks. CI, Kubernetes,
+load tests and notification delivery remain outside this local verification.
+Review the diff and results; when ready, rerun local checks and use the normal
+JT-76 commit/push/PR-review workflow. No Git or Jira publishing action was taken.

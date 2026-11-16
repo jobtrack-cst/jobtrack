@@ -2,70 +2,82 @@ package postgres
 
 import (
 	"context"
-	"time"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/events"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/domain"
+	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/ports"
 )
 
-// RecordJob claims the delivery, snapshots matching subscriptions and stores notifications atomically.
-func (r *Alerts) RecordJob(ctx context.Context, eventID string, job *eventsv1.JobPublished) error {
+type Jobs struct{ pool *pgxpool.Pool }
+
+var _ ports.JobRepository = (*Jobs)(nil)
+
+func NewJobs(pool *pgxpool.Pool) *Jobs { return &Jobs{pool: pool} }
+
+func (r *Jobs) WithinTransaction(ctx context.Context, apply func(ports.JobTransaction) error) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return databaseError(err)
 	}
 	defer tx.Rollback(ctx)
-	claim, err := tx.Exec(ctx, "INSERT INTO processed_events(event_id) VALUES($1) ON CONFLICT DO NOTHING", eventID)
-	if err != nil {
-		return databaseError(err)
-	}
-	if claim.RowsAffected() == 0 {
-		return nil
-	}
-	rows, err := tx.Query(ctx, `SELECT alert_id::text,applicant_id::text FROM job_alerts
- WHERE (cardinality(category_ids)=0 OR $1=ANY(category_ids))
- AND (cardinality(tag_ids)=0 OR tag_ids && $2::text[])
- AND (location='' OR location=$3) ORDER BY alert_id`, job.CategoryId, job.TagIds, job.Location)
-	if err != nil {
-		return databaseError(err)
-	}
-	type match struct{ alert, applicant string }
-	matches := []match{}
-	for rows.Next() {
-		var m match
-		if err = rows.Scan(&m.alert, &m.applicant); err != nil {
-			rows.Close()
-			return databaseError(err)
-		}
-		matches = append(matches, m)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return databaseError(err)
-	}
-	now := time.Now().UTC()
-	for _, m := range matches {
-		if _, err = tx.Exec(ctx, "INSERT INTO matched_subscriptions(source_event_id,alert_id,job_id,applicant_id) VALUES($1,$2,$3,$4)", eventID, m.alert, job.JobId, m.applicant); err != nil {
-			return databaseError(err)
-		}
-		data, err := anypb.New(&eventsv1.JobAlertMatched{JobId: job.JobId, ApplicantId: m.applicant})
-		if err != nil {
-			return err
-		}
-		envelope := &eventsv1.EventEnvelope{EventId: uuid.NewString(), Type: "job_alert.matched", Producer: "job-alert", OccurredAt: timestamppb.New(now), Data: data}
-		payload, err := events.MarshalEnvelope(envelope)
-		if err != nil {
-			return err
-		}
-		if _, err = tx.Exec(ctx, "INSERT INTO outbox_events(event_id,routing_key,payload,created_at) VALUES($1,$2,$3,$4)", envelope.EventId, envelope.Type, string(payload), now); err != nil {
-			return databaseError(err)
-		}
+	if err = apply(jobTransaction{tx: tx}); err != nil {
+		return err
 	}
 	if err = tx.Commit(ctx); err != nil {
+		return databaseError(err)
+	}
+	return nil
+}
+
+type jobTransaction struct{ tx pgx.Tx }
+
+func (t jobTransaction) Claim(ctx context.Context, id string) (bool, error) {
+	result, err := t.tx.Exec(ctx, "INSERT INTO processed_events(event_id) VALUES($1) ON CONFLICT DO NOTHING", id)
+	if err != nil {
+		return false, databaseError(err)
+	}
+	return result.RowsAffected() > 0, nil
+}
+func (t jobTransaction) Candidates(ctx context.Context, job domain.PublishedJob) ([]domain.Alert, error) {
+	// Narrow in SQL to avoid loading every subscription. Domain rechecks the rules.
+	rows, err := t.tx.Query(ctx, `SELECT alert_id::text,applicant_id::text,category_ids,tag_ids,location FROM job_alerts
+ WHERE (cardinality(category_ids)=0 OR $1=ANY(category_ids))
+ AND (cardinality(tag_ids)=0 OR tag_ids && $2::text[])
+ AND (location='' OR location=$3) ORDER BY alert_id`, job.CategoryID, job.TagIDs, job.Location)
+	if err != nil {
+		return nil, databaseError(err)
+	}
+	defer rows.Close()
+	candidates := []domain.Alert{}
+	for rows.Next() {
+		var a domain.Alert
+		if err = rows.Scan(&a.ID, &a.ApplicantID, &a.CategoryIDs, &a.TagIDs, &a.Location); err != nil {
+			return nil, databaseError(err)
+		}
+		candidates = append(candidates, a)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, databaseError(err)
+	}
+	return candidates, nil
+}
+func (t jobTransaction) SaveMatches(ctx context.Context, eventID, jobID string, matches []domain.Match) error {
+	for _, m := range matches {
+		if _, err := t.tx.Exec(ctx, "INSERT INTO matched_subscriptions(source_event_id,alert_id,job_id,applicant_id) VALUES($1,$2,$3,$4)", eventID, m.AlertID, jobID, m.ApplicantID); err != nil {
+			return databaseError(err)
+		}
+	}
+	return nil
+}
+func (t jobTransaction) AddEvent(ctx context.Context, e *eventsv1.EventEnvelope) error {
+	payload, err := events.MarshalEnvelope(e)
+	if err != nil {
+		return err
+	}
+	if _, err = t.tx.Exec(ctx, "INSERT INTO outbox_events(event_id,routing_key,payload,created_at) VALUES($1,$2,$3,$4)", e.EventId, e.Type, string(payload), e.OccurredAt.AsTime()); err != nil {
 		return databaseError(err)
 	}
 	return nil

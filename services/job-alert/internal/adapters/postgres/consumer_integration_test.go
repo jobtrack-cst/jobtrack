@@ -9,6 +9,7 @@ import (
 	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/rabbitmq"
+	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/app"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -34,7 +35,7 @@ func TestJobConsumer_BrokerDuplicatesInvalidAndShutdown(t *testing.T) {
 	workerCtx, cancel := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	ready := make(chan struct{}, 1)
-	cfg := rabbitmq.JobConsumerConfig(broker, slog.New(slog.NewTextHandler(io.Discard, nil)), repo)
+	cfg := rabbitmq.JobConsumerConfig(broker, slog.New(slog.NewTextHandler(io.Discard, nil)), app.NewJobs(postgres.NewJobs(pool), integrationClock{}))
 	cfg.OnReady = func() {
 		select {
 		case ready <- struct{}{}:

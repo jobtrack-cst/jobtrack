@@ -116,5 +116,3 @@ func (r *Alerts) Delete(ctx context.Context, id, owner string) error {
 	}
 	return domain.ErrNotFound
 }
-
-func (r *Alerts) Outbox() *Outbox { return NewOutbox(r.pool) }

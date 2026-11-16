@@ -164,7 +164,7 @@ func TestStartup_RabbitMQOrderFailuresAndCleanup(t *testing.T) {
 						},
 						close: func() { calls = append(calls, "close database") },
 					}, nil
-				}, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository) error {
+				}, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository, _ ports.JobRepository, _ ports.OutboxRepository) error {
 					return runWithPublisher(ctx, cfg, logger, checker, func(url string) (publisherResource, error) {
 						calls = append(calls, "open RabbitMQ")
 						if url != cfg.rabbitMQURL {
@@ -252,7 +252,7 @@ func TestRunWithDatabase_OrdersStartupAndCleansUp(t *testing.T) {
 						},
 						close: func() { calls = append(calls, "close") },
 					}, nil
-				}, func(got context.Context, _ config, _ *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository) error {
+				}, func(got context.Context, _ config, _ *slog.Logger, checker ports.HealthChecker, _ ports.AlertRepository, _ ports.JobRepository, _ ports.OutboxRepository) error {
 					calls = append(calls, "start")
 					if stage == "listener failure" {
 						return errors.New("bind failed")
