@@ -12,9 +12,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgcontainer "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/services/moderation/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/moderation/internal/domain"
@@ -106,6 +110,27 @@ func dismiss(t *testing.T, ctx context.Context, repo *postgres.Reports, r domain
 
 func removal(job string, at time.Time) domain.Removal {
 	return domain.NewRemoval(job, adminID, "fake company", at)
+}
+
+// eventFor builds a valid moderation.job_removed envelope for rm with a new
+// event ID. It skips the app layer's checks on purpose, so the database limit
+// tests can still store an empty or too long reason and see the CHECK refuse it.
+func eventFor(t *testing.T, rm domain.Removal) *eventsv1.EventEnvelope {
+	t.Helper()
+	data, err := anypb.New(&eventsv1.ModerationJobRemoved{JobId: rm.JobID, Reason: rm.Reason})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &eventsv1.EventEnvelope{
+		EventId: uuid.NewString(), Type: "moderation.job_removed", Producer: "moderation",
+		OccurredAt: timestamppb.New(rm.RemovedAt), Data: data,
+	}
+}
+
+// removeJob calls RemoveJob with the event the app layer would store.
+func removeJob(t *testing.T, ctx context.Context, repo *postgres.Reports, rm domain.Removal) error {
+	t.Helper()
+	return repo.RemoveJob(ctx, rm, eventFor(t, rm))
 }
 
 func TestReports_CreateAndGet(t *testing.T) {
@@ -208,7 +233,7 @@ func TestReports_Dismiss(t *testing.T) {
 	})
 	t.Run("dismissing an actioned report", func(t *testing.T) {
 		open := mustCreate(t, ctx, repo, newOpen(2, jobB, reporterID, base))
-		if err := repo.RemoveJob(ctx, removal(jobB, later)); err != nil {
+		if err := removeJob(t, ctx, repo, removal(jobB, later)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := dismiss(t, ctx, repo, open, later); !errors.Is(err, domain.ErrReportNotOpen) {
@@ -273,7 +298,7 @@ func TestReports_RemoveJob(t *testing.T) {
 	}
 	otherJob := mustCreate(t, ctx, repo, newOpen(4, jobB, reporterID, base))
 
-	if err := repo.RemoveJob(ctx, removal(jobA, removedAt)); err != nil {
+	if err := removeJob(t, ctx, repo, removal(jobA, removedAt)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -296,7 +321,7 @@ func TestReports_RemoveJob(t *testing.T) {
 		})
 	}
 
-	t.Run("removal is stored for the Sprint 2 event", func(t *testing.T) {
+	t.Run("removal is stored with the admin", func(t *testing.T) {
 		var reason, removedBy string
 		var at time.Time
 		if err := pool.QueryRow(ctx, `SELECT reason, removed_by, removed_at FROM removed_jobs WHERE job_id = $1`, jobA).Scan(&reason, &removedBy, &at); err != nil {
@@ -307,7 +332,7 @@ func TestReports_RemoveJob(t *testing.T) {
 		}
 	})
 	t.Run("second takedown of the same job", func(t *testing.T) {
-		if err := repo.RemoveJob(ctx, removal(jobA, removedAt.Add(time.Hour))); !errors.Is(err, domain.ErrJobAlreadyRemoved) {
+		if err := removeJob(t, ctx, repo, removal(jobA, removedAt.Add(time.Hour))); !errors.Is(err, domain.ErrJobAlreadyRemoved) {
 			t.Fatalf("err=%v, want ErrJobAlreadyRemoved", err)
 		}
 	})
@@ -317,7 +342,7 @@ func TestReports_RemoveJob(t *testing.T) {
 		}
 	})
 	t.Run("removing a job with no reports", func(t *testing.T) {
-		if err := repo.RemoveJob(ctx, removal(unknownID, removedAt)); err != nil {
+		if err := removeJob(t, ctx, repo, removal(unknownID, removedAt)); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -334,7 +359,7 @@ func TestReports_RemoveJob_ConcurrentAdmins(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs[i] = repo.RemoveJob(ctx, removal(jobA, base))
+			errs[i] = removeJob(t, ctx, repo, removal(jobA, base))
 		}()
 	}
 	wg.Wait()
@@ -367,7 +392,7 @@ func TestReports_ReportRacingRemoval_NeverLeavesOpenReport(t *testing.T) {
 		var reportErr, removeErr error
 		wg.Add(2)
 		go func() { defer wg.Done(); _, reportErr = repo.Create(ctx, r) }()
-		go func() { defer wg.Done(); removeErr = repo.RemoveJob(ctx, removal(job, base)) }()
+		go func() { defer wg.Done(); removeErr = removeJob(t, ctx, repo, removal(job, base)) }()
 		wg.Wait()
 
 		if removeErr != nil {
@@ -471,7 +496,7 @@ func TestReports_DatabaseLimits(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			job := fmt.Sprintf("e0000000-0000-4000-8000-%012d", i)
-			err := repo.RemoveJob(ctx, domain.NewRemoval(job, adminID, tt.reason, base))
+			err := removeJob(t, ctx, repo, domain.NewRemoval(job, adminID, tt.reason, base))
 			if tt.wantErr != (err != nil) {
 				t.Fatalf("err=%v, wantErr=%v", err, tt.wantErr)
 			}
