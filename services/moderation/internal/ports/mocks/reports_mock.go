@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	domain "github.com/jobtrack-cst/jobtrack/services/moderation/internal/domain"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -104,17 +105,17 @@ func (mr *MockReportRepositoryMockRecorder) List(ctx, status, page any) *gomock.
 }
 
 // RemoveJob mocks base method.
-func (m *MockReportRepository) RemoveJob(ctx context.Context, rm domain.Removal) error {
+func (m *MockReportRepository) RemoveJob(ctx context.Context, rm domain.Removal, event *eventsv1.EventEnvelope) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveJob", ctx, rm)
+	ret := m.ctrl.Call(m, "RemoveJob", ctx, rm, event)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RemoveJob indicates an expected call of RemoveJob.
-func (mr *MockReportRepositoryMockRecorder) RemoveJob(ctx, rm any) *gomock.Call {
+func (mr *MockReportRepositoryMockRecorder) RemoveJob(ctx, rm, event any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveJob", reflect.TypeOf((*MockReportRepository)(nil).RemoveJob), ctx, rm)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveJob", reflect.TypeOf((*MockReportRepository)(nil).RemoveJob), ctx, rm, event)
 }
 
 // MockClock is a mock of Clock interface.

@@ -135,7 +135,7 @@ func TestModerationHandler_RoleMatrix(t *testing.T) {
 		},
 		"RemoveJob": func(d deps) {
 			d.clock.EXPECT().Now().Return(testTime)
-			d.repo.EXPECT().RemoveJob(gomock.Any(), gomock.Any()).Return(nil)
+			d.repo.EXPECT().RemoveJob(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 		},
 	}
 	for _, tt := range []struct {
@@ -366,7 +366,7 @@ func TestModerationHandler_RemoveJob(t *testing.T) {
 			name: "admin removes", req: &mv1.RemoveJobRequest{JobId: strings.ToUpper(jobID), Reason: "fake company"}, want: codes.OK,
 			setup: func(d deps) {
 				d.clock.EXPECT().Now().Return(testTime)
-				d.repo.EXPECT().RemoveJob(gomock.Any(), domain.Removal{JobID: jobID, Reason: "fake company", RemovedBy: adminID, RemovedAt: testTime}).Return(nil)
+				d.repo.EXPECT().RemoveJob(gomock.Any(), domain.Removal{JobID: jobID, Reason: "fake company", RemovedBy: adminID, RemovedAt: testTime}, gomock.Any()).Return(nil)
 			},
 		},
 		{name: "nil request", want: codes.InvalidArgument},
@@ -377,7 +377,7 @@ func TestModerationHandler_RemoveJob(t *testing.T) {
 			name: "second takedown", req: &mv1.RemoveJobRequest{JobId: jobID, Reason: "x"}, want: codes.FailedPrecondition,
 			setup: func(d deps) {
 				d.clock.EXPECT().Now().Return(testTime)
-				d.repo.EXPECT().RemoveJob(gomock.Any(), gomock.Any()).Return(domain.ErrJobAlreadyRemoved)
+				d.repo.EXPECT().RemoveJob(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.ErrJobAlreadyRemoved)
 			},
 		},
 	} {

@@ -14,6 +14,23 @@ import { ResumesPage } from './features/resume/ResumesPage';
 import { StatusPage } from './features/application-status/StatusPage';
 import { ReviewPage } from './features/review/ReviewPage';
 import { InterviewsPage } from './features/interview/InterviewsPage';
+import { CompanyPage } from './features/employer/CompanyPage';
+import { VerificationPage } from './features/company-verification/VerificationPage';
+import { AdminVerificationPage } from './features/company-verification/AdminVerificationPage';
+import { ReportJobPage } from './features/moderation/ReportJobPage';
+import { AdminModerationPage } from './features/moderation/AdminModerationPage';
+import { AnalyticsPage } from './features/analytics/AnalyticsPage';
+import { AuditLogPage } from './features/audit-log/AuditLogPage';
+
+// Workspace links per role; each path is relative to the role's landing path.
+const navigation: Record<Role, [path: string, label: string][]> = {
+  ROLE_APPLICANT: [['applications', 'Applications'], ['apply', 'Apply'], ['offers', 'Offers'], ['job-alerts', 'Job alerts'],
+    ['profile', 'Profile'], ['resumes', 'Resumes'], ['report-job', 'Report a job']],
+  ROLE_EMPLOYER: [['applications', 'Applications'], ['offers', 'Offers'], ['company', 'Company'], ['verification', 'Verification'],
+    ['report-job', 'Report a job']],
+  ROLE_ADMIN: [['verification', 'Verification'], ['moderation', 'Moderation'], ['analytics', 'Analytics'], ['audit-log', 'Audit log'],
+    ['report-job', 'Report a job']],
+};
 
 function Workspace({ role }: { role: Role }) {
   const { session } = useAuth();
@@ -21,14 +38,9 @@ function Workspace({ role }: { role: Role }) {
   if (session.user.role !== role) return <Navigate to={landingPath(session.user.role)} replace />;
   const base = landingPath(role);
   return <Stack spacing={3}>
-    {role !== 'ROLE_ADMIN' && <Stack component="nav" aria-label="Workspace" direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-      <Button component={Link} to={`${base}/applications`}>Applications</Button>
-      {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/apply`}>Apply</Button>}
-      <Button component={Link} to={`${base}/offers`}>Offers</Button>
-      {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/job-alerts`}>Job alerts</Button>}
-      {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/profile`}>Profile</Button>}
-      {role === 'ROLE_APPLICANT' && <Button component={Link} to={`${base}/resumes`}>Resumes</Button>}
-    </Stack>}
+    <Stack component="nav" aria-label="Workspace" direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+      {navigation[role].map(([path, label]) => <Button key={path} component={Link} to={`${base}/${path}`}>{label}</Button>)}
+    </Stack>
     <Outlet />
   </Stack>;
 }
@@ -58,6 +70,8 @@ export default function App() {
           <Route path="job-alerts" element={<JobAlertsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="resumes" element={<ResumesPage />} />
+          <Route path="report-job" element={<ReportJobPage />} />
+          <Route path="report-job/:jobId" element={<ReportJobPage />} />
           <Route path="*" element={<Navigate to="/applicant" replace />} />
         </Route>
         <Route path="/employer" element={<Workspace role="ROLE_EMPLOYER" />}>
@@ -69,10 +83,21 @@ export default function App() {
           <Route path="offers" element={<OffersPage key="employer-offers" />} />
           <Route path="offers/new/:applicationId" element={<OffersPage key="make-offer" create />} />
           <Route path="messages/:applicationId" element={<MessagesPage />} />
+          <Route path="company" element={<CompanyPage />} />
+          <Route path="verification" element={<VerificationPage />} />
+          <Route path="report-job" element={<ReportJobPage />} />
+          <Route path="report-job/:jobId" element={<ReportJobPage />} />
           <Route path="*" element={<Navigate to="/employer" replace />} />
         </Route>
-        <Route path="/admin/*" element={<Workspace role="ROLE_ADMIN" />}>
-          <Route path="*" element={<Typography variant="h4" component="h1">Admin workspace</Typography>} />
+        <Route path="/admin" element={<Workspace role="ROLE_ADMIN" />}>
+          <Route index element={<Typography variant="h4" component="h1">Admin workspace</Typography>} />
+          <Route path="verification" element={<AdminVerificationPage />} />
+          <Route path="moderation" element={<AdminModerationPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="audit-log" element={<AuditLogPage />} />
+          <Route path="report-job" element={<ReportJobPage />} />
+          <Route path="report-job/:jobId" element={<ReportJobPage />} />
+          <Route path="*" element={<Navigate to="/admin" replace />} />
         </Route>
         <Route path="*" element={<Home />} />
       </Routes>

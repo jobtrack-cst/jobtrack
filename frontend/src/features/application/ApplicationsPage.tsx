@@ -37,6 +37,7 @@ export function ApplicationsPage() {
       {employer && <Button component={Link} to={`${base}/applications/${a.applicationId}/review`}>Review</Button>}
       {employer ? <Button component={Link} to={`${base}/offers/new/${a.applicationId}`}>Make offer</Button>
         : <Button disabled={busy || a.withdrawn} onClick={() => { setSelected(a); setError(''); }}>Withdraw</Button>}
+      <Button component={Link} to={`${base}/report-job/${a.jobId}`}>Report job</Button>
     </Stack></CardContent></Card>)}
     <Pager next={resource.data?.pagination?.nextPageToken} token={token} busy={resource.loading || busy} onPage={setToken} />
     <Dialog open={!!selected} onClose={() => { if (!busy) setSelected(undefined); }}><DialogTitle>Withdraw this application?</DialogTitle><DialogActions>

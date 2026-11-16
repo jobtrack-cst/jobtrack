@@ -1,0 +1,11 @@
+{
+  "event_id": "9b2e4c71-6d3a-4f85-8a1c-3e5f7a9b1c2d",
+  "type": "moderation.job_removed",
+  "occurred_at": "2026-11-16T09:15:00.123456Z",
+  "producer": "moderation",
+  "data": {
+    "@type": "type.googleapis.com/jobtrack.events.v1.ModerationJobRemoved",
+    "job_id": "33333333-3333-4333-8333-333333333333",
+    "reason": "Fake company posting"
+  }
+}
