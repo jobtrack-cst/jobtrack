@@ -107,7 +107,7 @@ Commands run on branch `JT-88-team-b-frontend-pages`, in `frontend`:
 | Cypress `team-b-admin-pages.cy.js` | 55 passing |
 | Cypress `auth.cy.js`, `application-workflows.cy.js`, `applicant-hiring-pages.cy.js` | 19, 34 and 47 passing (see notes) |
 | Docker Compose browser check | Pass for the JT-88 pages (JT88-33); steps 15, 17 and 18 wait for JT-87 and JT-72 |
-| CI on the pull request | Pass: [run PASTE_RUN_NUMBER](https://github.com/jobtrack-cst/jobtrack/actions/runs/PASTE_RUN_NUMBER) on `e0ffca7` |
+| CI on the pull request | Pass: [run 43873890107](https://github.com/jobtrack-cst/jobtrack/actions/runs/43873890107) on `e0ffca7` |
 
 Notes:
 
@@ -125,4 +125,4 @@ Notes:
 | gRPC errors shown as clear messages | Met | JT88-06, JT88-10, JT88-14, JT88-19, JT88-24, JT88-27, JT88-31, step 14a |
 | Test steps in `docs/testing`; Cypress for the verification path | Met | This document; JT88-07 to JT88-15 |
 | Follows AGENTS.md Section 9 (Frontend); no new libraries | Met | `package.json` unchanged |
-| PR with the Jira key, CI green, merged, time logged | Met on merge | PR #64, CI green, approved by Phuntsho; time logged in Jira |
+| PR with the Jira key, CI green, merged, time logged | Met | PR #64 (squash merged as `fda2ebe`), CI green, approved by Phuntsho; time logged in Jira |
