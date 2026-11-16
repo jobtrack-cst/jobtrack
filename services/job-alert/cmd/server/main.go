@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"regexp"
@@ -15,25 +16,32 @@ import (
 	"syscall"
 	"time"
 
+	categoryv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/category_tag/v1"
 	jobalertv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_alert/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
+	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/clients"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/adapters/rabbitmq"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/ports"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type config struct {
-	serviceName   string
-	grpcPort      int
-	httpPort      int
-	databaseURL   string
-	migrationsDir string
-	rabbitMQURL   string
+	categoryTagAddr string
+	internalToken   string
+	serviceName     string
+	grpcPort        int
+	httpPort        int
+	databaseURL     string
+	migrationsDir   string
+	rabbitMQURL     string
 }
 
 func main() {
@@ -87,19 +95,77 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if strings.TrimSpace(cfg.rabbitMQURL) == "" {
 		return config{}, errors.New("RABBITMQ_URL is required")
 	}
+	if cfg.serviceName != "job-alert" {
+		return config{}, errors.New("SERVICE_NAME must be job-alert")
+	}
+	cfg.categoryTagAddr = getenv("CATEGORY_TAG_ADDR")
+	host, port, err := net.SplitHostPort(cfg.categoryTagAddr)
+	number, portErr := strconv.Atoi(port)
+	if err != nil || !validCategoryHost(host) || portErr != nil || number < 1 || number > 65535 {
+		return config{}, errors.New("CATEGORY_TAG_ADDR must be host:port")
+	}
+	cfg.internalToken = getenv("INTERNAL_TOKEN")
+	if _, err := grpcclient.InternalUnaryClientInterceptor(cfg.internalToken, cfg.serviceName); err != nil {
+		return config{}, errors.New("INTERNAL_TOKEN is invalid")
+	}
+	broker, err := url.Parse(cfg.rabbitMQURL)
+	if err != nil || broker.Host == "" || (broker.Scheme != "amqp" && broker.Scheme != "amqps") {
+		return config{}, errors.New("RABBITMQ_URL must be an AMQP URL")
+	}
 	return cfg, nil
+}
+
+func validCategoryHost(host string) bool {
+	if net.ParseIP(host) != nil {
+		return true
+	}
+	if len(host) == 0 || len(host) > 253 {
+		return false
+	}
+	for _, label := range strings.Split(host, ".") {
+		if len(label) == 0 || len(label) > 63 || !regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`).MatchString(label) {
+			return false
+		}
+	}
+	return true
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	return runWithDatabase(ctx, cfg, logger, openDatabase, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, repo ports.AlertRepository) error {
-		// Real ResolveNames client wiring belongs to Sprint 2. Category/tag requests
-		// fail closed until then; location-only subscriptions remain usable.
-		alerts := app.NewAlerts(repo, nil, nil)
-		return runWithPublisher(ctx, cfg, logger, checker, func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-			return runServers(ctx, cfg, logger, checker, alerts)
+		interceptor, err := grpcclient.InternalUnaryClientInterceptor(cfg.internalToken, cfg.serviceName)
+		if err != nil {
+			return errors.New("invalid internal client configuration")
+		}
+		conn, err := grpc.NewClient(cfg.categoryTagAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithChainUnaryInterceptor(interceptor))
+		if err != nil {
+			return errors.New("initialize category-tag client failed")
+		}
+		defer conn.Close()
+		alerts := app.NewAlerts(repo, clients.NewNames(categoryv1.NewCategoryTagInternalServiceClient(conn)), nil)
+		return runWithPublisher(ctx, cfg, logger, checker, func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, publisher ports.EventPublisher) error {
+			store := repo.(*postgres.Alerts)
+			relay := app.NewOutboxRelay(store.Outbox(), publisher, wallClock{})
+			workerCtx, stop := context.WithCancel(ctx)
+			consumerDone := make(chan error, 1)
+			go func() {
+				err := events.Consume(workerCtx, rabbitmq.JobConsumerConfig(cfg.rabbitMQURL, logger, store))
+				consumerDone <- err
+				stop()
+			}()
+			err = runWithRelay(workerCtx, logger, relay, outboxRelayInterval, func(ctx context.Context) error { return runServers(ctx, cfg, logger, checker, alerts) })
+			stop()
+			consumerErr := <-consumerDone
+			if consumerErr != nil && !errors.Is(consumerErr, context.Canceled) {
+				return errors.Join(err, errors.New("job consumer stopped"))
+			}
+			return err
 		})
 	})
 }
+
+type wallClock struct{}
+
+func (wallClock) Now() time.Time { return time.Now().UTC() }
 
 type publisherResource interface {
 	ports.EventPublisher
@@ -108,7 +174,7 @@ type publisherResource interface {
 
 func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
 	open func(string) (publisherResource, error),
-	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	start func(context.Context, config, *slog.Logger, ports.HealthChecker, ports.EventPublisher) error,
 ) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -116,17 +182,17 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 	if strings.TrimSpace(cfg.rabbitMQURL) == "" {
 		return errors.New("RABBITMQ_URL is required")
 	}
-	publisher, err := open(cfg.rabbitMQURL)
+	first, err := open(cfg.rabbitMQURL)
 	if err != nil {
 		return errors.New("initialize RabbitMQ publisher failed")
 	}
+	publisher := newRecoveringPublisher(first, func() (publisherResource, error) { return open(cfg.rabbitMQURL) })
 	defer func() {
 		if closeErr := publisher.Close(); closeErr != nil {
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Matching and business-event publishing belong to Sprint 2.
-	return start(ctx, cfg, logger, checker)
+	return start(ctx, cfg, logger, checker, publisher)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
