@@ -17,6 +17,7 @@ import (
 
 	messagingv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/messaging/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/messaging/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/messaging/internal/adapters/postgres"
@@ -99,10 +100,13 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	if err := db.Migrate(ctx, pool, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	register := registerMessages(postgres.NewMessages(pool), postgres.NewParticipants(pool))
-	return runWithPublisher(ctx, cfg, logger, app.NewHealthWithReadiness(postgres.NewReadiness(pool)), func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) }, func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
-		return runServers(ctx, cfg, logger, checker, register)
-	})
+	participants := postgres.NewParticipants(pool)
+	register := registerMessages(postgres.NewMessages(pool), participants)
+	return runWithPublisher(ctx, cfg, logger, app.NewHealthWithReadiness(postgres.NewReadiness(pool)),
+		func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
+		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
+			return runServers(ctx, cfg, logger, checker, register)
+		}, eventDependencies{outbox: postgres.NewOutbox(pool), recorder: participants})
 }
 
 // registerMessages exposes only the approved public service.
@@ -120,9 +124,15 @@ type publisherResource interface {
 	Close() error
 }
 
+type eventDependencies struct {
+	outbox   ports.OutboxRepository
+	recorder rabbitmq.ApplicationRecorder
+}
+
 func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,
 	open func(string) (publisherResource, error),
 	start func(context.Context, config, *slog.Logger, ports.HealthChecker) error,
+	dependencies ...eventDependencies,
 ) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -134,13 +144,29 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, chec
 	if err != nil {
 		return fmt.Errorf("initialize RabbitMQ publisher failed: %w", err)
 	}
+	recovering := newRecoveringPublisher(publisher, func() (publisherResource, error) { return open(cfg.rabbitMQURL) })
 	defer func() {
-		if closeErr := publisher.Close(); closeErr != nil {
+		if closeErr := recovering.Close(); closeErr != nil {
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Business-event publishing and participant consumption belong to Sprint 2.
-	return start(ctx, cfg, logger, checker)
+	if len(dependencies) == 0 {
+		return start(ctx, cfg, logger, checker)
+	}
+	d := dependencies[0]
+	workerCtx, cancel := context.WithCancel(ctx)
+	done := make(chan error, 1)
+	go func() {
+		done <- events.Consume(workerCtx, rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.recorder))
+	}()
+	defer func() {
+		cancel()
+		if consumerErr := <-done; consumerErr != nil {
+			err = errors.Join(err, consumerErr)
+		}
+	}()
+	relay := app.NewOutboxRelay(d.outbox, recovering, systemClock{})
+	return runWithRelay(workerCtx, logger, relay, outboxRelayInterval, func(ctx context.Context) error { return start(ctx, cfg, logger, checker) })
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
