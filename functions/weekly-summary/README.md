@@ -82,7 +82,8 @@ analytics, auth and email-sender:
 
 ```bash
 NS=<project-namespace>
-k3d image import jobtrack-weekly-summary:local -c <existing-cluster-name>
+docker tag jobtrack-weekly-summary:local dev.local/jobtrack-weekly-summary:local
+k3d image import dev.local/jobtrack-weekly-summary:local -c <existing-cluster-name>
 kubectl -n "$NS" create secret generic weekly-summary-credentials \
   --from-literal=internal-token="$INTERNAL_TOKEN"
 EMAIL_URL="$(kubectl -n "$NS" get ksvc email-sender -o jsonpath='{.status.address.url}')/send-email"
@@ -91,6 +92,10 @@ sed "s#set-at-deploy-time#${EMAIL_URL}#" deploy/knative/weekly-summary.yaml | ku
 kubectl -n "$NS" get ksvc weekly-summary
 kubectl -n "$NS" get pingsource weekly-summary-schedule
 ```
+
+Knative resolves image tags through a registry unless the image name starts
+with `dev.local/`, so the manifest uses `dev.local/jobtrack-weekly-summary:local`.
+With the plain local name, the revision fails with a Docker Hub 401.
 
 `EMAIL_SENDER_URL` must be the email-sender address that Knative reports,
 because Kourier routes by host name and Knative registers only
