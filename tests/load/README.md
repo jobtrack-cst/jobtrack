@@ -44,8 +44,9 @@ Requirements: Apache JMeter 5.6.3 and Java 17 or later on the load machine (`bre
        jobId=<job id>
        password=<a test password, 8 or more characters>
 
-5. Run without the GUI and write the results outside the repository:
+5. Run without the GUI and write the results outside the repository. JMeter needs the parent folder of the report to exist:
 
+       rm -rf /tmp/jt84-load && mkdir -p /tmp/jt84-load
        jmeter -n -t tests/load/deadline-rush.jmx -q ~/jt84-load.properties -Jusers=10 -JrampUp=10 \
          -l /tmp/jt84-load/results.jtl -e -o /tmp/jt84-load/report
 
