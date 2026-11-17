@@ -1,2 +1,6 @@
 # Local environment files hold real passwords. Commit only .env.example.
 .env
+
+# Local SonarQube run (JT-84): scanner work folder and Go coverage profile.
+.scannerwork/
+coverage.out
