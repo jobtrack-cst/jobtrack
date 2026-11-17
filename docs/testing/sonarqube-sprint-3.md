@@ -103,7 +103,7 @@ These are not defects and are not logged as bugs. They are candidates for refact
 
 | Jira key | Summary | Severity | Owner |
 |---|---|---|---|
-| JT-XX | `resume page: file name check uses a control character in a regular expression (SonarQube S6324)` | Trivial | Kinley |
+| JT-104 | `resume page: file name check uses a control character in a regular expression (SonarQube S6324)` | Trivial | Kinley |
 
 ## Evidence
 
