@@ -28,5 +28,5 @@ The same cases, plus a blank name, were also run on the new `checkResume` direct
 |---|---|
 | Lint, typecheck, build | Pass |
 | Cypress (`npm test`) | Pass |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Pass: [run 44349709577](https://github.com/jobtrack-cst/jobtrack/actions/runs/44349709577) on `bbd3b84` |
 | SonarQube | `typescript:S6324` no longer reported; checked in the final run (JT-97) |
