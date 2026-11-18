@@ -230,7 +230,7 @@ func TestServe_RegistersHealthAndShutsDownBothServers(t *testing.T) {
 	var logs bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("job-search", &logs), app.NewHealth(), nil, grpcListener, httpListener)
+		done <- serve(ctx, config{}, logging.New("job-search", &logs), app.NewHealth(), nil, grpcListener, httpListener)
 	}()
 	t.Cleanup(func() { cancel() })
 	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}
@@ -305,7 +305,7 @@ func TestServe_ServerFailureClosesBothListeners(t *testing.T) {
 			}
 			done := make(chan error, 1)
 			go func() {
-				done <- serve(context.Background(), logging.New("test", io.Discard), app.NewHealth(), nil, grpcListener, httpListener)
+				done <- serve(context.Background(), config{}, logging.New("test", io.Discard), app.NewHealth(), nil, grpcListener, httpListener)
 			}()
 			err := awaitServer(t, done)
 			if err == nil || !strings.Contains(err.Error(), fail) || strings.Contains(err.Error(), "private") {
