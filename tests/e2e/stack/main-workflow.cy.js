@@ -6,8 +6,6 @@
 // cy.env() so the values stay out of the browser and the command log (Cypress 16).
 // All other accounts are synthetic and unique per run, so the spec can be repeated.
 
-// Not secret: override with npm run test:stack -- --expose GATEWAY_URL=http://host:8000
-const gateway = Cypress.expose('GATEWAY_URL') || 'http://localhost:8000';
 const run = Date.now().toString(36);
 const password = `Jt95-${run}-pass`;
 const employer = { email: `jt95-employer-${run}@jobtrack.test`, name: `JT-95 Employer ${run}` };
@@ -52,6 +50,13 @@ function outcome(success, polls) {
     cy.wait(500);
     return outcome(success, polls - 1);
   });
+}
+
+const pad = n => String(n).padStart(2, '0');
+// Value for <input type="datetime-local">: daysAhead from now at hour:00, local time.
+function localInput(daysAhead, hour) {
+  const d = new Date(Date.now() + daysAhead * 86400000);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(hour)}:00`;
 }
 
 // Cypress types key by key; keep typed text short (under about 50 characters),
@@ -147,27 +152,25 @@ describe('JT-95 main workflow against the running stack', () => {
     cy.screenshot('03-admin-approved');
   });
 
-  it('04 employer sees Verified and posts a job', () => {
+  it('04 employer sees Verified, creates and publishes a job', () => {
     login(employer.email, password, '/employer');
     until('company Verified', () => nav('Company'), body => hasExact(body, '.MuiChip-label', 'Verified'));
-    // The job pages arrive with JT-73. Until then this one step uses the real
-    // gateway directly (no stub): create and publish a job closing in 3 days.
-    cy.request('POST', `${gateway}/v1/auth/login`, { email: employer.email, password }).then(({ body }) => {
-      const auth = { Authorization: `Bearer ${body.accessToken}` };
-      const deadline = new Date(Date.now() + 3 * 86400000).toISOString();
-      cy.request({ method: 'POST', url: `${gateway}/v1/jobs`, headers: auth, body: { title: `JT-95 Developer ${run}`, deadline } })
-        .then(({ body: created }) => {
-          state.jobId = created.job.jobId;
-          const publish = (tries = 20) => cy.request({ method: 'POST', url: `${gateway}/v1/jobs/${state.jobId}/publish`, headers: auth, body: {}, failOnStatusCode: false })
-            .then(response => {
-              if (response.status === 200) return;
-              if (tries <= 1) throw new Error(`publish job failed: HTTP ${response.status}`);
-              cy.wait(1000);
-              publish(tries - 1);
-            });
-          publish();
-        });
+    nav('My jobs');
+    cy.contains('a', 'Create job').click();
+    field('Title').type(`JT-95 Developer ${run}`);
+    field('Deadline').type(localInput(3, 17));
+    cy.contains('button', 'Create draft').should('be.enabled').click();
+    cy.location('pathname', { timeout: 15000 }).should('match', /^\/employer\/jobs\/[0-9a-f-]{36}$/).then(path => {
+      state.jobId = path.split('/').pop();
     });
+    cy.contains('Status: Draft').should('be.visible');
+    submitUntil('publish job', () => cy.get('body').then(body => {
+      // After a failed attempt the confirmation dialog is still open.
+      if (!body.find('button:contains("Confirm publish")').length) cy.contains('button', 'Publish job').click();
+      cy.contains('button', 'Confirm publish').click();
+    }), 'Job published.');
+    cy.contains('Status: Published', { timeout: 15000 }).should('be.visible');
+    cy.screenshot('04-job-published');
   });
 
   it('05 applicant registers and uploads a resume that is validated', () => {
@@ -212,10 +215,7 @@ describe('JT-95 main workflow against the running stack', () => {
   it('08 employer schedules an interview', () => {
     login(employer.email, password, '/employer');
     openApplication('Interviews');
-    const when = new Date(Date.now() + 2 * 86400000);
-    when.setHours(10, 0, 0, 0);
-    const pad = n => String(n).padStart(2, '0');
-    field('Date and time').type(`${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T10:00`);
+    field('Date and time').type(localInput(2, 10));
     field('Details').type('Room 2, JT-95 synthetic interview');
     submitUntil('schedule interview', () => cy.contains('button', 'Schedule interview').click(), 'Interview scheduled for');
     cy.contains('Room 2, JT-95 synthetic interview').should('be.visible');

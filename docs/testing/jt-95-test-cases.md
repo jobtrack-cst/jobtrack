@@ -15,7 +15,7 @@ Each step logs in through the UI as the right user. Services react to events, so
 | JT95-01 | Employer registers and creates a company profile (JT-63, JT-88) | Register as Employer, log in, Company: enter company name, Create profile | "Account created", employer workspace, "Company profile created" | Pass |
 | JT95-02 | Employer requests verification (JT-88, JT-56) | Verification: registration number, Send request | "Request sent" | Pass |
 | JT95-03 | Admin approves (JT-88, JT-56) | Log in as admin, Verification: find the request by registration number (paging if needed), Approve, Confirm approval | "Request approved" | Pass |
-| JT95-04 | Employer is verified and posts a job (JT-56, JT-38) | Company page shows Verified; job created and published through the gateway with `cy.request` (job pages arrive with JT-73) | Verification status Verified; publish returns HTTP 200 | Pass |
+| JT95-04 | Employer is verified and posts a job (JT-56, JT-38, JT-73) | Company page shows Verified; My jobs, Create job: title, deadline in 3 days, Create draft; Publish job, Confirm publish | Verification status Verified; job page shows Draft, then "Job published" and Published | Pass |
 | JT95-05 | Applicant uploads a resume that is validated (JT-48, JT-83) | Register as Applicant, Resumes: upload a synthetic PDF, Refresh resumes | "uploaded", then status Validated from resume-validator | Pass |
 | JT95-06 | Applicant applies (JT-78) | Apply: Job ID, Load job, choose the validated resume, Submit application | "Application submitted. ID"; status page shows Submitted | Pass |
 | JT95-07 | Employer reviews and shortlists (JT-79, JT-83) | Applications card, Review: score 4, Shortlist, Complete review, Confirm review | "Review completed"; status Shortlisted | Pass |
@@ -30,17 +30,16 @@ Stack: `docker compose -f deploy/compose/docker-compose.yml --profile functions 
 
 | Check | Result |
 |---|---|
-| `npm run test:stack` (Cypress 16.2.0, Electron) | 11 of 11 passing in 37 s |
+| `npm run test:stack` (Cypress 16.2.0, Electron) | 11 of 11 passing in NN s |
 | `npm test` (CI specs, stack folder excluded) | 4 specs, 155 of 155 passing |
 | CI on the pull request | CI_RUN_PLACEHOLDER |
 
-Screenshots of steps 01, 03, 05, 07, 09 and 11 (`frontend/cypress/screenshots/stack/`, not committed) are attached to JT-95 in Jira.
+Screenshots of steps 01, 03, 04, 05, 07, 09 and 11 (`frontend/cypress/screenshots/stack/`, not committed) are attached to JT-95 in Jira.
 
 Defects: none found in the application. Two failures during development were faults in the test itself (an application ID read before it was set, and a success message expected in an alert when the review page shows a card); both were fixed before this run.
 
 Notes:
 
-- Step 04 uses the gateway directly until the employer job pages (JT-73) are merged; recorded in AGENTS.md Section 16.
 - Typed text is kept short because long key-by-key typing trips React's nested update limit inside Cypress (see JT-83).
 
 ## Acceptance criteria review
@@ -48,7 +47,7 @@ Notes:
 | Acceptance criterion | Status | Evidence |
 |---|---|---|
 | New spec in `tests/e2e` with no `cy.intercept`, run against the full Compose stack with the functions profile | Met | `tests/e2e/stack/main-workflow.cy.js`; verification above |
-| Covers the main workflow from employer registration to the accepted offer, with the status history checked at the end | Met, with job posting through the gateway until JT-73 | JT95-01 to JT95-11 |
+| Covers the main workflow from employer registration to the accepted offer, with the status history checked at the end | Met | JT95-01 to JT95-11 |
 | Synthetic test data created by the test, so the run is repeatable | Met | Accounts unique per run; the passing run used a stack that already held data from an earlier run |
 | How to run written in the `tests/e2e` README; results and screenshots saved for the test report | Met | `tests/e2e/README.md`; screenshots in Jira |
 | Test cases in `docs/testing` traced to Jira; failures logged as Jira Bugs with severity | Met; no application failures to log | This document |

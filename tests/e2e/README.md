@@ -16,7 +16,7 @@ The spec runs the workflow in order, each step logging in through the UI as the 
 1. Employer registers and creates a company profile.
 2. Employer requests verification.
 3. Admin approves the request.
-4. Employer sees Verified and posts a job.
+4. Employer sees Verified, then creates and publishes a job on the My jobs pages.
 5. Applicant registers and uploads a resume, which resume-validator validates.
 6. Applicant applies.
 7. Employer reviews and shortlists.
@@ -24,8 +24,6 @@ The spec runs the workflow in order, each step logging in through the UI as the 
 9. Employer makes an offer.
 10. Applicant accepts it.
 11. The status history shows None, Submitted, Under review, Shortlisted, Interview, Offered and Accepted.
-
-Step 4 creates and publishes the job by calling the real gateway with `cy.request`, because the job pages (JT-73) are not on `main` yet. Replace it with the UI once JT-73 is merged.
 
 Services react to events, so the spec waits (refreshing the page, up to about 30 seconds per step) until each change is visible before the next step. All accounts and data are synthetic and unique per run (`jt95-*-<run>@jobtrack.test`), so the spec can run again on the same stack. Data from earlier runs stays in the database.
 
@@ -40,6 +38,6 @@ Services react to events, so the spec waits (refreshing the page, up to about 30
        export CYPRESS_ADMIN_EMAIL="$(grep '^ADMIN_EMAIL=' deploy/compose/.env | cut -d= -f2-)"
        export CYPRESS_ADMIN_PASSWORD="$(grep '^ADMIN_PASSWORD=' deploy/compose/.env | cut -d= -f2-)"
 
-3. In `frontend`: `npm run dev` in one terminal, then `npm run test:stack` in the other. If the gateway is not on http://localhost:8000, add `-- --expose GATEWAY_URL=http://<host>:8000`. The admin login is read with `cy.env()` (Cypress 16), which keeps it out of the browser and the command log.
+3. In `frontend`: `npm run dev` in one terminal, then `npm run test:stack` in the other. The admin login is read with `cy.env()` (Cypress 16), which keeps it out of the browser and the command log.
 
 Screenshots of the key steps are saved in `frontend/cypress/screenshots/stack/` (not committed); attach them to the Jira issue for the test report. The password is typed with logging off, so it does not appear in the Cypress command log.
