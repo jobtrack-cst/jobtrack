@@ -6,6 +6,7 @@ import { formatTime, gatewayMessage, grpcCode, isNotFound, length } from '../app
 import { useLoad } from '../application-status/useLoad';
 import { createCompanyProfile, getMyCompanyProfile, updateCompanyProfile, type CompanyFields, type CompanyProfile } from './api';
 import { companyProblems, emptyCompany, fromProfile, trimCompany, verificationOf } from './company';
+import { CompanyLogoUpload } from './CompanyLogoUpload';
 
 const messages = {
   [grpcCode.invalidArgument]: 'The profile was not saved. Company name needs 1 to 150 characters, description at most 2000, website a full http or https address of at most 255, and location at most 100.',
@@ -56,6 +57,8 @@ export function CompanyPage() {
       {!verified && <Button component={Link} to="/employer/verification">Request verification</Button>}
       <Typography variant="body2">Last updated: {formatTime(profile.timestamps?.updatedAt)}</Typography>
     </Stack>}
+    {/* The upload only changes the logo and updated_at, so unsaved form edits are kept (JT-102). */}
+    {profile && <CompanyLogoUpload profile={profile} onUploaded={setProfile} />}
     {creating && <Typography>You do not have a company profile yet. Create one before you request verification.</Typography>}
     {(profile || creating) && <Stack component="form" spacing={2} noValidate onSubmit={e => { e.preventDefault(); void save(); }}>
       <TextField label="Company name" required value={form.companyName} disabled={busy} helperText="1 to 150 characters"

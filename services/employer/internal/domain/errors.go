@@ -14,8 +14,12 @@ var (
 	ErrInvalidDescription = errors.New("description must be at most 2000 characters")
 	ErrInvalidWebsite     = errors.New("website must be an absolute http or https URL of at most 255 characters")
 	ErrInvalidLocation    = errors.New("location must be at most 100 characters")
+	ErrInvalidLogoSize    = errors.New("logo must be 1 to 1000000 bytes")
+	ErrInvalidLogoType    = errors.New("logo content_type must be image/jpeg or image/png")
+	ErrInvalidLogoContent = errors.New("logo content does not match its content_type")
 	// NOT_FOUND
 	ErrProfileNotFound = errors.New("company profile not found")
+	ErrLogoNotFound    = errors.New("company logo not found")
 	// ALREADY_EXISTS
 	ErrProfileExists = errors.New("company profile already exists for this employer")
 )

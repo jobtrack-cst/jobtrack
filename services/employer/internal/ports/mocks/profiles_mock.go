@@ -72,6 +72,36 @@ func (mr *MockProfileRepositoryMockRecorder) GetByEmployerID(ctx, employerID any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByEmployerID", reflect.TypeOf((*MockProfileRepository)(nil).GetByEmployerID), ctx, employerID)
 }
 
+// GetLogo mocks base method.
+func (m *MockProfileRepository) GetLogo(ctx context.Context, employerID string) (domain.Logo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogo", ctx, employerID)
+	ret0, _ := ret[0].(domain.Logo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLogo indicates an expected call of GetLogo.
+func (mr *MockProfileRepositoryMockRecorder) GetLogo(ctx, employerID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogo", reflect.TypeOf((*MockProfileRepository)(nil).GetLogo), ctx, employerID)
+}
+
+// PutLogo mocks base method.
+func (m *MockProfileRepository) PutLogo(ctx context.Context, employerID string, logo domain.Logo, now time.Time) (domain.CompanyProfile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutLogo", ctx, employerID, logo, now)
+	ret0, _ := ret[0].(domain.CompanyProfile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutLogo indicates an expected call of PutLogo.
+func (mr *MockProfileRepositoryMockRecorder) PutLogo(ctx, employerID, logo, now any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutLogo", reflect.TypeOf((*MockProfileRepository)(nil).PutLogo), ctx, employerID, logo, now)
+}
+
 // Update mocks base method.
 func (m *MockProfileRepository) Update(ctx context.Context, profile domain.CompanyProfile) (domain.CompanyProfile, error) {
 	m.ctrl.T.Helper()

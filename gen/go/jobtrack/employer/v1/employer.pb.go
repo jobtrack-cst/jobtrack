@@ -90,8 +90,10 @@ type CompanyProfile struct {
 	// the owning employer or an admin. Empty for everyone else.
 	RejectionReason string                 `protobuf:"bytes,7,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
 	Timestamps      *v1.ResourceTimestamps `protobuf:"bytes,8,opt,name=timestamps,proto3" json:"timestamps,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// True when a logo is stored. Profile reads never include the image bytes.
+	HasLogo       bool `protobuf:"varint,9,opt,name=has_logo,json=hasLogo,proto3" json:"has_logo,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CompanyProfile) Reset() {
@@ -178,6 +180,13 @@ func (x *CompanyProfile) GetTimestamps() *v1.ResourceTimestamps {
 		return x.Timestamps
 	}
 	return nil
+}
+
+func (x *CompanyProfile) GetHasLogo() bool {
+	if x != nil {
+		return x.HasLogo
+	}
+	return false
 }
 
 type CreateCompanyProfileRequest struct {
@@ -573,11 +582,204 @@ func (x *GetCompanyProfileResponse) GetProfile() *CompanyProfile {
 	return nil
 }
 
+type PutCompanyLogoRequest struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ContentType string                 `protobuf:"bytes,1,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	// Protobuf JSON uses base64; size, type and signature are runtime checks.
+	Content       []byte `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutCompanyLogoRequest) Reset() {
+	*x = PutCompanyLogoRequest{}
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutCompanyLogoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutCompanyLogoRequest) ProtoMessage() {}
+
+func (x *PutCompanyLogoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutCompanyLogoRequest.ProtoReflect.Descriptor instead.
+func (*PutCompanyLogoRequest) Descriptor() ([]byte, []int) {
+	return file_jobtrack_employer_v1_employer_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *PutCompanyLogoRequest) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *PutCompanyLogoRequest) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+type PutCompanyLogoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *CompanyProfile        `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutCompanyLogoResponse) Reset() {
+	*x = PutCompanyLogoResponse{}
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutCompanyLogoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutCompanyLogoResponse) ProtoMessage() {}
+
+func (x *PutCompanyLogoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutCompanyLogoResponse.ProtoReflect.Descriptor instead.
+func (*PutCompanyLogoResponse) Descriptor() ([]byte, []int) {
+	return file_jobtrack_employer_v1_employer_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PutCompanyLogoResponse) GetProfile() *CompanyProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type GetCompanyLogoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EmployerId    string                 `protobuf:"bytes,1,opt,name=employer_id,json=employerId,proto3" json:"employer_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCompanyLogoRequest) Reset() {
+	*x = GetCompanyLogoRequest{}
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCompanyLogoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCompanyLogoRequest) ProtoMessage() {}
+
+func (x *GetCompanyLogoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCompanyLogoRequest.ProtoReflect.Descriptor instead.
+func (*GetCompanyLogoRequest) Descriptor() ([]byte, []int) {
+	return file_jobtrack_employer_v1_employer_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetCompanyLogoRequest) GetEmployerId() string {
+	if x != nil {
+		return x.EmployerId
+	}
+	return ""
+}
+
+type GetCompanyLogoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ContentType   string                 `protobuf:"bytes,1,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCompanyLogoResponse) Reset() {
+	*x = GetCompanyLogoResponse{}
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCompanyLogoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCompanyLogoResponse) ProtoMessage() {}
+
+func (x *GetCompanyLogoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_employer_v1_employer_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCompanyLogoResponse.ProtoReflect.Descriptor instead.
+func (*GetCompanyLogoResponse) Descriptor() ([]byte, []int) {
+	return file_jobtrack_employer_v1_employer_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetCompanyLogoResponse) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *GetCompanyLogoResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 var File_jobtrack_employer_v1_employer_proto protoreflect.FileDescriptor
 
 const file_jobtrack_employer_v1_employer_proto_rawDesc = "" +
 	"\n" +
-	"#jobtrack/employer/v1/employer.proto\x12\x14jobtrack.employer.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fjobtrack/common/v1/common.proto\"\xfa\x02\n" +
+	"#jobtrack/employer/v1/employer.proto\x12\x14jobtrack.employer.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fjobtrack/common/v1/common.proto\"\x95\x03\n" +
 	"\x0eCompanyProfile\x12\x1f\n" +
 	"\vemployer_id\x18\x01 \x01(\tR\n" +
 	"employerId\x12!\n" +
@@ -589,7 +791,8 @@ const file_jobtrack_employer_v1_employer_proto_rawDesc = "" +
 	"\x10rejection_reason\x18\a \x01(\tR\x0frejectionReason\x12F\n" +
 	"\n" +
 	"timestamps\x18\b \x01(\v2&.jobtrack.common.v1.ResourceTimestampsR\n" +
-	"timestamps\"\x98\x01\n" +
+	"timestamps\x12\x19\n" +
+	"\bhas_logo\x18\t \x01(\bR\ahasLogo\"\x98\x01\n" +
 	"\x1bCreateCompanyProfileRequest\x12!\n" +
 	"\fcompany_name\x18\x01 \x01(\tR\vcompanyName\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x18\n" +
@@ -611,17 +814,30 @@ const file_jobtrack_employer_v1_employer_proto_rawDesc = "" +
 	"\vemployer_id\x18\x01 \x01(\tR\n" +
 	"employerId\"[\n" +
 	"\x19GetCompanyProfileResponse\x12>\n" +
-	"\aprofile\x18\x01 \x01(\v2$.jobtrack.employer.v1.CompanyProfileR\aprofile*\xa1\x01\n" +
+	"\aprofile\x18\x01 \x01(\v2$.jobtrack.employer.v1.CompanyProfileR\aprofile\"T\n" +
+	"\x15PutCompanyLogoRequest\x12!\n" +
+	"\fcontent_type\x18\x01 \x01(\tR\vcontentType\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\"X\n" +
+	"\x16PutCompanyLogoResponse\x12>\n" +
+	"\aprofile\x18\x01 \x01(\v2$.jobtrack.employer.v1.CompanyProfileR\aprofile\"8\n" +
+	"\x15GetCompanyLogoRequest\x12\x1f\n" +
+	"\vemployer_id\x18\x01 \x01(\tR\n" +
+	"employerId\"U\n" +
+	"\x16GetCompanyLogoResponse\x12!\n" +
+	"\fcontent_type\x18\x01 \x01(\tR\vcontentType\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent*\xa1\x01\n" +
 	"\x12VerificationStatus\x12#\n" +
 	"\x1fVERIFICATION_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eVERIFICATION_STATUS_UNVERIFIED\x10\x01\x12 \n" +
 	"\x1cVERIFICATION_STATUS_VERIFIED\x10\x02\x12 \n" +
-	"\x1cVERIFICATION_STATUS_REJECTED\x10\x032\x8a\x05\n" +
+	"\x1cVERIFICATION_STATUS_REJECTED\x10\x032\xb6\a\n" +
 	"\x0fEmployerService\x12\x9e\x01\n" +
 	"\x14CreateCompanyProfile\x121.jobtrack.employer.v1.CreateCompanyProfileRequest\x1a2.jobtrack.employer.v1.CreateCompanyProfileResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/v1/employer/profile\x12\x98\x01\n" +
 	"\x13GetMyCompanyProfile\x120.jobtrack.employer.v1.GetMyCompanyProfileRequest\x1a1.jobtrack.employer.v1.GetMyCompanyProfileResponse\"\x1c\x82\xd3\xe4\x93\x02\x16\x12\x14/v1/employer/profile\x12\x9e\x01\n" +
 	"\x14UpdateCompanyProfile\x121.jobtrack.employer.v1.UpdateCompanyProfileRequest\x1a2.jobtrack.employer.v1.UpdateCompanyProfileResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\x1a\x14/v1/employer/profile\x12\x99\x01\n" +
-	"\x11GetCompanyProfile\x12..jobtrack.employer.v1.GetCompanyProfileRequest\x1a/.jobtrack.employer.v1.GetCompanyProfileResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/v1/companies/{employer_id}BIZGgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/employer/v1;employerv1b\x06proto3"
+	"\x11GetCompanyProfile\x12..jobtrack.employer.v1.GetCompanyProfileRequest\x1a/.jobtrack.employer.v1.GetCompanyProfileResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/v1/companies/{employer_id}\x12\x91\x01\n" +
+	"\x0ePutCompanyLogo\x12+.jobtrack.employer.v1.PutCompanyLogoRequest\x1a,.jobtrack.employer.v1.PutCompanyLogoResponse\"$\x82\xd3\xe4\x93\x02\x1e:\x01*\x1a\x19/v1/employer/profile/logo\x12\x95\x01\n" +
+	"\x0eGetCompanyLogo\x12+.jobtrack.employer.v1.GetCompanyLogoRequest\x1a,.jobtrack.employer.v1.GetCompanyLogoResponse\"(\x82\xd3\xe4\x93\x02\"\x12 /v1/companies/{employer_id}/logoBIZGgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/employer/v1;employerv1b\x06proto3"
 
 var (
 	file_jobtrack_employer_v1_employer_proto_rawDescOnce sync.Once
@@ -636,7 +852,7 @@ func file_jobtrack_employer_v1_employer_proto_rawDescGZIP() []byte {
 }
 
 var file_jobtrack_employer_v1_employer_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_jobtrack_employer_v1_employer_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_jobtrack_employer_v1_employer_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_jobtrack_employer_v1_employer_proto_goTypes = []any{
 	(VerificationStatus)(0),              // 0: jobtrack.employer.v1.VerificationStatus
 	(*CompanyProfile)(nil),               // 1: jobtrack.employer.v1.CompanyProfile
@@ -648,28 +864,37 @@ var file_jobtrack_employer_v1_employer_proto_goTypes = []any{
 	(*UpdateCompanyProfileResponse)(nil), // 7: jobtrack.employer.v1.UpdateCompanyProfileResponse
 	(*GetCompanyProfileRequest)(nil),     // 8: jobtrack.employer.v1.GetCompanyProfileRequest
 	(*GetCompanyProfileResponse)(nil),    // 9: jobtrack.employer.v1.GetCompanyProfileResponse
-	(*v1.ResourceTimestamps)(nil),        // 10: jobtrack.common.v1.ResourceTimestamps
+	(*PutCompanyLogoRequest)(nil),        // 10: jobtrack.employer.v1.PutCompanyLogoRequest
+	(*PutCompanyLogoResponse)(nil),       // 11: jobtrack.employer.v1.PutCompanyLogoResponse
+	(*GetCompanyLogoRequest)(nil),        // 12: jobtrack.employer.v1.GetCompanyLogoRequest
+	(*GetCompanyLogoResponse)(nil),       // 13: jobtrack.employer.v1.GetCompanyLogoResponse
+	(*v1.ResourceTimestamps)(nil),        // 14: jobtrack.common.v1.ResourceTimestamps
 }
 var file_jobtrack_employer_v1_employer_proto_depIdxs = []int32{
 	0,  // 0: jobtrack.employer.v1.CompanyProfile.verification_status:type_name -> jobtrack.employer.v1.VerificationStatus
-	10, // 1: jobtrack.employer.v1.CompanyProfile.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
+	14, // 1: jobtrack.employer.v1.CompanyProfile.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
 	1,  // 2: jobtrack.employer.v1.CreateCompanyProfileResponse.profile:type_name -> jobtrack.employer.v1.CompanyProfile
 	1,  // 3: jobtrack.employer.v1.GetMyCompanyProfileResponse.profile:type_name -> jobtrack.employer.v1.CompanyProfile
 	1,  // 4: jobtrack.employer.v1.UpdateCompanyProfileResponse.profile:type_name -> jobtrack.employer.v1.CompanyProfile
 	1,  // 5: jobtrack.employer.v1.GetCompanyProfileResponse.profile:type_name -> jobtrack.employer.v1.CompanyProfile
-	2,  // 6: jobtrack.employer.v1.EmployerService.CreateCompanyProfile:input_type -> jobtrack.employer.v1.CreateCompanyProfileRequest
-	4,  // 7: jobtrack.employer.v1.EmployerService.GetMyCompanyProfile:input_type -> jobtrack.employer.v1.GetMyCompanyProfileRequest
-	6,  // 8: jobtrack.employer.v1.EmployerService.UpdateCompanyProfile:input_type -> jobtrack.employer.v1.UpdateCompanyProfileRequest
-	8,  // 9: jobtrack.employer.v1.EmployerService.GetCompanyProfile:input_type -> jobtrack.employer.v1.GetCompanyProfileRequest
-	3,  // 10: jobtrack.employer.v1.EmployerService.CreateCompanyProfile:output_type -> jobtrack.employer.v1.CreateCompanyProfileResponse
-	5,  // 11: jobtrack.employer.v1.EmployerService.GetMyCompanyProfile:output_type -> jobtrack.employer.v1.GetMyCompanyProfileResponse
-	7,  // 12: jobtrack.employer.v1.EmployerService.UpdateCompanyProfile:output_type -> jobtrack.employer.v1.UpdateCompanyProfileResponse
-	9,  // 13: jobtrack.employer.v1.EmployerService.GetCompanyProfile:output_type -> jobtrack.employer.v1.GetCompanyProfileResponse
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	1,  // 6: jobtrack.employer.v1.PutCompanyLogoResponse.profile:type_name -> jobtrack.employer.v1.CompanyProfile
+	2,  // 7: jobtrack.employer.v1.EmployerService.CreateCompanyProfile:input_type -> jobtrack.employer.v1.CreateCompanyProfileRequest
+	4,  // 8: jobtrack.employer.v1.EmployerService.GetMyCompanyProfile:input_type -> jobtrack.employer.v1.GetMyCompanyProfileRequest
+	6,  // 9: jobtrack.employer.v1.EmployerService.UpdateCompanyProfile:input_type -> jobtrack.employer.v1.UpdateCompanyProfileRequest
+	8,  // 10: jobtrack.employer.v1.EmployerService.GetCompanyProfile:input_type -> jobtrack.employer.v1.GetCompanyProfileRequest
+	10, // 11: jobtrack.employer.v1.EmployerService.PutCompanyLogo:input_type -> jobtrack.employer.v1.PutCompanyLogoRequest
+	12, // 12: jobtrack.employer.v1.EmployerService.GetCompanyLogo:input_type -> jobtrack.employer.v1.GetCompanyLogoRequest
+	3,  // 13: jobtrack.employer.v1.EmployerService.CreateCompanyProfile:output_type -> jobtrack.employer.v1.CreateCompanyProfileResponse
+	5,  // 14: jobtrack.employer.v1.EmployerService.GetMyCompanyProfile:output_type -> jobtrack.employer.v1.GetMyCompanyProfileResponse
+	7,  // 15: jobtrack.employer.v1.EmployerService.UpdateCompanyProfile:output_type -> jobtrack.employer.v1.UpdateCompanyProfileResponse
+	9,  // 16: jobtrack.employer.v1.EmployerService.GetCompanyProfile:output_type -> jobtrack.employer.v1.GetCompanyProfileResponse
+	11, // 17: jobtrack.employer.v1.EmployerService.PutCompanyLogo:output_type -> jobtrack.employer.v1.PutCompanyLogoResponse
+	13, // 18: jobtrack.employer.v1.EmployerService.GetCompanyLogo:output_type -> jobtrack.employer.v1.GetCompanyLogoResponse
+	13, // [13:19] is the sub-list for method output_type
+	7,  // [7:13] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_jobtrack_employer_v1_employer_proto_init() }
@@ -683,7 +908,7 @@ func file_jobtrack_employer_v1_employer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobtrack_employer_v1_employer_proto_rawDesc), len(file_jobtrack_employer_v1_employer_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

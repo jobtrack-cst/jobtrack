@@ -90,6 +90,39 @@ func (h *EmployerHandler) GetCompanyProfile(ctx context.Context, req *employerv1
 	return &employerv1.GetCompanyProfileResponse{Profile: profileToProto(profile)}, nil
 }
 
+// PutCompanyLogo stores or replaces the caller's logo (JT-102).
+func (h *EmployerHandler) PutCompanyLogo(ctx context.Context, req *employerv1.PutCompanyLogoRequest) (*employerv1.PutCompanyLogoResponse, error) {
+	caller, err := callerFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	profile, err := h.profiles.PutLogo(ctx, caller, req.GetContentType(), req.GetContent())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &employerv1.PutCompanyLogoResponse{Profile: profileToProto(profile)}, nil
+}
+
+// GetCompanyLogo returns the stored, already validated content type, so a
+// client never receives a type that was not checked (JT-102).
+func (h *EmployerHandler) GetCompanyLogo(ctx context.Context, req *employerv1.GetCompanyLogoRequest) (*employerv1.GetCompanyLogoResponse, error) {
+	caller, err := callerFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	logo, err := h.profiles.GetLogo(ctx, caller, req.GetEmployerId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &employerv1.GetCompanyLogoResponse{ContentType: logo.ContentType, Content: logo.Content}, nil
+}
+
 // callerFrom trusts x-user-id and x-user-role only because the gateway sets
 // them (or job-posting forwards them through pkg/grpcclient).
 func callerFrom(ctx context.Context) (domain.Caller, error) {
@@ -127,6 +160,7 @@ func profileToProto(p domain.CompanyProfile) *employerv1.CompanyProfile {
 			CreatedAt: timestamppb.New(p.CreatedAt),
 			UpdatedAt: timestamppb.New(p.UpdatedAt),
 		},
+		HasLogo: p.HasLogo,
 	}
 }
 
@@ -136,13 +170,14 @@ func toStatus(err error) error {
 	switch {
 	case errors.Is(err, domain.ErrInvalidEmployerID), errors.Is(err, domain.ErrInvalidCompanyName),
 		errors.Is(err, domain.ErrInvalidDescription), errors.Is(err, domain.ErrInvalidWebsite),
-		errors.Is(err, domain.ErrInvalidLocation):
+		errors.Is(err, domain.ErrInvalidLocation), errors.Is(err, domain.ErrInvalidLogoSize),
+		errors.Is(err, domain.ErrInvalidLogoType), errors.Is(err, domain.ErrInvalidLogoContent):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrUnauthenticated):
 		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, domain.ErrEmployerRoleRequired):
 		return status.Error(codes.PermissionDenied, err.Error())
-	case errors.Is(err, domain.ErrProfileNotFound):
+	case errors.Is(err, domain.ErrProfileNotFound), errors.Is(err, domain.ErrLogoNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrProfileExists):
 		return status.Error(codes.AlreadyExists, err.Error())
