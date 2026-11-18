@@ -23,7 +23,7 @@ func (s *Alerts) Create(ctx context.Context, c domain.Caller, categories, tags [
 	if err := c.RequireRole("applicant"); err != nil {
 		return domain.Alert{}, err
 	}
-	categories, tags, err := domain.NormalizeFilters(categories, tags, location)
+	categories, tags, location, err := domain.NormalizeFilters(categories, tags, location)
 	if err != nil {
 		return domain.Alert{}, err
 	}

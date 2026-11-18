@@ -25,7 +25,18 @@ func (r *Jobs) write(ctx context.Context, routingKey string, change func(pgx.Tx)
 	if err != nil {
 		return domain.Job{}, err
 	}
+	if err := storeJobEvent(ctx, tx, routingKey, j); err != nil {
+		return domain.Job{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return domain.Job{}, err
+	}
+	return j, nil
+}
 
+// storeJobEvent stores one job event in the outbox inside tx, so the event
+// exists exactly when the job change is committed.
+func storeJobEvent(ctx context.Context, tx pgx.Tx, routingKey string, j domain.Job) error {
 	var data proto.Message
 	switch routingKey {
 	case "job.published":
@@ -53,12 +64,12 @@ func (r *Jobs) write(ctx context.Context, routingKey string, change func(pgx.Tx)
 			JobId: j.ID,
 		}
 	default:
-		return domain.Job{}, errors.New("unknown routing key")
+		return errors.New("unknown routing key")
 	}
 
 	body, err := anypb.New(data)
 	if err != nil {
-		return domain.Job{}, err
+		return err
 	}
 	event := &eventsv1.EventEnvelope{
 		EventId:    uuid.NewString(),
@@ -69,13 +80,9 @@ func (r *Jobs) write(ctx context.Context, routingKey string, change func(pgx.Tx)
 	}
 	payload, err := events.MarshalEnvelope(event)
 	if err != nil {
-		return domain.Job{}, err
+		return err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO outbox_events(event_id,routing_key,payload,created_at) VALUES($1,$2,$3,$4)`, event.EventId, routingKey, string(payload), j.UpdatedAt); err != nil {
-		return domain.Job{}, err
-	}
-	if err = tx.Commit(ctx); err != nil {
-		return domain.Job{}, err
-	}
-	return j, nil
+	_, err = tx.Exec(ctx, `INSERT INTO outbox_events(event_id,routing_key,payload,created_at) VALUES($1,$2,$3,$4)`,
+		event.EventId, routingKey, string(payload), j.UpdatedAt)
+	return err
 }

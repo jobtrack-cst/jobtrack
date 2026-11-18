@@ -34,6 +34,15 @@ application message thread. No feature session or token is persisted.
 See [JT-78 test cases](../docs/testing/jt-78-test-cases.md) for routes, public API
 constraints, acceptance coverage and manual integration steps.
 
+JT-83 adds the applicant Profile and Resumes pages, and per application a
+Status page (current status and history) and an Interviews page for both roles,
+plus a Review page for employers. Open them from the workspace navigation and
+the Status, Interviews and Review buttons on each application card. Resumes are
+checked in the browser (PDF, 1 to 2,000,000 bytes, starting with `%PDF-`) and
+sent as base64; validation runs afterwards, so use Refresh resumes to see the
+result. Interview times use the browser's time zone and are sent in UTC. See
+[JT-83 test cases](../docs/testing/jt-83-test-cases.md).
+
 Validation:
 
 ```sh
@@ -46,8 +55,9 @@ npm test
 
 `lint` uses TypeScript's unused-local, unused-parameter, and switch fallthrough
 checks, alongside strict type checking. It introduces no separate lint tool.
-Cypress tests live in `tests/e2e/auth.cy.js` and
-`tests/e2e/application-workflows.cy.js` and stub gateway responses; they do
+Cypress tests live in `tests/e2e/auth.cy.js`,
+`tests/e2e/application-workflows.cy.js` and
+`tests/e2e/applicant-hiring-pages.cy.js` and stub gateway responses; they do
 not prove live backend connectivity or CORS. For a manual integration check,
 register synthetic applicant and employer accounts, log in with each and the
 seeded admin, verify each landing page, then log out. In browser Network tools,

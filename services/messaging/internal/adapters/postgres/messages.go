@@ -3,8 +3,11 @@ package postgres
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
+	"github.com/jobtrack-cst/jobtrack/services/messaging/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/messaging/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/messaging/internal/ports"
 )
@@ -31,8 +34,27 @@ func dbError(ctx context.Context) error {
 	return errors.New("messaging database operation failed")
 }
 func (r *Messages) Create(ctx context.Context, m domain.Message) (domain.Message, error) {
-	m, err := scanMessage(r.pool.QueryRow(ctx, `INSERT INTO messages (`+columns+`) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING `+columns, m.ID, m.ApplicationID, m.SenderID, m.RecipientID, m.Content, m.CreatedAt, m.UpdatedAt))
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
+		return domain.Message{}, dbError(ctx)
+	}
+	defer tx.Rollback(ctx)
+	m, err = scanMessage(tx.QueryRow(ctx, `INSERT INTO messages (`+columns+`) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING `+columns, m.ID, m.ApplicationID, m.SenderID, m.RecipientID, m.Content, m.CreatedAt, m.UpdatedAt))
+	if err != nil {
+		return domain.Message{}, dbError(ctx)
+	}
+	envelope, err := app.MessageEvent(m, uuid.NewString())
+	if err != nil {
+		return domain.Message{}, err
+	}
+	payload, err := events.MarshalEnvelope(envelope)
+	if err != nil {
+		return domain.Message{}, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO outbox_events(event_id,routing_key,payload,created_at) VALUES($1,$2,$3,$4)`, envelope.EventId, envelope.Type, string(payload), m.CreatedAt); err != nil {
+		return domain.Message{}, dbError(ctx)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return domain.Message{}, dbError(ctx)
 	}
 	return m, nil

@@ -1,0 +1,11 @@
+{
+ "event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+ "type":"job_alert.matched",
+ "occurred_at":"2026-11-16T08:00:00Z",
+ "producer":"job-alert",
+ "data":{
+  "@type":"type.googleapis.com/jobtrack.events.v1.JobAlertMatched",
+  "job_id":"33333333-3333-4333-8333-333333333333",
+  "applicant_id":"55555555-5555-4555-8555-555555555555"
+ }
+}

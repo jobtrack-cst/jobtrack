@@ -334,6 +334,8 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: job-alert
+      CATEGORY_TAG_ADDR: category-tag:9090
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
       # pgx reads PGPASSWORD separately; raw passwords are not URI components.
       DATABASE_URL: postgres://job_alert@postgres:5432/job_alert?sslmode=disable
       PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}

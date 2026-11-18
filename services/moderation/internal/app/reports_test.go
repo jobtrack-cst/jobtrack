@@ -368,14 +368,14 @@ func TestReports_RemoveJob(t *testing.T) {
 			name: "admin removes the job", caller: admin, jobID: jobID, reason: "fake company",
 			setup: func(repo *mocks.MockReportRepository, clock *mocks.MockClock) {
 				clock.EXPECT().Now().Return(now)
-				repo.EXPECT().RemoveJob(gomock.Any(), removal).Return(nil)
+				repo.EXPECT().RemoveJob(gomock.Any(), removal, gomock.Any()).Return(nil)
 			},
 		},
 		{
 			name: "job ID lowercased and reason trimmed", caller: admin, jobID: strings.ToUpper(jobID), reason: "  fake company ",
 			setup: func(repo *mocks.MockReportRepository, clock *mocks.MockClock) {
 				clock.EXPECT().Now().Return(now)
-				repo.EXPECT().RemoveJob(gomock.Any(), removal).Return(nil)
+				repo.EXPECT().RemoveJob(gomock.Any(), removal, gomock.Any()).Return(nil)
 			},
 		},
 		{
@@ -384,14 +384,14 @@ func TestReports_RemoveJob(t *testing.T) {
 				clock.EXPECT().Now().Return(now)
 				repo.EXPECT().RemoveJob(gomock.Any(), domain.Removal{
 					JobID: jobID, Reason: strings.Repeat("a", 500), RemovedBy: adminID, RemovedAt: now.UTC(),
-				}).Return(nil)
+				}, gomock.Any()).Return(nil)
 			},
 		},
 		{
 			name: "second takedown of the same job", caller: admin, jobID: jobID, reason: "fake company",
 			setup: func(repo *mocks.MockReportRepository, clock *mocks.MockClock) {
 				clock.EXPECT().Now().Return(now)
-				repo.EXPECT().RemoveJob(gomock.Any(), removal).Return(domain.ErrJobAlreadyRemoved)
+				repo.EXPECT().RemoveJob(gomock.Any(), removal, gomock.Any()).Return(domain.ErrJobAlreadyRemoved)
 			},
 			wantErr: domain.ErrJobAlreadyRemoved,
 		},
@@ -399,7 +399,7 @@ func TestReports_RemoveJob(t *testing.T) {
 			name: "repository error is returned", caller: admin, jobID: jobID, reason: "fake company",
 			setup: func(repo *mocks.MockReportRepository, clock *mocks.MockClock) {
 				clock.EXPECT().Now().Return(now)
-				repo.EXPECT().RemoveJob(gomock.Any(), removal).Return(errDB)
+				repo.EXPECT().RemoveJob(gomock.Any(), removal, gomock.Any()).Return(errDB)
 			},
 			wantErr: errDB,
 		},

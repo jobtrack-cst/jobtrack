@@ -54,8 +54,8 @@ func NewReportReason(raw string) (string, error) {
 	return reason, nil
 }
 
-// NewRemovalReason validates the admin's takedown reason, which Sprint 2
-// sends in moderation.job_removed.
+// NewRemovalReason validates the admin's takedown reason, which is sent in
+// moderation.job_removed (JT-87).
 func NewRemovalReason(raw string) (string, error) {
 	reason := strings.TrimSpace(raw)
 	if !textWithin(reason, 1, MaxRemovalReasonLength) {

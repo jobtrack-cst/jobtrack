@@ -23,6 +23,8 @@ const (
 	EmployerService_GetMyCompanyProfile_FullMethodName  = "/jobtrack.employer.v1.EmployerService/GetMyCompanyProfile"
 	EmployerService_UpdateCompanyProfile_FullMethodName = "/jobtrack.employer.v1.EmployerService/UpdateCompanyProfile"
 	EmployerService_GetCompanyProfile_FullMethodName    = "/jobtrack.employer.v1.EmployerService/GetCompanyProfile"
+	EmployerService_PutCompanyLogo_FullMethodName       = "/jobtrack.employer.v1.EmployerService/PutCompanyLogo"
+	EmployerService_GetCompanyLogo_FullMethodName       = "/jobtrack.employer.v1.EmployerService/GetCompanyLogo"
 )
 
 // EmployerServiceClient is the client API for EmployerService service.
@@ -43,6 +45,16 @@ type EmployerServiceClient interface {
 	// GetCompanyProfile returns any employer's profile. Also used by
 	// job-posting for the verified check (NOT_FOUND counts as not verified).
 	GetCompanyProfile(ctx context.Context, in *GetCompanyProfileRequest, opts ...grpc.CallOption) (*GetCompanyProfileResponse, error)
+	// PutCompanyLogo sets or replaces the caller's company logo. Employer role
+	// only, own profile only (NOT_FOUND if the caller has no profile). Never
+	// changes verification_status. At runtime, content must be 1 to 1,000,000
+	// bytes, content_type image/jpeg or image/png, and the file signature must
+	// match the type; every failure is INVALID_ARGUMENT.
+	PutCompanyLogo(ctx context.Context, in *PutCompanyLogoRequest, opts ...grpc.CallOption) (*PutCompanyLogoResponse, error)
+	// GetCompanyLogo returns any employer's logo to any authenticated role.
+	// NOT_FOUND if the employer has no profile or no logo.
+	// Protobuf JSON encodes bytes as base64.
+	GetCompanyLogo(ctx context.Context, in *GetCompanyLogoRequest, opts ...grpc.CallOption) (*GetCompanyLogoResponse, error)
 }
 
 type employerServiceClient struct {
@@ -93,6 +105,26 @@ func (c *employerServiceClient) GetCompanyProfile(ctx context.Context, in *GetCo
 	return out, nil
 }
 
+func (c *employerServiceClient) PutCompanyLogo(ctx context.Context, in *PutCompanyLogoRequest, opts ...grpc.CallOption) (*PutCompanyLogoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PutCompanyLogoResponse)
+	err := c.cc.Invoke(ctx, EmployerService_PutCompanyLogo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *employerServiceClient) GetCompanyLogo(ctx context.Context, in *GetCompanyLogoRequest, opts ...grpc.CallOption) (*GetCompanyLogoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCompanyLogoResponse)
+	err := c.cc.Invoke(ctx, EmployerService_GetCompanyLogo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EmployerServiceServer is the server API for EmployerService service.
 // All implementations must embed UnimplementedEmployerServiceServer
 // for forward compatibility.
@@ -111,6 +143,16 @@ type EmployerServiceServer interface {
 	// GetCompanyProfile returns any employer's profile. Also used by
 	// job-posting for the verified check (NOT_FOUND counts as not verified).
 	GetCompanyProfile(context.Context, *GetCompanyProfileRequest) (*GetCompanyProfileResponse, error)
+	// PutCompanyLogo sets or replaces the caller's company logo. Employer role
+	// only, own profile only (NOT_FOUND if the caller has no profile). Never
+	// changes verification_status. At runtime, content must be 1 to 1,000,000
+	// bytes, content_type image/jpeg or image/png, and the file signature must
+	// match the type; every failure is INVALID_ARGUMENT.
+	PutCompanyLogo(context.Context, *PutCompanyLogoRequest) (*PutCompanyLogoResponse, error)
+	// GetCompanyLogo returns any employer's logo to any authenticated role.
+	// NOT_FOUND if the employer has no profile or no logo.
+	// Protobuf JSON encodes bytes as base64.
+	GetCompanyLogo(context.Context, *GetCompanyLogoRequest) (*GetCompanyLogoResponse, error)
 	mustEmbedUnimplementedEmployerServiceServer()
 }
 
@@ -132,6 +174,12 @@ func (UnimplementedEmployerServiceServer) UpdateCompanyProfile(context.Context, 
 }
 func (UnimplementedEmployerServiceServer) GetCompanyProfile(context.Context, *GetCompanyProfileRequest) (*GetCompanyProfileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCompanyProfile not implemented")
+}
+func (UnimplementedEmployerServiceServer) PutCompanyLogo(context.Context, *PutCompanyLogoRequest) (*PutCompanyLogoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PutCompanyLogo not implemented")
+}
+func (UnimplementedEmployerServiceServer) GetCompanyLogo(context.Context, *GetCompanyLogoRequest) (*GetCompanyLogoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCompanyLogo not implemented")
 }
 func (UnimplementedEmployerServiceServer) mustEmbedUnimplementedEmployerServiceServer() {}
 func (UnimplementedEmployerServiceServer) testEmbeddedByValue()                         {}
@@ -226,6 +274,42 @@ func _EmployerService_GetCompanyProfile_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EmployerService_PutCompanyLogo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PutCompanyLogoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EmployerServiceServer).PutCompanyLogo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EmployerService_PutCompanyLogo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EmployerServiceServer).PutCompanyLogo(ctx, req.(*PutCompanyLogoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EmployerService_GetCompanyLogo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCompanyLogoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EmployerServiceServer).GetCompanyLogo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EmployerService_GetCompanyLogo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EmployerServiceServer).GetCompanyLogo(ctx, req.(*GetCompanyLogoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EmployerService_ServiceDesc is the grpc.ServiceDesc for EmployerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -248,6 +332,14 @@ var EmployerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCompanyProfile",
 			Handler:    _EmployerService_GetCompanyProfile_Handler,
+		},
+		{
+			MethodName: "PutCompanyLogo",
+			Handler:    _EmployerService_PutCompanyLogo_Handler,
+		},
+		{
+			MethodName: "GetCompanyLogo",
+			Handler:    _EmployerService_GetCompanyLogo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

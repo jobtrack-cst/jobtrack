@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/services/moderation/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/moderation/internal/ports"
 )
@@ -158,11 +160,16 @@ func (r *Reports) whyNotDismissed(ctx context.Context, id string) error {
 	return domain.ErrReportNotOpen
 }
 
-// RemoveJob records the takedown and actions the job's OPEN reports together.
-// ON CONFLICT keeps the transaction usable, and the primary key still stops a
-// second takedown if two admins race.
-func (r *Reports) RemoveJob(ctx context.Context, rm domain.Removal) error {
-	err := pgx.BeginTxFunc(ctx, r.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
+// RemoveJob records the takedown, actions the job's OPEN reports and stores
+// the moderation.job_removed event together, so the event exists exactly when
+// the removal is committed (JT-87). ON CONFLICT keeps the transaction usable,
+// and the primary key still stops a second takedown if two admins race.
+func (r *Reports) RemoveJob(ctx context.Context, rm domain.Removal, event *eventsv1.EventEnvelope) error {
+	payload, err := events.MarshalEnvelope(event)
+	if err != nil {
+		return errors.New("removal event is not valid")
+	}
+	err = pgx.BeginTxFunc(ctx, r.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, lockJob, rm.JobID); err != nil {
 			return err
 		}
@@ -177,10 +184,16 @@ func (r *Reports) RemoveJob(ctx context.Context, rm domain.Removal) error {
 		if tag.RowsAffected() == 0 {
 			return domain.ErrJobAlreadyRemoved
 		}
-		_, err = tx.Exec(ctx,
+		if _, err := tx.Exec(ctx,
 			`UPDATE reports SET status = 'actioned', updated_at = $2
 			 WHERE job_id = $1 AND status = 'open'`,
-			rm.JobID, rm.RemovedAt)
+			rm.JobID, rm.RemovedAt); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx,
+			`INSERT INTO outbox_events (event_id, routing_key, payload, created_at)
+			 VALUES ($1, $2, $3, $4)`,
+			event.GetEventId(), event.GetType(), string(payload), rm.RemovedAt)
 		return err
 	})
 	if errors.Is(err, domain.ErrJobAlreadyRemoved) {

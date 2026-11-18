@@ -161,8 +161,10 @@ func (r *Jobs) ListClosingBetween(ctx context.Context, window domain.ClosingWind
 	return out, total, rows.Err()
 }
 
-// RecordJobRemoved implements the moderation consumer. It updates the job
-// to REMOVED and stores the event ID in processed_events in a single transaction.
+// RecordJobRemoved applies moderation.job_removed in one transaction: it claims
+// the event ID, sets the job to removed and, only when the job was published,
+// stores job.closed in the outbox. A redelivered event ID, an unknown job or an
+// already removed job changes nothing and stores no event.
 func (r *Jobs) RecordJobRemoved(ctx context.Context, eventID, jobID string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -170,26 +172,44 @@ func (r *Jobs) RecordJobRemoved(ctx context.Context, eventID, jobID string) erro
 	}
 	defer tx.Rollback(context.Background())
 
-	// 1. Check if already processed (idempotency)
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM processed_events WHERE event_id = $1)`, eventID).Scan(&exists); err != nil {
-		return err
-	}
-	if exists {
-		return nil // Already processed, ignore
-	}
-
-	// 2. Mark as processed
-	if _, err := tx.Exec(ctx, `INSERT INTO processed_events (event_id) VALUES ($1)`, eventID); err != nil {
-		return err
-	}
-
-	// 3. Update job status to REMOVED (only if it's not already removed)
-	_, err = tx.Exec(ctx, `UPDATE jobs SET status = 'removed', updated_at = now() WHERE job_id = $1 AND status != 'REMOVED'`, jobID)
+	// A concurrent duplicate waits here and then inserts nothing.
+	tag, err := tx.Exec(ctx,
+		`INSERT INTO processed_events (event_id) VALUES ($1) ON CONFLICT (event_id) DO NOTHING`, eventID)
 	if err != nil {
 		return err
 	}
+	if tag.RowsAffected() == 0 {
+		return nil
+	}
 
+	// The row lock stops CloseJob from changing the status between this read and the update.
+	var stored string
+	err = tx.QueryRow(ctx, `SELECT status FROM jobs WHERE job_id = $1 FOR UPDATE`, jobID).Scan(&stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return tx.Commit(ctx) // unknown job: keep the claim so redelivery is ignored
+	}
+	if err != nil {
+		return err
+	}
+	previous, ok := domain.ParseStatus(stored)
+	if !ok {
+		return errors.New("stored job status is not valid")
+	}
+	if previous == domain.StatusRemoved {
+		return tx.Commit(ctx)
+	}
+
+	removed, err := scanJob(tx.QueryRow(ctx,
+		`UPDATE jobs SET status = $2, updated_at = now() WHERE job_id = $1 RETURNING `+jobColumns,
+		jobID, domain.StatusRemoved.String()))
+	if err != nil {
+		return err
+	}
+	if domain.RemovalPublishesClose(previous) {
+		if err := storeJobEvent(ctx, tx, "job.closed", removed); err != nil {
+			return err
+		}
+	}
 	return tx.Commit(ctx)
 }
 

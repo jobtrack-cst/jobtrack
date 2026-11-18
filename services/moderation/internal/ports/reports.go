@@ -6,13 +6,14 @@ import (
 	"context"
 	"time"
 
+	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	"github.com/jobtrack-cst/jobtrack/services/moderation/internal/domain"
 )
 
 // ReportRepository stores reports and the jobs moderation has removed.
 // Moderation has no allowed call to job-posting (AGENTS.md Section 6), so
 // there are no client ports and it only knows the jobs it removed itself.
-// Publishing moderation.job_removed uses EventPublisher in Sprint 2.
+// It publishes moderation.job_removed through the outbox (JT-87).
 type ReportRepository interface {
 	// Create stores a new OPEN report. It holds a per-job lock shared with
 	// RemoveJob, so a report can never slip in as OPEN beside a removal. It
@@ -32,9 +33,11 @@ type ReportRepository interface {
 	Dismiss(ctx context.Context, r domain.Report) (domain.Report, error)
 	// RemoveJob records the removal and marks every OPEN report for the job as
 	// ACTIONED (updated_at = RemovedAt) in one transaction under the per-job
-	// lock. It returns domain.ErrJobAlreadyRemoved if the job was removed
-	// before, including when two admins race.
-	RemoveJob(ctx context.Context, rm domain.Removal) error
+	// lock. In the same transaction it stores event in the outbox, so the
+	// event exists exactly when the removal is committed (JT-87). It returns
+	// domain.ErrJobAlreadyRemoved if the job was removed before, including
+	// when two admins race; then nothing is stored.
+	RemoveJob(ctx context.Context, rm domain.Removal, event *eventsv1.EventEnvelope) error
 }
 
 // Clock makes created_at, updated_at and removed_at testable.
