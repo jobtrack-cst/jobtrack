@@ -51,10 +51,11 @@ func TestLoadConfig(t *testing.T) {
 		{
 			name: "valid config",
 			env: map[string]string{
-				"SERVICE_NAME": "saved-jobs",
-				"DATABASE_URL": "postgres://localhost",
-				"GRPC_PORT":    "9090",
-				"HTTP_PORT":    "8080",
+				"SERVICE_NAME":   "saved-jobs",
+				"DATABASE_URL":   "postgres://localhost",
+				"GRPC_PORT":      "9090",
+				"HTTP_PORT":      "8080",
+				"INTERNAL_TOKEN": "test-token-visible-ascii",
 			},
 			want: config{
 				serviceName:   "saved-jobs",
@@ -62,6 +63,7 @@ func TestLoadConfig(t *testing.T) {
 				migrationsDir: "services/saved-jobs/migrations",
 				grpcPort:      9090,
 				httpPort:      8080,
+				internalToken: "test-token-visible-ascii",
 			},
 		},
 		{
@@ -70,6 +72,14 @@ func TestLoadConfig(t *testing.T) {
 				"SERVICE_NAME": "saved-jobs",
 			},
 			wantErr: "DATABASE_URL is required",
+		},
+		{
+			name: "missing INTERNAL_TOKEN",
+			env: map[string]string{
+				"SERVICE_NAME": "saved-jobs",
+				"DATABASE_URL": "postgres://localhost",
+			},
+			wantErr: "INTERNAL_TOKEN is required",
 		},
 	}
 
@@ -198,7 +208,7 @@ func TestServe_RegistersHealthAndShutsDownBothServers(t *testing.T) {
 	var logs bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("saved-jobs", &logs), app.NewHealth(), nil, grpcListener, httpListener)
+		done <- serve(ctx, config{internalToken: "test-token-visible-ascii"}, logging.New("saved-jobs", &logs), app.NewHealth(), nil, grpcListener, httpListener)
 	}()
 	t.Cleanup(func() { cancel() })
 	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}
@@ -261,7 +271,7 @@ func TestServe_ServerFailureClosesBothListeners(t *testing.T) {
 			}
 			done := make(chan error, 1)
 			go func() {
-				done <- serve(context.Background(), logging.New("test", io.Discard), app.NewHealth(), nil, grpcListener, httpListener)
+				done <- serve(context.Background(), config{internalToken: "test-token-visible-ascii"}, logging.New("test", io.Discard), app.NewHealth(), nil, grpcListener, httpListener)
 			}()
 			err := awaitServer(t, done)
 			if err == nil || !strings.Contains(err.Error(), fail) || strings.Contains(err.Error(), "private") {
