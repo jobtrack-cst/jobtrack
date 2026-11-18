@@ -22,6 +22,13 @@ type ProfileRepository interface {
 	// verification columns, so it cannot undo a verification event (JT-56).
 	// It returns the stored row, or domain.ErrProfileNotFound.
 	Update(ctx context.Context, profile domain.CompanyProfile) (domain.CompanyProfile, error)
+	// PutLogo stores or replaces the employer's logo and sets the profile's
+	// updated_at in one transaction, never touching the verification columns
+	// (JT-102). It returns the stored profile, or domain.ErrProfileNotFound.
+	PutLogo(ctx context.Context, employerID string, logo domain.Logo, now time.Time) (domain.CompanyProfile, error)
+	// GetLogo returns domain.ErrLogoNotFound when the employer has no profile
+	// or no logo.
+	GetLogo(ctx context.Context, employerID string) (domain.Logo, error)
 }
 
 // Clock makes created_at and updated_at testable.
