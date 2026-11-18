@@ -19,6 +19,7 @@ import (
 	savedjobsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/saved_jobs/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/app"
@@ -152,7 +153,8 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, pool *pgxpool.Pool, grpcListener, httpListener net.Listener) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
-	grpcServer := grpc.NewServer()
+	requestMetrics := requestmetrics.New("saved-jobs")
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor()))
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
 
 	// Initialize our repository and app layer
@@ -163,7 +165,8 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 	savedjobsv1.RegisterSavedJobsServiceServer(grpcServer, grpcadapter.NewSavedJobsHandler(savedJobsSvc))
 	savedjobsv1.RegisterSavedJobsInternalServiceServer(grpcServer, grpcadapter.NewSavedJobsInternalHandler(savedJobsSvc))
 
-	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
+	requestMetrics.RegisterGRPC(grpcServer)
+	httpServer := &http.Server{Handler: healthHandler(checker, requestMetrics), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
 		_ = grpcServer.Serve(grpcListener)

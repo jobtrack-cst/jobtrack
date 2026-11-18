@@ -6,11 +6,13 @@ import (
 	"net/http"
 
 	"github.com/jobtrack-cst/jobtrack/gateway/internal/middleware"
+	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 )
 
 // newHandler serves /healthz and /metrics without a token and sends every other
 // request through Authenticate to grpc-gateway.
 func newHandler(api http.Handler, verifier middleware.TokenVerifier, logger *slog.Logger) http.Handler {
+	requestMetrics := requestmetrics.New("gateway")
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -24,9 +26,10 @@ func newHandler(api http.Handler, verifier middleware.TokenVerifier, logger *slo
 		_, _ = io.WriteString(w, "# HELP jobtrack_service_ready Whether the service readiness check succeeds.\n"+
 			"# TYPE jobtrack_service_ready gauge\n"+
 			"jobtrack_service_ready 1\n")
+		requestMetrics.WritePrometheus(w)
 	})
 	// JT-54: the body limit sits after authentication, so anonymous requests get 401
 	// without the gateway reading a large body; register and login still pass through it.
 	mux.Handle("/", middleware.Authenticate(verifier, logger, middleware.LimitBody(middleware.MaxBodyBytes, api)))
-	return mux
+	return requestMetrics.HTTP(mux)
 }
