@@ -136,7 +136,7 @@ Critical paths:
 - JT-84, then JT-96, then JT-97 (load test and test report)
 - JT-97 and JT-99, then JT-100 (closure), on 19 Nov
 
-Jigden's order after JT-98: the JT-102 backend once Phuntsho approves the proto diff (18 Nov), then the JT-102 frontend and JT-99 UAT on the morning of 19 Nov, and JT-100 on the afternoon of 19 Nov. If JT-102 is not working by midday on 19 Nov, it stops and Jigden switches to JT-99 and JT-100. If time is short, JT-72 is dropped first, then JT-67 and JT-70.
+Jigden's order after JT-98: the JT-102 backend once Phuntsho approves the proto diff (18 Nov), then the JT-102 frontend and JT-99 UAT on the morning of 19 Nov, and JT-100 on the afternoon of 19 Nov. If JT-102 is not working by midday on 19 Nov, it stops and Jigden switches to JT-99 and JT-100 (both Must), because JT-102 must not delay Must tasks. If time is short, the agreed slip order applies: JT-66 first, then JT-102 and JT-103, then the other Should tasks. Among those other Should tasks, Jigden's JT-72 slips before JT-67 and JT-70.
 
 ---
 
