@@ -38,6 +38,25 @@ service EmployerService {
   rpc GetCompanyProfile(GetCompanyProfileRequest) returns (GetCompanyProfileResponse) {
     option (google.api.http) = {get: "/v1/companies/{employer_id}"};
   }
+
+  // PutCompanyLogo sets or replaces the caller's company logo. Employer role
+  // only, own profile only (NOT_FOUND if the caller has no profile). Never
+  // changes verification_status. At runtime, content must be 1 to 1,000,000
+  // bytes, content_type image/jpeg or image/png, and the file signature must
+  // match the type; every failure is INVALID_ARGUMENT.
+  rpc PutCompanyLogo(PutCompanyLogoRequest) returns (PutCompanyLogoResponse) {
+    option (google.api.http) = {
+      put: "/v1/employer/profile/logo"
+      body: "*"
+    };
+  }
+
+  // GetCompanyLogo returns any employer's logo to any authenticated role.
+  // NOT_FOUND if the employer has no profile or no logo.
+  // Protobuf JSON encodes bytes as base64.
+  rpc GetCompanyLogo(GetCompanyLogoRequest) returns (GetCompanyLogoResponse) {
+    option (google.api.http) = {get: "/v1/companies/{employer_id}/logo"};
+  }
 }
 
 // VerificationStatus is set only by employer.verified and
@@ -61,6 +80,8 @@ message CompanyProfile {
   // the owning employer or an admin. Empty for everyone else.
   string rejection_reason = 7;
   jobtrack.common.v1.ResourceTimestamps timestamps = 8;
+  // True when a logo is stored. Profile reads never include the image bytes.
+  bool has_logo = 9;
 }
 
 message CreateCompanyProfileRequest {
@@ -98,4 +119,20 @@ message GetCompanyProfileRequest {
 
 message GetCompanyProfileResponse {
   CompanyProfile profile = 1;
+}
+
+message PutCompanyLogoRequest {
+  string content_type = 1;
+  // Protobuf JSON uses base64; size, type and signature are runtime checks.
+  bytes content = 2;
+}
+message PutCompanyLogoResponse {
+  CompanyProfile profile = 1;
+}
+message GetCompanyLogoRequest {
+  string employer_id = 1;
+}
+message GetCompanyLogoResponse {
+  string content_type = 1;
+  bytes content = 2;
 }
