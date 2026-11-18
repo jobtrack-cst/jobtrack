@@ -398,6 +398,31 @@ services:
     stop_grace_period: 25s
     restart: unless-stopped
 
+
+  # JT-71: Notification dispatcher. Consumes events and writes to inbox + email-sender.
+  notification-dispatcher:
+    profiles: [functions]
+    image: ${NOTIFICATION_DISPATCHER_IMAGE:-jobtrack-notification-dispatcher:local}
+    build:
+      context: ../..
+      dockerfile: functions/notification-dispatcher/Dockerfile
+    environment:
+      SERVICE_NAME: notification-dispatcher
+      HTTP_PORT: "8080"
+      AUTH_ADDR: auth:9090
+      NOTIFICATION_INBOX_ADDR: notification-inbox:9090
+      EMAIL_SENDER_URL: http://email-sender:8080/send-email
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      auth:
+        condition: service_healthy
+      notification-inbox:
+        condition: service_healthy
+      email-sender:
+        condition: service_started
+    stop_grace_period: 35s
+    restart: unless-stopped
+
   # JT-86 weekly summary. Triggered by hand in Compose (JT-61); k3d uses a PingSource.
   weekly-summary:
     profiles: [functions]
