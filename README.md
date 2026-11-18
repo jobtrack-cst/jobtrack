@@ -2,12 +2,14 @@
 
 JobTrack is a job and internship application portal for students, employers and placement coordinators at the College of Science and Technology, Royal University of Bhutan. It is a shared final project for WEB303, SWE302 and SWE303.
 
-JobTrack is under development; the complete application is not finished. This branch includes shared contracts, Go infrastructure helpers and a runnable golden service template with tests, a Dockerfile, reference Kubernetes manifests and a service generator. Many production service directories remain placeholders.
+JobTrack is under development. Docker Compose defines all 20 services and the gateway, with an opt-in functions profile. The recorded main-workflow test runs against that stack; the complete five-function k3d deployment and WEB303 assessment-scope confirmation remain pending. See the run guide for current wiring limits and verification steps.
 
 The golden template at `services/service-template/` is a reference implementation, not a 21st production microservice. It demonstrates gRPC Health/Check, PostgreSQL startup migrations, RabbitMQ publisher initialization, JSON logging, `/healthz` and `/metrics`.
 
 See [AGENTS.md](AGENTS.md) for the authoritative architecture, service ownership, conventions, testing requirements and team workflow.
 
+- [System architecture, service ownership, databases, events and security](docs/architecture/system-architecture.md)
+- [End-to-end run guide: Docker Compose and k3d/Knative](docs/deployment/how-to-run.md)
 - [Golden service build, configuration and generation guide](docs/deployment/jt-19-golden-service.md)
 - [JT-19 test cases and verification evidence](docs/testing/jt-19-test-cases.md)
 
@@ -54,4 +56,4 @@ jobtrack/
     workflows/              CI workflows
 ```
 
-Empty directories are tracked with `.gitkeep` files. The template has been verified in an isolated Docker Compose environment. Integration with the official JT-27 Compose configuration and GitHub Actions CI under JT-28 remains pending; Kubernetes cluster deployment has not been tested. See the JT-19 verification document for the scope and limitations of each check.
+Empty directories are tracked with `.gitkeep` files. [JT-95](docs/testing/jt-95-test-cases.md) records the main UI workflow against Compose, and [JT-29](docs/deployment/jt-29-cluster-spike.md) records the isolated Knative transport spike. Those results do not establish a complete application deployment in k3d. [JT-94 validation](docs/testing/jt-94-docs-validation.md) separates documentation checks from deployment work still requiring verification.
