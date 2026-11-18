@@ -89,7 +89,7 @@ All commands ran on 18 November 2026 on Jigden's laptop (WSL Ubuntu, Docker Desk
 | Compose | employer and gateway rebuilt from the branch; `00004_create_company_logos.sql` applied, database at version 4; consumer ready on `employer.verification` |
 | End to end (JT102-22) | Pass, 20 of 20 checks through the gateway on port 8000 (employer `300ff3ef-d6b9-441f-87dc-2b31ff431d01`): upload before a profile 404; new profile without `has_logo`; logo before upload 404; real 1x1 PNG uploaded (200) with `has_logo` true and verification unchanged; applicant sees `has_logo` on the profile with no image bytes in the response; applicant reads the same PNG back; replaced with a JPEG; 1,000,000 bytes accepted; 1,000,001 bytes, 0 bytes, 1 byte, GIF and PNG with JPEG bytes each HTTP 400 with code 3; applicant upload 403; no token 401; unknown employer 404; ID not a UUID 400 |
 | Frontend | `npm run lint` and `npm run build` pass; browser checks JT102-23 to JT102-27 pass (8 of 8). A page refresh logs the user out because the token is kept only in memory; this is existing frontend shell behaviour, so JT102-24 logs in again instead |
-| CI on the pull request | Green on PR #71 |
+| CI on the pull request | Green on PR #72 |
 
 ## Not delivered in JT-102
 
