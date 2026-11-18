@@ -1,0 +1,72 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 5s
+
+scrape_configs:
+  - job_name: jobtrack
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: ["analytics:8080"]
+        labels:
+          service: analytics
+      - targets: ["applicant-profile:8080"]
+        labels:
+          service: applicant-profile
+      - targets: ["application:8080"]
+        labels:
+          service: application
+      - targets: ["application-status:8080"]
+        labels:
+          service: application-status
+      - targets: ["audit-log:8080"]
+        labels:
+          service: audit-log
+      - targets: ["auth:8080"]
+        labels:
+          service: auth
+      - targets: ["category-tag:8080"]
+        labels:
+          service: category-tag
+      - targets: ["company-verification:8080"]
+        labels:
+          service: company-verification
+      - targets: ["employer:8080"]
+        labels:
+          service: employer
+      - targets: ["gateway:8080"]
+        labels:
+          service: gateway
+      - targets: ["interview:8080"]
+        labels:
+          service: interview
+      - targets: ["job-alert:8080"]
+        labels:
+          service: job-alert
+      - targets: ["job-posting:8080"]
+        labels:
+          service: job-posting
+      - targets: ["job-search:8080"]
+        labels:
+          service: job-search
+      - targets: ["messaging:8080"]
+        labels:
+          service: messaging
+      - targets: ["moderation:8080"]
+        labels:
+          service: moderation
+      - targets: ["notification-inbox:8080"]
+        labels:
+          service: notification-inbox
+      - targets: ["offer:8080"]
+        labels:
+          service: offer
+      - targets: ["resume:8080"]
+        labels:
+          service: resume
+      - targets: ["review:8080"]
+        labels:
+          service: review
+      - targets: ["saved-jobs:8080"]
+        labels:
+          service: saved-jobs

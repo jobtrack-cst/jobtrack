@@ -92,3 +92,11 @@ Each service's database and user already exist. If you add a new service that is
 - `required variable ... is missing a value: set in .env`: you have not created `deploy/compose/.env`. See First-time setup.
 - `port is already allocated`: another program uses that port, often a local Postgres on 5432. Stop it, or change the left side of the port mapping in your local copy only.
 - `/bin/bash^M: bad interpreter` in the Postgres logs: the init script has Windows line endings. The repo's `.gitattributes` prevents this; if your editor changed it, save the file with LF line endings and reset.
+
+## Optional monitoring (JT-93)
+
+The `monitoring` profile adds Prometheus on http://localhost:9090 and Grafana on
+http://localhost:3000, bound to loopback only. It is disabled by default to save
+memory. Set separate Grafana credentials in `.env` before enabling it. See the
+[monitoring guide](../../docs/deployment/jt-93-monitoring.md) for startup, checks,
+screenshots and the request/error/latency dashboards.

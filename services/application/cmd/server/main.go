@@ -21,6 +21,7 @@ import (
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/grpcclient"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/clients"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/adapters/postgres"
@@ -195,12 +196,14 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, grpcListener, httpListener net.Listener, services ...*app.Service) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
-	grpcServer := grpc.NewServer()
+	requestMetrics := requestmetrics.New("application")
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor()))
 	for _, service := range services {
 		applicationv1.RegisterApplicationServiceServer(grpcServer, grpcadapter.NewApplicationHandler(service))
 	}
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
-	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
+	requestMetrics.RegisterGRPC(grpcServer)
+	httpServer := &http.Server{Handler: healthHandler(checker, requestMetrics), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
 		_ = grpcServer.Serve(grpcListener)
