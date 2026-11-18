@@ -185,6 +185,18 @@ describe('JT-83 resume upload', () => {
     cy.contains('Pending validation').should('be.visible');
   });
 
+  it('accepts a file name of exactly 255 characters', () => {
+    const name = `${'n'.repeat(251)}.pdf`;
+    openResumes();
+    cy.intercept('POST', `${gateway}/v1/resumes`, req => {
+      expect(req.body.fileName).to.eq(name);
+      req.reply({ resume: { ...pending, fileName: name } });
+    }).as('upload');
+    choose(pdf(), name);
+    cy.wait('@upload');
+    cy.contains('uploaded').should('be.visible');
+  });
+
   it('accepts a file of exactly 2,000,000 bytes', () => {
     openResumes();
     cy.intercept('POST', `${gateway}/v1/resumes`, req => {
@@ -202,6 +214,9 @@ describe('JT-83 resume upload', () => {
     ['an empty file', () => Cypress.Buffer.alloc(0), 'empty.pdf', 'application/pdf', 'The file is empty'],
     ['a PDF type without the %PDF- signature', () => Cypress.Buffer.from('not really a pdf'), 'fake.pdf', 'application/pdf', 'not a valid PDF'],
     ['a file name over 255 characters', () => pdf(), `${'n'.repeat(252)}.pdf`, 'application/pdf', 'file name must have 1 to 255'],
+    ['a file name with a slash', () => pdf(), 'cv/1.pdf', 'application/pdf', 'file name must have 1 to 255'],
+    ['a file name with a backslash', () => pdf(), 'cv\\1.pdf', 'application/pdf', 'file name must have 1 to 255'],
+    ['a file name with a NUL character', () => pdf(), 'cv\u00001.pdf', 'application/pdf', 'file name must have 1 to 255'],
   ]) {
     it(`rejects ${name} before uploading`, () => {
       let posted = false;
