@@ -67,3 +67,10 @@ log the token. A static host must serve `index.html` for client-side routes.
 If an IDE terminal exports `ELECTRON_RUN_AS_NODE=1`, launch the tests with
 `env -u ELECTRON_RUN_AS_NODE npm test`. After reinstalling dependencies, restart
 Vite if its dependency cache is stale (`npm run dev -- --force`).
+
+JT-73 adds employer **My jobs** (create draft, edit, publish and close), applicant
+**Search jobs**, **Saved jobs** and full job details, plus **Notifications** for
+all three roles. Job forms reuse seeded category/tag/location options; deadlines
+are entered in local time and sent in UTC. Publish requires a verified company.
+See [JT-73 test cases](../docs/testing/jt-73-frontend.md) for routes, contract
+constraints, gateway-stubbed Cypress cases and manual integration steps.

@@ -18,9 +18,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	jobsearchv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_search/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/job-search/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/job-search/internal/adapters/postgres"
+	"github.com/jobtrack-cst/jobtrack/services/job-search/internal/adapters/rabbitmq"
 	"github.com/jobtrack-cst/jobtrack/services/job-search/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/job-search/internal/ports"
 	"google.golang.org/grpc"
@@ -156,18 +158,31 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, pool, grpcListener, httpListener)
+	return serve(ctx, cfg, logger, checker, pool, grpcListener, httpListener)
 }
 
 // serve owns both listeners and stops the other server when either one fails.
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, pool *pgxpool.Pool, grpcListener, httpListener net.Listener) error {
+func serve(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, pool *pgxpool.Pool, grpcListener, httpListener net.Listener) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
 	grpcServer := grpc.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
 
-	search := app.NewSearch(postgres.NewSearchRepository(pool), systemClock{})
-	jobsearchv1.RegisterJobSearchServiceServer(grpcServer, grpcadapter.NewJobSearchHandler(search))
+	// Set up app and adapters
+	searchRepo := postgres.NewSearchRepository(pool)
+	writeRepo := postgres.NewWriteRepository(pool)
+
+	searchSvc := app.NewSearch(searchRepo, systemClock{})
+	consumerSvc := app.NewConsumer(writeRepo)
+
+	jobsearchv1.RegisterJobSearchServiceServer(grpcServer, grpcadapter.NewJobSearchHandler(searchSvc))
+
+	// Start the background consumer
+	consumerCtx, stopConsumer := context.WithCancel(ctx)
+	defer stopConsumer()
+	go func() {
+		_ = events.Consume(consumerCtx, rabbitmq.JobConsumerConfig(cfg.rabbitMQURL, logger, consumerSvc))
+	}()
 
 	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)

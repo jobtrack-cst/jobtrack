@@ -37,6 +37,9 @@ type CompanyProfile struct {
 	RejectionReason    string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	// HasLogo only says whether a logo is stored; the bytes are read
+	// separately through GetLogo (JT-102).
+	HasLogo bool
 }
 
 // ProfileFields are the editable fields, validated and trimmed.

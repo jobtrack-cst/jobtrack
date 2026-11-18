@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -13,7 +14,11 @@ import (
 
 const uniqueViolation = "23505"
 
-const profileColumns = "employer_id, company_name, description, website, location, verification_status, rejection_reason, created_at, updated_at"
+// hasLogoColumn only checks that a logo row exists, so profile reads never
+// load the image bytes (JT-102).
+const hasLogoColumn = "EXISTS (SELECT 1 FROM company_logos l WHERE l.employer_id = company_profiles.employer_id)"
+
+const profileColumns = "employer_id, company_name, description, website, location, verification_status, rejection_reason, created_at, updated_at, " + hasLogoColumn
 
 // Profiles stores company profiles in the employer database. The adapter
 // never owns the pool.
@@ -90,11 +95,61 @@ func (r *Profiles) Update(ctx context.Context, p domain.CompanyProfile) (domain.
 	return updated, nil
 }
 
+// PutLogo updates the profile row first: it fails with ErrProfileNotFound
+// when there is no profile, and its row lock makes concurrent uploads for one
+// employer run one after the other. Only updated_at changes on the profile,
+// never the verification columns (JT-102).
+func (r *Profiles) PutLogo(ctx context.Context, employerID string, logo domain.Logo, now time.Time) (domain.CompanyProfile, error) {
+	var updated domain.CompanyProfile
+	err := pgx.BeginTxFunc(ctx, r.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE company_profiles SET updated_at = $2 WHERE employer_id = $1`, employerID, now)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return domain.ErrProfileNotFound
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO company_logos (employer_id, content_type, content, updated_at)
+			 VALUES ($1, $2, $3, $4)
+			 ON CONFLICT (employer_id) DO UPDATE
+			 SET content_type = EXCLUDED.content_type, content = EXCLUDED.content, updated_at = EXCLUDED.updated_at`,
+			employerID, logo.ContentType, logo.Content, now); err != nil {
+			return err
+		}
+		updated, err = scanProfile(tx.QueryRow(ctx,
+			`SELECT `+profileColumns+` FROM company_profiles WHERE employer_id = $1`, employerID))
+		return err
+	})
+	if errors.Is(err, domain.ErrProfileNotFound) {
+		return domain.CompanyProfile{}, domain.ErrProfileNotFound
+	}
+	if err != nil {
+		return domain.CompanyProfile{}, safe(ctx, "put company logo failed")
+	}
+	return updated, nil
+}
+
+// GetLogo is the only query that reads the image bytes.
+func (r *Profiles) GetLogo(ctx context.Context, employerID string) (domain.Logo, error) {
+	var logo domain.Logo
+	err := r.pool.QueryRow(ctx,
+		`SELECT content_type, content FROM company_logos WHERE employer_id = $1`, employerID,
+	).Scan(&logo.ContentType, &logo.Content)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Logo{}, domain.ErrLogoNotFound
+	}
+	if err != nil {
+		return domain.Logo{}, safe(ctx, "get company logo failed")
+	}
+	return logo, nil
+}
+
 func scanProfile(row pgx.Row) (domain.CompanyProfile, error) {
 	var p domain.CompanyProfile
 	var status string
 	if err := row.Scan(&p.EmployerID, &p.CompanyName, &p.Description, &p.Website, &p.Location,
-		&status, &p.RejectionReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		&status, &p.RejectionReason, &p.CreatedAt, &p.UpdatedAt, &p.HasLogo); err != nil {
 		return domain.CompanyProfile{}, err
 	}
 	parsed, ok := parseStatus(status)
