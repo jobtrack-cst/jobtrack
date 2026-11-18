@@ -30,9 +30,9 @@ Stack: `docker compose -f deploy/compose/docker-compose.yml --profile functions 
 
 | Check | Result |
 |---|---|
-| `npm run test:stack` (Cypress 16.2.0, Electron) | 11 of 11 passing in NN s |
+| `npm run test:stack` (Cypress 16.2.0, Electron) | 11 of 11 passing in 40 s |
 | `npm test` (CI specs, stack folder excluded) | 4 specs, 155 of 155 passing |
-| CI on the pull request | CI_RUN_PLACEHOLDER |
+| CI on the pull request | Pass: [run RUN_ID](https://github.com/jobtrack-cst/jobtrack/actions/runs/44331902466) on `9744f02` |
 
 Screenshots of steps 01, 03, 04, 05, 07, 09 and 11 (`frontend/cypress/screenshots/stack/`, not committed) are attached to JT-95 in Jira.
 
