@@ -17,7 +17,7 @@ Acceptance criteria used in the matrix:
 Rules (AGENTS.md Section 15, 18 Nov 2026):
 
 - One transaction: claim the `event_id` in `processed_events` with `ON CONFLICT DO NOTHING`, lock the job row with `SELECT ... FOR UPDATE`, set `removed`, and store `job.closed` through the same `storeJobEvent` helper that `UpdateFields` and `UpdateStatus` use.
-- `job.closed` only when the job was `published` (`domain.RemovalPublishesClose`). A draft job was never published; a closed job already sent `job.closed`, and analytics counts every `job.closed`. To be confirmed by Sangay as job-posting owner in the PR.
+- `job.closed` only when the job was `published` (`domain.RemovalPublishesClose`). A draft job was never published; a closed job already sent `job.closed`, and analytics counts every `job.closed`. Approved by Sangay as job-posting owner in PR #69.
 - Producer `job-posting`, `event_id` a new UUID, `occurred_at` and outbox `created_at` the removal time (`updated_at`).
 
 ## Test matrix
