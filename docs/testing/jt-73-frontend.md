@@ -104,7 +104,7 @@ as passed.
 | Draft update | Updated the draft through the employer page. | No direct API mutation attempt was recorded. |
 | JT73-M03: unverified publish | Publishing as an unverified employer was rejected with a safe error in the UI. | This observation does not establish all publish failure partitions or cancellation behavior. |
 | JT73-M03: company verification setup | Created a test company and submitted a verification request; admin approval completed and the company showed verified status. | Records the observed setup workflow, not complete company-verification test coverage. |
-| JT73-M03/M04: publish and published edit | Published successfully, edited the published job's description, and saw that description persist after Refresh Job. | Published-title editing and other unexecuted edit partitions remain pending. |
+| JT73-M03/M04: publish and published edit | Published successfully, edited the published job's description, and saw that description persist after Refresh Job. | Published-title editing was not established by this earlier observation; the later title-update scenario is recorded below. Other unexecuted edit partitions remain pending. |
 | JT73-M04: second employer | A second employer was denied job management in the browser UI. | Owner mutation enforcement through direct API update/publish/close attempts was not tested. |
 | JT73-M08: notifications | Applicant, employer and admin notification pages each displayed their empty state; applicant Unread only also displayed an empty state. | No nonempty notifications, mark-as-read transition, recipient isolation with data or notification pagination was established. |
 | Saved jobs: initial observation | Applicant Saved jobs displayed its empty state. | This initial empty-state observation is retained; later bookmark operations are recorded below. |
@@ -123,7 +123,7 @@ update.
 | JT73-M05: direct published details | Applicant opened the job directly and saw the full updated description, location, deadline and Published status. | Search discovery, filtering and indexing were not established by direct navigation. |
 | JT73-M06: Save and populated listing | Save succeeded. Saved Jobs listed one bookmark with the matching job ID and a saved timestamp. | Establishes a populated one-item listing, not pagination or closure cleanup. |
 | JT73-M06: Unsave | Unsave succeeded and the saved-job count became zero. | Manual removal does not establish event-driven bookmark cleanup. |
-| JT73-M06: save again and View Job | Saving again succeeded; opening the job through Saved Jobs → View Job succeeded. | Independent of the still-blocked search workflow. |
+| JT73-M06: save again and View Job | Saving again succeeded; opening the job through Saved Jobs → View Job succeeded. | Independent of the search workflow, which was blocked at that observation. |
 | JT73-M06: duplicate Save | Duplicate Save returned HTTP 409 with safe already-saved guidance; the saved-job count remained one. | Other save/error partitions remain pending. |
 | JT73-M05: Apply navigation | Apply opened `/applicant/apply` with the correct job ID prefilled. | No application was submitted; application submission and eligibility outcomes were not tested by this observation. |
 | Report Job navigation | Report Job opened the report form with the correct job ID. | No report was submitted. |
@@ -154,22 +154,72 @@ request. They do not establish those properties for other endpoints or roles,
 any preflight request or its headers/status, or complete CORS coverage. UTC
 payload serialization and the other pending checks remain unverified.
 
-### Search blocker and dependency
+### JT-69: earlier blocker and subsequent live search verification
 
-After publishing, applicant search stayed at **zero results**. Search indexing,
-filtering and discovery through search (JT73-M05), including search-led detail
-and bookmark workflows and search removal after closure, remain **blocked on
-JT-69**. The later known-ID details and bookmark observations above establish
-those direct UI operations only; they do not establish search integration.
-The observed zero-result state is not a successful search integration result.
-Full JT-73 integration acceptance remains blocked on JT-69 and JT-70.
+The earlier observation is retained: after publishing QA intern, applicant
+search stayed at **zero results**. At that time,
+[JT-69](https://jobtrack-cst.atlassian.net/browse/JT-69) was reported as an
+unmerged dependency, Jira status **In Progress**, owned by **Sangay**, and the
+`main` job-search service lacked the job event consumer. The known-ID details
+and bookmark checks above did not establish search integration at that stage.
 
-The reported unmerged dependency is [JT-69](https://jobtrack-cst.atlassian.net/browse/JT-69):
-Jira status **In Progress**, owned by **Sangay** as of 18 Nov 2026. The current
-`main` job-search service lacks the job event consumer that builds its search
-read model from job events. This dependency status and diagnosis are recorded
-from the supplied context, not a new Jira query or checkout of `main`. Resume
-these blocked checks once JT-69 is merged and available in the live environment.
+Later on **18 November 2026**, after JT-69 was reported merged into `main`,
+job-search was rebuilt via Docker Compose. Startup logs confirmed that the
+event consumer was ready on queue **`job-search.jobs`**. A verified employer
+created and published the following synthetic job:
+
+| Field | Observed value |
+|---|---|
+| Title | `JT73 Search Test` |
+| Job ID | `d4ad8da7-9ab4-4c70-b522-a21c4b59794e` |
+| Category | Business and Finance |
+| Tag | Accounting |
+| Location | Bumthang |
+| Deadline | 25 November 2026 at 5 PM local time |
+
+| Live scenario (JT73-M05) | Observed result | Status |
+|---|---|---|
+| Applicant unfiltered Refresh Search after publication | Displayed one matching job, `JT73 Search Test`. | Passed |
+| Combined title `JT73 Search Test`, category Business and Finance, tag Accounting and location Bumthang | Returned exactly one matching job. | Passed |
+| Keep the same title, category and tag; change only location to Thimphu | Returned zero results, showed the correct empty state and disabled pagination. | Passed |
+
+For these exact scenarios, **publish-to-search integration was verified after
+the backend consumer merged**. The earlier JT-69 publish-to-search blocker is
+therefore resolved for the observed environment and job. The observations
+support these combined-filter positive and negative cases, not every search
+partition or event path.
+
+The merge, Compose rebuild, startup logs and browser results above are supplied
+live evidence; no checkout, rebuild, new test execution or Jira query was
+performed for this documentation update. At that stage, they did **not**
+establish `job.updated` propagation or `job.closed` search removal; the
+subsequent specific live scenarios below supply that evidence for this job.
+Multi-page live pagination, notifications mark-as-read with real data and JT-70
+bookmark cleanup remain pending or blocked; full JT-73 integration acceptance
+is not established.
+
+### Published update and closure in search — 18 Nov 2026 (PR #72)
+
+Additional reported live UI verification used the same synthetic job,
+`d4ad8da7-9ab4-4c70-b522-a21c4b59794e`. These results extend the earlier
+publish-to-search and combined-filter observations without replacing them.
+
+| Specific live scenario | Observed result | Status |
+|---|---|---|
+| JT73-M04/M05: published title edit and `job.updated` propagation | Employer changed `JT73 Search Test` to `JT73 Search Test Updated`, clicked Save Changes and received `Job updated`. The job remained Published with an unchanged deadline. Applicant cleared search filters, refreshed and saw exactly one result with the updated title. | Passed |
+| JT73-M07: close and `job.closed` propagation to job-search | Employer closed the same job, received `Job closed`, saw Closed status and no editing actions. Applicant cleared filters and refreshed Search Jobs: `Matching jobs: 0`, the correct empty state and disabled pagination; the closed job was absent. | Passed |
+
+These observations confirm **`job.updated` propagation** and **`job.closed`
+removal from the job-search read model for this job**. They are supplied live
+browser observations, not new executions by the assistant, event-payload
+inspection or complete coverage of all consumer behavior. The unchanged
+deadline is a UI observation, not an additional wire-precision check. Close
+cancellation remains untested live.
+
+Search removal does not establish saved-job cleanup: **JT-70 remains blocked**.
+Notification mark-as-read and other notification checks requiring real data,
+and multi-page live pagination, remain pending. No code, Git branch, Jira or
+PR changes were made for this documentation update.
 
 ### Bookmark cleanup blocker — JT-70
 
@@ -181,18 +231,21 @@ is **To Do**, assigned to **Jigden**, as reported for 18 Nov 2026. This diagnosi
 and Jira status are supplied evidence, not a new backend execution or Jira query
 for this documentation update.
 
-Automatic bookmark cleanup after closure (JT73-M07) is **blocked on JT-70**;
-search indexing remains **blocked on JT-69**. Neither backend integration is
-recorded as passed. Once the respective consumer is available in the live
-environment, repeat the corresponding event propagation checks. Manual
-save/unsave success and direct Closed details do not prove either consumer ran.
+Automatic bookmark cleanup after closure (JT73-M07) remains **blocked on
+JT-70** and is not recorded as passed. Publish-to-search and the specific
+`job.updated` and `job.closed` search scenarios above are verified for the
+synthetic search job; none establishes bookmark cleanup.
+Once the saved-jobs consumer is available in the live environment, repeat the
+bookmark cleanup check. Manual save/unsave success and direct Closed details
+do not prove that the saved-jobs consumer ran.
 
 ### Untested and pending live checks
 
 Mark-as-read and nonempty pagination (own jobs, search results, saved jobs and
 notifications) are **untested for lack of sufficient data**. A one-bookmark
-listing is now verified, but no populated pagination behavior or notification
-transition can be inferred from it or the earlier empty states.
+listing and a one-result search are now verified, but no multi-page live
+pagination behavior or notification transition can be inferred from them, the
+earlier empty states or disabled pagination in the zero-result search case.
 
 All other live steps not explicitly verified above remain **pending**, including
 unexecuted portions of JT73-M01–M12: request headers and CORS checks beyond the
@@ -203,10 +256,11 @@ partitions, including expired-job behavior; application/report submission and
 other unexecuted navigation/eligibility checks; save/error partitions beyond the
 observed duplicate Save; nonempty notification
 content and recipient isolation; remaining authentication/role/session-expiry
-paths; service outage/recovery; and moderation-removal propagation. Search
-indexing/removal is blocked on JT-69 and automatic bookmark cleanup after
-closure is blocked on JT-70, as described above. The observed successful close
-does not cover cancellation or either backend propagation path.
+paths; service outage/recovery; and moderation-removal propagation. The exact
+`job.updated` and `job.closed` search scenarios above passed for the specified
+job; other unexecuted event-propagation partitions remain pending. Automatic
+bookmark cleanup after closure remains blocked on JT-70. The observed close
+and search removal do not cover close cancellation or bookmark cleanup.
 Remote CI and deployment checks remain unrun. The partial UI observations do
 not establish complete manual test-case coverage or full integration acceptance.
 
@@ -236,8 +290,10 @@ interactions/stubs were corrected without changing the shared client contract.
 The final regression run includes all 29 JT-73 cases.
 
 The manual results above supersede the earlier statement that live checks were
-entirely unrun. Full integration acceptance remains blocked by JT-69 and JT-70; all
-unexecuted live checks remain pending. This update changes only this document;
+entirely unrun. Publish-to-search and the specific update/close propagation
+scenarios above passed after JT-69 merged; full integration acceptance remains
+blocked by JT-70 and the remaining
+pending live checks. This update changes only this document;
 no source, tests, Jira, branches, commits or PRs were altered. Before submitting,
 complete the blocked/pending cases and run local checks, then commit with JT-73,
 push, open a PR and move the Jira card to In Review when ready.
@@ -281,5 +337,7 @@ existing server. Cypress ran with approved execution outside the sandbox and
 `ELECTRON_RUN_AS_NODE` unset.
 
 These are gateway-stubbed browser checks, not new live-backend observations or
-a manual screen-reader session. The existing live evidence, pending checks and
-JT-69 backend search-consumer blocker remain unchanged.
+a manual screen-reader session. The live evidence and limitations recorded at
+that stage are retained above. Subsequent publish-to-search verification
+supersedes the earlier JT-69 blocker for those exact scenarios; JT-70 and the
+other pending live checks remain.
