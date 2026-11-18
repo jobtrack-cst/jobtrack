@@ -22,13 +22,20 @@ import { AdminModerationPage } from './features/moderation/AdminModerationPage';
 import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { AuditLogPage } from './features/audit-log/AuditLogPage';
 
+import { JobsPage } from './features/job-posting/JobsPage';
+import { ManageJobPage } from './features/job-posting/ManageJobPage';
+import { SearchJobsPage } from './features/job-search/SearchJobsPage';
+import { JobDetailsPage } from './features/job-search/JobDetailsPage';
+import { SavedJobsPage } from './features/saved-jobs/SavedJobsPage';
+import { NotificationsPage } from './features/notification-inbox/NotificationsPage';
+
 // Workspace links per role; each path is relative to the role's landing path.
 const navigation: Record<Role, [path: string, label: string][]> = {
-  ROLE_APPLICANT: [['applications', 'Applications'], ['apply', 'Apply'], ['offers', 'Offers'], ['job-alerts', 'Job alerts'],
+  ROLE_APPLICANT: [['jobs', 'Search jobs'], ['saved-jobs', 'Saved jobs'], ['notifications', 'Notifications'], ['applications', 'Applications'], ['apply', 'Apply'], ['offers', 'Offers'], ['job-alerts', 'Job alerts'],
     ['profile', 'Profile'], ['resumes', 'Resumes'], ['report-job', 'Report a job']],
-  ROLE_EMPLOYER: [['applications', 'Applications'], ['offers', 'Offers'], ['company', 'Company'], ['verification', 'Verification'],
+  ROLE_EMPLOYER: [['jobs', 'My jobs'], ['notifications', 'Notifications'], ['applications', 'Applications'], ['offers', 'Offers'], ['company', 'Company'], ['verification', 'Verification'],
     ['report-job', 'Report a job']],
-  ROLE_ADMIN: [['verification', 'Verification'], ['moderation', 'Moderation'], ['analytics', 'Analytics'], ['audit-log', 'Audit log'],
+  ROLE_ADMIN: [['notifications', 'Notifications'], ['verification', 'Verification'], ['moderation', 'Moderation'], ['analytics', 'Analytics'], ['audit-log', 'Audit log'],
     ['report-job', 'Report a job']],
 };
 
@@ -61,6 +68,10 @@ export default function App() {
         <Route path="/register" element={<AuthPage key="register" registration />} />
         <Route path="/applicant" element={<Workspace role="ROLE_APPLICANT" />}>
           <Route index element={<Typography variant="h4" component="h1">Applicant workspace</Typography>} />
+          <Route path="jobs" element={<SearchJobsPage />} />
+          <Route path="jobs/:jobId" element={<JobDetailsPage />} />
+          <Route path="saved-jobs" element={<SavedJobsPage />} />
+          <Route path="notifications" element={<NotificationsPage key="applicant-notifications" />} />
           <Route path="apply" element={<ApplyPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
           <Route path="applications/:applicationId/status" element={<StatusPage />} />
@@ -83,6 +94,10 @@ export default function App() {
           <Route path="offers" element={<OffersPage key="employer-offers" />} />
           <Route path="offers/new/:applicationId" element={<OffersPage key="make-offer" create />} />
           <Route path="messages/:applicationId" element={<MessagesPage />} />
+          <Route path="jobs" element={<JobsPage />} />
+          <Route path="jobs/new" element={<ManageJobPage key="create-job" create />} />
+          <Route path="jobs/:jobId" element={<ManageJobPage key="manage-job" />} />
+          <Route path="notifications" element={<NotificationsPage key="employer-notifications" />} />
           <Route path="company" element={<CompanyPage />} />
           <Route path="verification" element={<VerificationPage />} />
           <Route path="report-job" element={<ReportJobPage />} />
@@ -92,6 +107,7 @@ export default function App() {
         <Route path="/admin" element={<Workspace role="ROLE_ADMIN" />}>
           <Route index element={<Typography variant="h4" component="h1">Admin workspace</Typography>} />
           <Route path="verification" element={<AdminVerificationPage />} />
+          <Route path="notifications" element={<NotificationsPage key="admin-notifications" />} />
           <Route path="moderation" element={<AdminModerationPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="audit-log" element={<AuditLogPage />} />
