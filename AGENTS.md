@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 18 Nov 2026 (JT-98 Sprint 3 review and Sprint 4 planning)
+- Last updated: 18 Nov 2026 (JT-95 Cypress main workflow against the running stack)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -703,6 +703,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 18 Nov 2026 | JT-102 (company logo) and JT-103 (applicant profile photo) approved as Should tasks that slip after JT-66: JPEG or PNG only, a 1 MB limit, file signature validation, ownership checks and additive protobuf changes. Each proto diff needs Phuntsho's explicit approval before implementation (Phuntsho as Product Owner and contracts lead, JT-98) | Follows the resume upload pattern (JT-48) and the rule that contract changes need agreement (Section 0) |
 | 18 Nov 2026 | Sprint 4 slip order: JT-66 first, then JT-102 and JT-103, then the other Should tasks; a Must task is never cut. There is no Sprint 5 and no extension: an unfinished Should task is recorded as not delivered in the closure report (JT-100) (Phuntsho as Product Owner, JT-98) | Sprint 4 ends on the planned completion date (19 Nov) with no buffer, and Sprint 3 carried 19 points into it |
 | 18 Nov 2026 | JT-102 `employer.proto` change approved by Phuntsho as Product Owner and contracts lead at 17:16: new RPCs `PutCompanyLogo` (`PUT /v1/employer/profile/logo`, body `"*"`, with `content_type` and `content` bytes) and `GetCompanyLogo` (`GET /v1/companies/{employer_id}/logo`, returns `content_type` and `content`), and `bool has_logo = 9` on `CompanyProfile`. Additive only, following the resume pattern, with no delete RPC. JPEG or PNG only, 1 MB limit, file signature validation and ownership checks; image bytes are never included in normal profile responses. Before coding, Sangay confirms the exact diff for Team B in the PR, and the PR must pass `buf lint`, `buf breaking` and CI. JT-102 stays a Should task and must not delay Must tasks (JT-98) | Adds logo upload without changing existing fields or responses, meeting the 18 Nov profile image conditions |
+| 18 Nov 2026 | Cypress against the running stack: specs that need the Docker Compose stack live in `tests/e2e/stack/`, are excluded from `cypress.config.cjs` (so CI's `npm test` stays stubbed) and run locally with `npm run test:stack` (`frontend/cypress.stack.config.cjs`); CI does not run them. They use no `cy.intercept`, create synthetic accounts unique per run, read the admin login with `cy.env()` from `CYPRESS_ADMIN_EMAIL` and `CYPRESS_ADMIN_PASSWORD` (Cypress 16), and wait for event-driven changes by refreshing the page. `stack/main-workflow.cy.js` covers the main workflow from employer registration to the accepted offer and the status history (JT-95, approved by Jigden during JT-95) | Shows the real UI and services working together without making CI depend on a running stack |
 
 
 ---
