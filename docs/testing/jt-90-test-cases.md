@@ -56,7 +56,7 @@ All commands ran on 18 November 2026 on Jigden's laptop (WSL Ubuntu, Docker Desk
 | Integration tests | Pass, all packages `ok` (postgres package 18.3 s, real PostgreSQL 17 and RabbitMQ 4.1 containers) |
 | Compose | job-posting rebuilt from the branch; database at version 3, no migration added; consumer ready on `job-posting.moderation` |
 | End to end (JT90-14) | Pass. Job `d5b82017-4fdd-4a59-a4be-2e48bcc6c7fb` read as `JOB_STATUS_REMOVED` 2.1 s after the removal. Outbox: `job.published` `57df01e0-7b2b-4764-93f1-339ebf370669` and `job.closed` `b7771e5c-4b4f-40ed-b3b3-7b308ee795da` (created 10:00:36.118 UTC, published 10:00:37.119 UTC); exactly one `job.closed` message for the job received on a check queue bound to `job.closed` on `jobtrack.events`, producer `job-posting`; job-posting logged `outbox events published` with count 1. A second removal was refused by moderation (HTTP 400, code 9) and added no message or outbox row |
-| CI on the pull request | To be filled in after CI runs |
+| CI on the pull request | Green, all checks passed on PR #69 (https://github.com/jobtrack-cst/jobtrack/pull/69) |
 
 ## Acceptance criteria review
 
