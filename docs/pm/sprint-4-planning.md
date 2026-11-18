@@ -125,7 +125,7 @@ Sangay held 13 of the 19 carried points. Moving JT-73, JT-72 and JT-70 (6 points
 | JT-99 | JT-73; the main workflow running in Docker Compose | JT-100 | |
 | JT-100 | JT-97, JT-99 and the final sprint status | None | Records unfinished Should tasks as not delivered |
 | JT-101 | None | None | Due by the 18 Nov stand-up |
-| JT-102 | Phuntsho's approval of the `employer.proto` diff | None | Slips after JT-66 |
+| JT-102 | Approved `employer.proto` diff (18 Nov, 17:16); Sangay confirms it in the PR | None | Slips after JT-66 |
 | JT-103 | Phuntsho's approval of the `applicant_profile.proto` diff | None | Slips after JT-66 |
 | JT-104 | None | JT-97 (SonarQube result) | |
 
@@ -174,6 +174,6 @@ Recorded in the AGENTS.md Decision log (Section 15), agreed with Phuntsho as Pro
 
 ## 10. Open items
 
-- The `employer.proto` diff for JT-102 (`PutCompanyLogo`, `GetCompanyLogo` and `has_logo` on `CompanyProfile`) was sent to Phuntsho on 18 Nov at 16:53 and is waiting for approval.
+- The `employer.proto` diff for JT-102 (`PutCompanyLogo`, `GetCompanyLogo` and `has_logo` on `CompanyProfile`) was sent to Phuntsho on 18 Nov at 16:53 and approved by him at 17:16 (AGENTS.md Section 15). Sangay confirms the exact diff for Team B in the JT-102 PR.
 - Confirm the WEB303 deployment scope against the official assessment requirements (Phuntsho).
 - JT-104 has no estimate yet (Sprint 2 action: estimate every task and bug before it enters a sprint).
