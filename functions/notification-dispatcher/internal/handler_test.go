@@ -191,3 +191,270 @@ func TestHandle_ApplicationSubmitted(t *testing.T) {
 		t.Error("expected email-sender to be called for the employer")
 	}
 }
+
+func TestHandle_ApplicationStatusChanged(t *testing.T) {
+	fixtureData, err := os.ReadFile("../../../tests/contract/fixtures/application.status_changed.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+	event := cloudevents.NewEvent()
+	event.SetID("77777777-7777-4777-8777-777777777777")
+	event.SetType("application.status_changed")
+	event.SetSource("application-status")
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
+		t.Fatalf("failed to parse fixture: %v", err)
+	}
+	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+		t.Fatalf("failed to set data: %v", err)
+	}
+
+	emailServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer emailServer.Close()
+
+	inboxCalls := 0
+	mockInbox := &mockInboxClient{
+		CreateNotificationFunc: func(ctx context.Context, req *inboxv1.CreateNotificationRequest, opts ...grpc.CallOption) (*inboxv1.CreateNotificationResponse, error) {
+			inboxCalls++
+			return &inboxv1.CreateNotificationResponse{}, nil
+		},
+	}
+	mockAuth := &mockAuthClient{
+		GetUserFunc: func(ctx context.Context, req *authv1.GetUserRequest, opts ...grpc.CallOption) (*authv1.GetUserResponse, error) {
+			return &authv1.GetUserResponse{User: &authv1.User{Email: "applicant@example.com"}}, nil
+		},
+	}
+	handler := &Handler{
+		authClient: mockAuth, inboxClient: mockInbox,
+		httpClient: &http.Client{}, emailURL: emailServer.URL,
+		seenIDs: make(map[string]time.Time),
+	}
+	if err := handler.Handle(context.Background(), event); err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if inboxCalls != 1 {
+		t.Errorf("expected 1 notification, got %d", inboxCalls)
+	}
+}
+
+func TestHandle_InterviewScheduled(t *testing.T) {
+	fixtureData, err := os.ReadFile("../../../tests/contract/fixtures/interview.scheduled.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+	event := cloudevents.NewEvent()
+	event.SetID("88888888-8888-4888-8888-888888888888")
+	event.SetType("interview.scheduled")
+	event.SetSource("interview")
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
+		t.Fatalf("failed to parse fixture: %v", err)
+	}
+	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+		t.Fatalf("failed to set data: %v", err)
+	}
+
+	emailServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer emailServer.Close()
+	inboxCalls := 0
+	mockInbox := &mockInboxClient{
+		CreateNotificationFunc: func(ctx context.Context, req *inboxv1.CreateNotificationRequest, opts ...grpc.CallOption) (*inboxv1.CreateNotificationResponse, error) {
+			inboxCalls++
+			return &inboxv1.CreateNotificationResponse{}, nil
+		},
+	}
+	mockAuth := &mockAuthClient{
+		GetUserFunc: func(ctx context.Context, req *authv1.GetUserRequest, opts ...grpc.CallOption) (*authv1.GetUserResponse, error) {
+			return &authv1.GetUserResponse{User: &authv1.User{Email: "applicant@example.com"}}, nil
+		},
+	}
+	handler := &Handler{
+		authClient: mockAuth, inboxClient: mockInbox,
+		httpClient: &http.Client{}, emailURL: emailServer.URL,
+		seenIDs: make(map[string]time.Time),
+	}
+	if err := handler.Handle(context.Background(), event); err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if inboxCalls != 1 {
+		t.Errorf("expected 1 notification, got %d", inboxCalls)
+	}
+}
+
+func TestHandle_OfferMade(t *testing.T) {
+	fixtureData, err := os.ReadFile("../../../tests/contract/fixtures/offer.made.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+	event := cloudevents.NewEvent()
+	event.SetID("99999999-9999-4999-8999-999999999999")
+	event.SetType("offer.made")
+	event.SetSource("offer")
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
+		t.Fatalf("failed to parse fixture: %v", err)
+	}
+	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+		t.Fatalf("failed to set data: %v", err)
+	}
+	emailServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer emailServer.Close()
+	inboxCalls := 0
+	mockInbox := &mockInboxClient{
+		CreateNotificationFunc: func(ctx context.Context, req *inboxv1.CreateNotificationRequest, opts ...grpc.CallOption) (*inboxv1.CreateNotificationResponse, error) {
+			inboxCalls++
+			return &inboxv1.CreateNotificationResponse{}, nil
+		},
+	}
+	mockAuth := &mockAuthClient{
+		GetUserFunc: func(ctx context.Context, req *authv1.GetUserRequest, opts ...grpc.CallOption) (*authv1.GetUserResponse, error) {
+			return &authv1.GetUserResponse{User: &authv1.User{Email: "applicant@example.com"}}, nil
+		},
+	}
+	handler := &Handler{
+		authClient: mockAuth, inboxClient: mockInbox,
+		httpClient: &http.Client{}, emailURL: emailServer.URL,
+		seenIDs: make(map[string]time.Time),
+	}
+	if err := handler.Handle(context.Background(), event); err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if inboxCalls != 1 {
+		t.Errorf("expected 1 notification, got %d", inboxCalls)
+	}
+}
+
+func TestHandle_MessageSent(t *testing.T) {
+	fixtureData, err := os.ReadFile("../../../tests/contract/fixtures/message.sent.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+	event := cloudevents.NewEvent()
+	event.SetID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+	event.SetType("message.sent")
+	event.SetSource("messaging")
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
+		t.Fatalf("failed to parse fixture: %v", err)
+	}
+	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+		t.Fatalf("failed to set data: %v", err)
+	}
+	inboxCalls := 0
+	mockInbox := &mockInboxClient{
+		CreateNotificationFunc: func(ctx context.Context, req *inboxv1.CreateNotificationRequest, opts ...grpc.CallOption) (*inboxv1.CreateNotificationResponse, error) {
+			inboxCalls++
+			return &inboxv1.CreateNotificationResponse{}, nil
+		},
+	}
+	handler := &Handler{
+		authClient: &mockAuthClient{}, inboxClient: mockInbox,
+		httpClient: &http.Client{}, emailURL: "http://invalid",
+		seenIDs: make(map[string]time.Time),
+	}
+	if err := handler.Handle(context.Background(), event); err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if inboxCalls != 1 {
+		t.Errorf("expected 1 notification, got %d", inboxCalls)
+	}
+}
+
+func TestHandle_JobAlertMatched(t *testing.T) {
+	fixtureData, err := os.ReadFile("../../../tests/contract/fixtures/job_alert.matched.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+	event := cloudevents.NewEvent()
+	event.SetID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	event.SetType("job_alert.matched")
+	event.SetSource("job-alert")
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
+		t.Fatalf("failed to parse fixture: %v", err)
+	}
+	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+		t.Fatalf("failed to set data: %v", err)
+	}
+	inboxCalls := 0
+	mockInbox := &mockInboxClient{
+		CreateNotificationFunc: func(ctx context.Context, req *inboxv1.CreateNotificationRequest, opts ...grpc.CallOption) (*inboxv1.CreateNotificationResponse, error) {
+			inboxCalls++
+			return &inboxv1.CreateNotificationResponse{}, nil
+		},
+	}
+	handler := &Handler{
+		authClient: &mockAuthClient{}, inboxClient: mockInbox,
+		httpClient: &http.Client{}, emailURL: "http://invalid",
+		seenIDs: make(map[string]time.Time),
+	}
+	if err := handler.Handle(context.Background(), event); err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if inboxCalls != 1 {
+		t.Errorf("expected 1 notification, got %d", inboxCalls)
+	}
+}
+
+func TestHandle_EmployerVerified(t *testing.T) {
+	fixtureData, err := os.ReadFile("../../../tests/contract/fixtures/employer.verified.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+	event := cloudevents.NewEvent()
+	event.SetID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+	event.SetType("employer.verified")
+	event.SetSource("company-verification")
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
+		t.Fatalf("failed to parse fixture: %v", err)
+	}
+	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+		t.Fatalf("failed to set data: %v", err)
+	}
+	emailServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer emailServer.Close()
+	inboxCalls := 0
+	mockInbox := &mockInboxClient{
+		CreateNotificationFunc: func(ctx context.Context, req *inboxv1.CreateNotificationRequest, opts ...grpc.CallOption) (*inboxv1.CreateNotificationResponse, error) {
+			inboxCalls++
+			return &inboxv1.CreateNotificationResponse{}, nil
+		},
+	}
+	mockAuth := &mockAuthClient{
+		GetUserFunc: func(ctx context.Context, req *authv1.GetUserRequest, opts ...grpc.CallOption) (*authv1.GetUserResponse, error) {
+			return &authv1.GetUserResponse{User: &authv1.User{Email: "employer@example.com"}}, nil
+		},
+	}
+	handler := &Handler{
+		authClient: mockAuth, inboxClient: mockInbox,
+		httpClient: &http.Client{}, emailURL: emailServer.URL,
+		seenIDs: make(map[string]time.Time),
+	}
+	if err := handler.Handle(context.Background(), event); err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if inboxCalls != 1 {
+		t.Errorf("expected 1 notification, got %d", inboxCalls)
+	}
+}
