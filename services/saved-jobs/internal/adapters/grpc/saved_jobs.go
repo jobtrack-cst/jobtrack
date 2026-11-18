@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
 	savedjobsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/saved_jobs/v1"
@@ -95,16 +96,38 @@ func (h *SavedJobsInternalHandler) ListJobSavers(ctx context.Context, req *saved
 	if pageSize == 0 {
 		pageSize = 20
 	}
+	if pageSize < 0 {
+		return nil, status.Error(codes.InvalidArgument, "page_size must not be negative")
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
 	offset := 0
+	if req.GetPagination().GetPageToken() != "" {
+		var err error
+		offset, err = strconv.Atoi(req.GetPagination().GetPageToken())
+		if err != nil || offset < 0 {
+			return nil, status.Error(codes.InvalidArgument, "page_token must be a non-negative decimal offset")
+		}
+	}
 
 	savers, total, err := h.svc.ListJobSavers(ctx, req.GetJobId(), pageSize, offset)
 	if err != nil {
 		return nil, toStatus(err)
 	}
 
+	nextToken := ""
+	if offset+len(savers) < total {
+		nextToken = strconv.Itoa(offset + len(savers))
+	}
+
 	return &savedjobsv1.ListJobSaversResponse{
 		ApplicantIds: savers,
-		Pagination:   &commonv1.PaginationResponse{TotalCount: int64(total)},
+		Pagination: &commonv1.PaginationResponse{
+			TotalCount:    int64(total),
+			NextPageToken: nextToken,
+		},
 	}, nil
 }
 
