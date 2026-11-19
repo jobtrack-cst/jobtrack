@@ -710,6 +710,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 
 ## 16. Known issues and open questions
 
+- Notification-dispatcher has no Compose RabbitMQ forwarder and no Knative deployment or forwarder manifest. This blocks verified event delivery for JT-71 and JT-92.
 - JT-77 cluster deployment dependency: `deploy/knative/email-sender.yaml` sets `SMTP_ADDR=mailpit:1025`, which requires reachable Mailpit SMTP and the `mailpit` DNS name in the function's cluster namespace. Mailpit is configured only in Compose; cluster manifests and an explicit deployment task remain to be provided by DevOps before cluster email delivery can be verified.
 - Offer application lifecycle eligibility remains unresolved for Sprint 2, including required lifecycle state, interview completion, employer verification and withdrawal handling. Whether Offer should consume `application.withdrawn` and which trusted data sources support these checks require agreement; Sprint 1 checks only local participants, employer ownership and lifetime offer uniqueness (JT-45).
 - JT-29 confirmed 16 GiB physical RAM and the forwarder fallback; the spike does not prove capacity for the complete 20-service deployment. Docker Desktop currently has approximately 7.75 GiB allocated.

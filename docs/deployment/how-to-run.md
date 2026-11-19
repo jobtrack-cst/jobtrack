@@ -350,6 +350,35 @@ upstream; CORS failures require matching the browser origin; quorum redeclaratio
 failures require reviewed migration, never automatic queue deletion. Avoid sharing
 logs containing user data or credentials.
 
+For local password-authentication failures after an `.env` edit, first inspect the
+failing service's logs and confirm its database/user/host settings without printing
+passwords. Existing PostgreSQL users and RabbitMQ credentials survive restarts;
+restore the last working local configuration or coordinate credential rotation
+with DevOps. Restarting containers does not rerun PostgreSQL initialization on an
+existing volume. Prefer these repairs over a data reset.
+
+If a host port is already in use, inspect `docker compose -f
+deploy/compose/docker-compose.yml ps` and the process reported in the bind error.
+Stop only an identified, authorized conflicting process/container, or agree on a
+local host-port override with DevOps. Keep gateway URLs, browser CORS and test URLs
+consistent with any override; never publish service gRPC 9090 as a workaround.
+
+An optional local reset is a last resort. **`down -v` permanently deletes named-volume
+data**, including PostgreSQL databases, RabbitMQ messages and monitoring history.
+It must never run automatically. Before executing it, obtain explicit authorization
+and backup confirmation that required data is backed up and restorable. The owner
+must explicitly authorize deletion of the local data. Only after those
+confirmations, run from the repository root:
+
+```bash
+# DESTRUCTIVE: run only after explicit authorization and backup confirmation.
+docker compose -f deploy/compose/docker-compose.yml --profile functions --profile monitoring down -v
+# Recreate with the privately configured .env; PostgreSQL initialization runs again.
+docker compose -f deploy/compose/docker-compose.yml --profile functions --profile monitoring up -d --build
+```
+
+This is a manual recovery option, not a required setup or verification step.
+
 For k3d use explicit-context `k get events --sort-by=.lastTimestamp`, `k describe
 ksvc FUNCTION` and the relevant revision logs after replacing `FUNCTION`. Check
 image resolution, Secret key references, DNS/TCP access and internal allowlists.

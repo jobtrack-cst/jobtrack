@@ -19,31 +19,48 @@ Gateway owner: Jigden Shakya; backup: Sangay Tenzin.
 flowchart TD
     UI["React web app: applicant, employer, admin"] -->|REST + JWT| GW["API Gateway: grpc-gateway"]
     GW -->|"Public gRPC: user ID and role metadata"| MS["20 Go microservices"]
+    MS ---|"Includes"| APP["Application"]
+    MS ---|"Includes"| JP["Job Posting"]
+    APP -->|"Public gRPC: GetJob, forwarded user identity"| JP
     MS -->|"Own database only"| PG["PostgreSQL: 20 databases and 20 service users"]
     MS -->|"Publish domain envelopes"| MQ["RabbitMQ: jobtrack.events topic exchange"]
     MQ -->|"Service queues"| MS
-    MQ -->|"Function queues"| FW["Go RabbitMQ-to-HTTP forwarders"]
-    FW -->|"HTTP CloudEvents"| EF["resume-validator and notification-dispatcher"]
-    PS["Knative PingSources: daily and weekly"] --> SF["deadline-reminder and weekly-summary"]
-    EF -->|"Validation result events"| MQ
-    SF -->|"Deadline reminder events"| MQ
-    EF -->|"Dispatcher HTTP JSON"| ES["email-sender"]
-    SF -->|"Weekly summary HTTP JSON"| ES
+    MQ -->|"resume.uploaded queue"| FW["Resume validator forwarder"]
+    FW -->|"HTTP CloudEvent: resume.uploaded"| RV["resume-validator"]
+    MQ -.->|"Assigned event queues: wiring missing"| DFW["Dispatcher forwarder: pending"]
+    DFW -.->|"HTTP CloudEvents: wiring missing"| ND["notification-dispatcher"]
+    PS["Knative PingSources"] -->|"Daily 07:00 Asia/Thimphu"| DR["deadline-reminder"]
+    PS -->|"Monday 08:00 Asia/Thimphu"| WS["weekly-summary"]
+    RV -->|"Publish resume.validated or resume.rejected"| MQ
+    DR -->|"Publish deadline.reminder"| MQ
+    RV -->|"Internal gRPC: Resume.GetResumeFile"| MS
+    DR -->|"Internal gRPC: Job Posting.ListJobsClosingBetween"| JP
+    DR -->|"Internal gRPC: Saved Jobs.ListJobSavers"| MS
+    WS -->|"Internal gRPC: Analytics.GetInternalSummary and Auth.ListUsersByRole"| MS
+    ND -->|"Internal gRPC: Notification Inbox.CreateNotification and Auth.GetUser"| MS
+    ND -->|"HTTP JSON: POST /send-email"| ES["email-sender"]
+    WS -->|"HTTP JSON: POST /send-email"| ES
     ES -->|SMTP| MP["Mailpit: synthetic email inbox"]
-    EF -->|"Approved internal gRPC"| MS
-    SF -->|"Approved internal gRPC"| MS
     PM["Prometheus"] -->|"Scrape HTTP metrics"| MS
     PM -->|"Scrape HTTP metrics"| GW
     GF["Grafana"] -->|Query| PM
 ```
 
-Arrows show the agreed logical flows, not an implemented network bridge. Function
-groups label their specific publishing/calling member on each edge. In Compose,
-functions are ordinary HTTP containers in the opt-in `functions` profile; there
-is no Knative or scale to zero, and schedules are invoked manually. In the agreed
-WEB303 deployment, services stay in Compose and all five functions run on Knative
-in k3d; official assessment-scope confirmation is still open (AGENTS.md Section 16).
-Cross-network connectivity and missing trigger wiring remain deployment work.
+Arrows show the agreed logical contracts, not proof of deployed connectivity.
+Application and Job Posting are two of the 20 services, shown separately to expose
+an approved service-to-service call. Among the five functions, Resume Validator
+and Notification Dispatcher consume domain events via HTTP CloudEvents; Resume
+Validator and Deadline Reminder publish domain events. Notification Dispatcher and Weekly
+Summary invoke Email Sender. Dotted dispatcher edges mark missing transport wiring:
+there is no Compose RabbitMQ forwarder or Knative deployment/forwarder manifest
+for it (AGENTS.md Section 16). No verified dispatcher event delivery is implied.
+
+In Compose, functions are ordinary HTTP containers in the opt-in `functions`
+profile; there is no Knative or scale to zero, and schedules are invoked manually.
+PingSource edges describe the Knative manifests, not Compose scheduling or verified
+cluster runs. In the agreed WEB303 deployment, services stay in Compose and all
+five functions run on Knative in k3d; official assessment-scope confirmation is
+still open (AGENTS.md Section 16). Cross-network connectivity remains deployment work.
 
 ## Services, ownership, data and events
 

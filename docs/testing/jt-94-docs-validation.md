@@ -1,10 +1,8 @@
 # JT-94 documentation validation
 
 Date: 19 November 2026 (Asia/Thimphu). Branch:
-`JT-94-architecture-deployment-docs`. Initial `git status --short --branch`
-showed this branch with a clean working tree. No branch switch, pull, staging,
-commit, push or Jira mutation was performed. Only Markdown documentation changed;
-local `.env`, code, contracts, manifests and dependencies were preserved.
+`JT-94-architecture-deployment-docs`. Documentation changes cover the architecture,
+run guide and validation evidence for JT-94.
 
 ## Changes and traceability
 
@@ -26,11 +24,11 @@ CI configuration. Local secret values were not printed or copied into docs.
 
 | Check | Result and scope |
 |---|---|
-| `git diff --check` and full changed/new Markdown review | Pass; whitespace and documentation-only scope inspected, including untracked new files |
+| `git diff --check` and full changed/new Markdown review | Pass; whitespace and documentation-only scope inspected |
 | Local link/path validation with Python standard library | Pass; 43 relative Markdown link destinations exist; referenced runnable command files exist. No external website checks required for the new local navigation |
 | Inventory comparison with AGENTS.md and database init script | Pass; exact 20 service owner/responsibility/event rows, matching snake_case database/user names; five function/trigger rows and all ten approved synchronous-call rows retained |
-| Fenced shell blocks via `bash -n` | Pass; 16 shell blocks, syntax only, including the conditional k3d variable checks. Does not run build/apply commands or establish prerequisite values |
-| Mermaid source review | Pass for declared nodes/edge references, five-function scope and flow direction against AGENTS.md; no installed Mermaid renderer used. Teammate must inspect rendering in the PR preview |
+| Fenced shell blocks via `bash -n` | Pass; 17 shell blocks across the JT-94 guides and two READMEs, syntax only, including the conditional k3d variable checks. Does not run build/apply commands or establish prerequisite values |
+| Mermaid source review | Pass for 18 declared nodes and 27 edge references, five separate function nodes, approved flow directions and dotted pending dispatcher wiring against AGENTS.md; no installed Mermaid renderer used. Teammate must inspect rendering in the PR preview |
 | Four Compose `config --quiet` checks with `.env.example` | Pass for default, `functions`, `monitoring` and both profiles. Structural/interpolation check only; placeholders are not runtime credentials |
 | Compose parsed inventory with example configuration | Pass; 20 service build definitions and gateway; five functions plus validator forwarder in the functions profile; no dispatcher forwarder, host gRPC mapping or gateway internal token |
 | `kubectl kustomize deploy/knative/forwarder` | Pass; local render only, output kept outside repo |
@@ -41,14 +39,28 @@ CI configuration. Local secret values were not printed or copied into docs.
 | `docker compose ... exec -T rabbitmq rabbitmqctl list_queues name type messages_ready messages_unacknowledged consumers` | Pass; validator inbox/result source queues each had one consumer and zero ready/unacknowledged messages; their dead queues were empty. Snapshot only, not proof of a new event outcome |
 | Gateway `GET /healthz`, unauthenticated `GET /v1/auth/me`, Mailpit `/api/v1/info` | Pass: `ok`, HTTP 401 and successful Mailpit response, respectively, using five-second curl limits |
 
-The first unprivileged Docker status query was denied by the local socket sandbox;
-the read-only status and Resume probes succeeded with approved elevated execution.
-No daemon settings or resources were changed. No complete stack smoke run, image
-build, npm/Go test suite, workflow mutation, Knative apply or live cluster test was
-run for this documentation-only change. Existing prior results are linked and dated
+No complete stack smoke run, image build, npm/Go test suite, workflow mutation,
+Knative apply or live cluster test was run for this documentation change.
+Existing prior results are linked and dated
 in their own reports; they are not new JT-94 evidence. The repository has no
 dedicated Markdown/link/Mermaid validation job in CI, so local checks used existing
 Python/Bash/Compose/kubectl tools without adding dependencies or test code.
+
+## PR #79 documentation revision checks
+
+Rechecked relative links and shell syntax across the JT-94 guides and two READMEs:
+43 local links and 17 shell blocks passed. Within the four edited files (including
+AGENTS.md), 31 local links and 16 shell blocks passed. The 20 service/database rows,
+five function rows and ten synchronous-call rows still match AGENTS.md; Sections
+0–15 of AGENTS.md are unchanged. Mermaid source checks confirmed all 18 nodes and
+27 edges reference defined nodes, the five function flows are separate, and missing
+dispatcher transport is dotted. Only the four requested Markdown files changed;
+`git diff --check` passed.
+
+The Compose, Kustomize, smoke-script and runtime results above are retained prior
+evidence and were not rerun for this revision. Shell syntax checks did not execute
+the destructive reset example or any deployment commands. Mermaid rendering still
+needs visual inspection in the PR preview; source checks do not verify deployment.
 
 ## Open deployment dependencies and teammate review
 
@@ -67,8 +79,3 @@ Python/Bash/Compose/kubectl tools without adding dependencies or test code.
   actual trigger-to-outcome and scale-to-zero/reactivation evidence for all five.
   Review conditional image/apply examples against the agreed reachable endpoints
   before executing them. Recheck resource capacity under the intended workload.
-
-Peer review, applicable green CI, PR and merge are not verified here. JT-94 is not
-claimed Done. After local verification/review, the member should commit with
-`JT-94`, push the branch, open a PR and move the card to In Review; these remain
-manual follow-up steps under the user's restrictions for this session.
