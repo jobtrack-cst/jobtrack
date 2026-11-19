@@ -9,7 +9,7 @@
 | Owner | Kinley Tobgay Lhendrup (testing and QA lead) |
 | Backup | Jigden Shakya |
 | Status | Final; updated in JT-97 to match what was done. Results are in [test-summary-report.md](test-summary-report.md) |
-| Version | 1.0, 18 Nov 2026 (0.2, 9 Nov 2026, was the draft for team review) |
+| Version | 1.0, 19 Nov 2026 (0.2, 9 Nov 2026, was the draft for team review) |
 | Source of truth | [AGENTS.md](../../AGENTS.md). If this plan conflicts with it, AGENTS.md wins and this plan is corrected through a pull request. |
 
 ## 2. Scope
@@ -117,9 +117,9 @@ End-to-end and load testing start when:
 
 System testing is complete by the end of Sprint 4 when (results in [test-summary-report.md](test-summary-report.md)):
 
-- The Cypress main workflow test in `tests/e2e` passes.
+- The Cypress main workflow test in `tests/e2e/stack` passes against the running Docker Compose stack (JT-95).
 - The JMeter deadline-rush scenario with 200 concurrent users has been run and its report saved in `docs/testing`.
-- A SonarQube report has been saved in `docs/testing` for each sprint.
+- A SonarQube report has been saved in `docs/testing` for each sprint from Sprint 3, when SonarQube was set up (JT-84), and for the final run (JT-97).
 - Proposed: no Critical bug is open, and every open Major bug is agreed with the Product Owner.
 
 ## 7. Defect process
