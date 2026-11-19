@@ -492,6 +492,24 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+
+  notification-dispatcher-forwarder:
+    profiles: [functions]
+    build:
+      context: ../..
+      dockerfile: cmd/rabbitmq-forwarder/Dockerfile
+    environment:
+      SERVICE_NAME: rabbitmq-forwarder
+      HTTP_PORT: "8080"
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      SINK_URL: http://notification-dispatcher:8080/
+      FUNCTION_NAME: notification-dispatcher
+      EVENT_TYPES: "application.submitted,application.status_changed,interview.scheduled,offer.made,message.sent,job_alert.matched,employer.verified,deadline.reminder"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   resume-validator-forwarder:
     profiles: [functions]
     build:
