@@ -11,7 +11,7 @@ spec:
       containerConcurrency: 10
       timeoutSeconds: 25
       containers:
-        - image: jobtrack-email-sender:local
+        - image: dev.local/jobtrack-email-sender:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
