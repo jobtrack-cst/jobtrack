@@ -1,0 +1,26 @@
+{
+  "task": "JT-92",
+  "date": "2026-11-19",
+  "cluster": "jobtrack-jt29",
+  "namespace": "default",
+  "ksvc_status": {
+    "email-sender": "PENDING_VERIFICATION",
+    "resume-validator": "PENDING_VERIFICATION",
+    "deadline-reminder": "PENDING_VERIFICATION",
+    "weekly-summary": "PENDING_VERIFICATION",
+    "notification-dispatcher": "PENDING_VERIFICATION"
+  },
+  "forwarders": {
+    "resume-validator-forwarder": "PENDING_VERIFICATION",
+    "notification-dispatcher-forwarder": "PENDING_VERIFICATION"
+  },
+  "verification": {
+    "email-sender": {"trigger": "POST /send-email via curl", "expected": "204 + Mailpit inbox", "observed": "PENDING_VERIFICATION"},
+    "resume-validator": {"trigger": "RabbitMQ event resume.uploaded", "expected": "resume.validated or resume.rejected published", "observed": "PENDING_VERIFICATION"},
+    "deadline-reminder": {"trigger": "POST / (manual run)", "expected": "204 + deadline.reminder events published", "observed": "PENDING_VERIFICATION"},
+    "weekly-summary": {"trigger": "POST / (manual run)", "expected": "204 + admin emails in Mailpit", "observed": "PENDING_VERIFICATION"},
+    "notification-dispatcher": {"trigger": "RabbitMQ event deadline.reminder", "expected": "Notification in inbox DB + email in Mailpit", "observed": "PENDING_VERIFICATION"}
+  },
+  "scale_to_zero": "PENDING_VERIFICATION",
+  "notes": "Evidence captured on Phuntsho's laptop (cluster host). Fill in once Phuntsho runs docs/deployment/jt-92-knative-functions.md."
+}
