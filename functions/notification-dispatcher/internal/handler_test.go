@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -59,14 +58,8 @@ func TestHandle_DeadlineReminder(t *testing.T) {
 
 	// 3. The fixture is the envelope: {"event_id": "...", "data": {...}}
 	//    Parse it to extract just the inner "data" object.
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture envelope: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
-		t.Fatalf("failed to set event data: %v", err)
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
+		t.Fatalf("failed to set data: %v", err)
 	}
 
 	// 4. Set up the mock Email server
@@ -135,14 +128,8 @@ func TestHandle_ApplicationSubmitted(t *testing.T) {
 	event.SetSource("application")
 	event.SetTime(time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC))
 
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture envelope: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
-		t.Fatalf("failed to set event data: %v", err)
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
+		t.Fatalf("failed to set data: %v", err)
 	}
 
 	// 3. Set up the mock Email server
@@ -201,13 +188,7 @@ func TestHandle_ApplicationStatusChanged(t *testing.T) {
 	event.SetID("77777777-7777-4777-8777-777777777777")
 	event.SetType("application.status_changed")
 	event.SetSource("application-status")
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
 		t.Fatalf("failed to set data: %v", err)
 	}
 
@@ -250,13 +231,7 @@ func TestHandle_InterviewScheduled(t *testing.T) {
 	event.SetID("88888888-8888-4888-8888-888888888888")
 	event.SetType("interview.scheduled")
 	event.SetSource("interview")
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
 		t.Fatalf("failed to set data: %v", err)
 	}
 
@@ -298,13 +273,7 @@ func TestHandle_OfferMade(t *testing.T) {
 	event.SetID("99999999-9999-4999-8999-999999999999")
 	event.SetType("offer.made")
 	event.SetSource("offer")
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
 		t.Fatalf("failed to set data: %v", err)
 	}
 	emailServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -345,13 +314,7 @@ func TestHandle_MessageSent(t *testing.T) {
 	event.SetID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 	event.SetType("message.sent")
 	event.SetSource("messaging")
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
 		t.Fatalf("failed to set data: %v", err)
 	}
 	inboxCalls := 0
@@ -383,13 +346,7 @@ func TestHandle_JobAlertMatched(t *testing.T) {
 	event.SetID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
 	event.SetType("job_alert.matched")
 	event.SetSource("job-alert")
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
 		t.Fatalf("failed to set data: %v", err)
 	}
 	inboxCalls := 0
@@ -421,13 +378,7 @@ func TestHandle_EmployerVerified(t *testing.T) {
 	event.SetID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
 	event.SetType("employer.verified")
 	event.SetSource("company-verification")
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(fixtureData, &envelope); err != nil {
-		t.Fatalf("failed to parse fixture: %v", err)
-	}
-	if err := event.SetData(cloudevents.ApplicationJSON, envelope.Data); err != nil {
+	if err := event.SetData(cloudevents.ApplicationJSON, fixtureData); err != nil {
 		t.Fatalf("failed to set data: %v", err)
 	}
 	emailServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -19,6 +19,7 @@ import (
 	notificationinboxv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/notification_inbox/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/notification-inbox/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/notification-inbox/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/notification-inbox/internal/app"
@@ -152,7 +153,8 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, pool *pgxpool.Pool, grpcListener, httpListener net.Listener) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
-	grpcServer := grpc.NewServer()
+	requestMetrics := requestmetrics.New("notification-inbox")
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor()))
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
 
 	// Initialize our repository and app layer
@@ -163,7 +165,8 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 	notificationinboxv1.RegisterNotificationInboxServiceServer(grpcServer, grpcadapter.NewNotificationInboxHandler(notificationsSvc))
 	notificationinboxv1.RegisterNotificationInboxInternalServiceServer(grpcServer, grpcadapter.NewNotificationInboxInternalHandler(notificationsSvc))
 
-	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
+	requestMetrics.RegisterGRPC(grpcServer)
+	httpServer := &http.Server{Handler: healthHandler(checker, requestMetrics), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
 		_ = grpcServer.Serve(grpcListener)

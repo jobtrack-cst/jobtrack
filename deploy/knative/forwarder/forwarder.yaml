@@ -54,3 +54,60 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-dispatcher-forwarder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-dispatcher-forwarder
+  template:
+    metadata:
+      labels:
+        app: notification-dispatcher-forwarder
+    spec:
+      containers:
+        - name: forwarder
+          image: jobtrack-rabbitmq-forwarder:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: amqp-url
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SINK_URL
+              value: http://notification-dispatcher.$(POD_NAMESPACE).svc.cluster.local
+            - name: FUNCTION_NAME
+              value: notification-dispatcher
+            - name: EVENT_TYPES
+              value: "application.submitted,application.status_changed,interview.scheduled,offer.made,message.sent,job_alert.matched,employer.verified,deadline.reminder"
+            - name: HTTP_PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
