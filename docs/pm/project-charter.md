@@ -5,9 +5,9 @@
 | Project | JobTrack: A Job and Internship Application Portal |
 | Jira task | JT-24 |
 | Prepared by | Jigden Shakya (Scrum Master and project manager) |
-| Version | 1.1 (agreed by the team on 3 Nov 2026; awaiting tutor review) |
-| Date | 3 Nov 2026 (1.0 on 2 Nov; 1.1 updates the review policy) |
-| Based on | Approved project proposal (submitted 26 Oct 2026) and AGENTS.md (1 Nov 2026) |
+| Version | 1.2 (dates aligned with AGENTS.md Section 14 on 19 Nov 2026, JT-67; 1.1 agreed by the team on 3 Nov 2026; awaiting tutor review) |
+| Date | 19 Nov 2026 (1.0 on 2 Nov; 1.1 on 3 Nov updates the review policy; 1.2 on 19 Nov updates the objective targets, milestones and timeline to the revised schedule and the one-day Sprint 4 extension) |
+| Based on | Approved project proposal (submitted 26 Oct 2026) and AGENTS.md (1 Nov 2026; dates from AGENTS.md Section 14 as of 19 Nov 2026) |
 | Format | Tailored project charter following PMI PMBOK practice, adapted for Scrum |
 
 ---
@@ -33,8 +33,8 @@ This charter formally starts the development phase and records what the team has
 | # | Objective | Success criteria | Target |
 |---|---|---|---|
 | O1 | Establish the development foundation and contracts | Repo, `.proto` contracts for all 20 services, golden template, CI, Docker Compose and a proven cluster setup in place | End of Sprint 0 (3 Nov) |
-| O2 | Build and deploy the full system | All 20 microservices, the gateway, 5 Knative functions and the React frontend running; the main workflow (post, apply, review, interview, offer, accept or decline, with notifications) works end to end on the k3d cluster | End of Sprint 4 (15 Nov) |
-| O3 | Prove quality through systematic testing | At least 80 percent line coverage on `application` and `application-status`; contract checks in CI; Cypress end-to-end tests of the main workflow; JMeter load test with 200 concurrent users; results documented | End of Sprint 4 (15 Nov) |
+| O2 | Build and deploy the full system | All 20 microservices, the gateway, 5 Knative functions and the React frontend running; the main workflow (post, apply, review, interview, offer, accept or decline, with notifications) works end to end on the k3d cluster | End of Sprint 4 (20 Nov) |
+| O3 | Prove quality through systematic testing | At least 80 percent line coverage on `application` and `application-status`; contract checks in CI; Cypress end-to-end tests of the main workflow; JMeter load test with 200 concurrent users; results documented | End of Sprint 4 (20 Nov) |
 | O4 | Manage the project with Scrum and PMBOK artefacts | Sprint ceremonies held; Jira kept current with time logged; risk register reviewed every retrospective; earned value calculated from Jira time logs; lessons-learned review at closure | Throughout, closure after presentation |
 
 ---
@@ -129,11 +129,11 @@ This charter formally starts the development phase and records what the team has
 | ID | Milestone | Target date |
 |---|---|---|
 | M1 | Sprint 0 complete: repo, contracts for all 20 services, golden template, CI, local environment, proven cluster setup, charter, DoD, risk register | 3 Nov 2026 |
-| M2 | Sprint 1 complete: all 20 services and the gateway running with basic operations | 6 Nov 2026 |
-| M3 | Sprint 2 complete: core flow working end to end with events and the first functions | 9 Nov 2026 |
-| M4 | Sprint 3 complete: full business logic, all 5 functions, frontend for all roles, integration tests | 12 Nov 2026 |
-| M5 | Sprint 4 complete: end-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze | 15 Nov 2026 |
-| M6 | Buffer (only if needed) | 16 to 17 Nov 2026 |
+| M2 | Sprint 1 complete: all 20 services and the gateway running with basic operations | 8 Nov 2026 |
+| M3 | Sprint 2 complete: core flow working end to end with events and the first functions | 13 Nov 2026 |
+| M4 | Sprint 3 complete: full business logic, all 5 functions, frontend for all roles, integration tests | 16 Nov 2026 |
+| M5 | Sprint 4 complete: end-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze | 20 Nov 2026 (extended by one day on 19 Nov) |
+| M6 | Planned project completion (no buffer; schedule revised on 11 Nov and Sprint 4 extended by one day on 19 Nov, see AGENTS.md Section 15) | 20 Nov 2026 |
 | M7 | Final presentation, closure report and lessons learned | To be announced |
 
 The full sprint calendar is in `docs/pm/definition-of-done.md`.
@@ -203,7 +203,7 @@ Assumptions:
 
 Constraints:
 
-- Fixed, short timeline (Sprint 0 to Sprint 4, 2 to 15 Nov, with a 2-day buffer).
+- Fixed, short timeline (Sprint 0 to Sprint 4, 2 to 20 Nov, with no buffer; see AGENTS.md Section 14).
 - Minimum of 20 microservices, as required by the tutor.
 - Only the tools listed in AGENTS.md Section 7 may be used unless the team agrees.
 - No funding and no production hosting.
@@ -241,8 +241,8 @@ The project is complete when:
 | SMS Sender | Serverless stub | Dropped | No real value as a stub |
 | Notification function | Notification Orchestrator | Notification Dispatcher | Renamed |
 | Service ownership | 5 services per member | Reassigned by team (see Section 4) | Matches the new service list and team pairs |
-| Method | Incremental phases with a weekly meeting | Scrum: Sprint 0 plus four 3-day sprints, daily stand-ups | Accelerated plan with regular feedback |
-| Timeline | Weeks 7 to 15 of the semester | 2 to 17 Nov 2026 (start moved from 28 Oct) | Team was busy with other coursework |
+| Method | Incremental phases with a weekly meeting | Scrum: Sprint 0 plus four short sprints (planned at 3 days; Sprint 2 and Sprint 4 extended), daily stand-ups | Accelerated plan with regular feedback |
+| Timeline | Weeks 7 to 15 of the semester | 2 to 20 Nov 2026 (start moved from 28 Oct; schedule revised on 11 Nov; Sprint 4 extended by one day on 19 Nov) | Team was busy with other coursework; later changes are in the AGENTS.md Decision log |
 | PM tools | GanttProject, draw.io, LibreOffice Calc, shared task board | Jira (space JT) and GitHub | Single tool for backlog, sprints and time tracking |
 | Branching | Not specified | GitHub Flow | Long-lived branches add merge work |
 | Code review | All members review one another's changes | PRs required for `main`; reviews encouraged but not merge-blocking; CI required once in place | Avoid blocking short sprints on reviewer availability (team decision, 3 Nov) |
