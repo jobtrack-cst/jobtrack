@@ -21,4 +21,9 @@ type Repository interface {
 
 	// ListJobSavers returns the applicant IDs who saved a job.
 	ListJobSavers(ctx context.Context, jobID string, limit, offset int) ([]string, int, error)
+
+	// CloseJob applies a job.closed event in one transaction: it claims the
+	// event ID in processed_events, records the job in closed_jobs and deletes
+	// every bookmark for it. An already processed event ID changes nothing.
+	CloseJob(ctx context.Context, closure domain.JobClosure) (domain.ClosureOutcome, error)
 }
