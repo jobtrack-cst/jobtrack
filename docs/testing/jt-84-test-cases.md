@@ -114,7 +114,7 @@ On the Docker host, before and during each run:
 | 1-user trial | Pass, 8 of 8 samples, 0 errors |
 | 10-user trial | Pass, 80 of 80 samples, 0 errors |
 | Docker statistics cover both runs | Pass |
-| CI on the pull request | <green or red, with run link> |
+| CI on the pull request | Green: all 32 checks passed, including the required `CI passed` check, on commit `b590f1a` ([PR #83 checks](https://github.com/jobtrack-cst/jobtrack/pull/83/checks)) |
 
 The JMeter results, HTML reports and Docker statistics files are kept outside the repository by Kinley and Phuntsho.
 
@@ -126,4 +126,4 @@ The JMeter results, HTML reports and Docker statistics files are kept outside th
 | AC2: draft a 200-concurrent-user deadline-rush JMeter scenario in `tests/load` | Met | JT84-03, JT84-04 |
 | AC3: perform a low-user-count trial using a JMeter laptop separate from the Docker host | Met | JT84-05 to JT84-09 |
 | AC4: document hardware limitations | Met | JT84-10 |
-| AC5: submit changes through a PR titled with the Jira key and log time in Jira | <Met or Not met> | <PR link> |
+| AC5: submit changes through a PR titled with the Jira key and log time in Jira | Met | [PR #83](https://github.com/jobtrack-cst/jobtrack/pull/83), time logged in Jira JT-84 |

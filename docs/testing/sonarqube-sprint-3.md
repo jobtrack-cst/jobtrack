@@ -11,7 +11,7 @@ Traceability: [JT-84](https://jobtrack-cst.atlassian.net/browse/JT-84) (parent J
 | Scanner | SonarScanner CLI 8.4.0.16527 in Docker (`sonarsource/sonar-scanner-cli`, amd64 image under emulation) |
 | Rules | Default "Sonar way" profiles for Go, TypeScript, JavaScript and Docker; default quality gate |
 | Scope | `sonar-project.properties`: sources `cmd`, `functions`, `gateway`, `pkg`, `services`, `frontend/src`; tests, mocks, testdata and generated `.pb.go` excluded from sources |
-| Coverage | Go unit tests only: `go test -coverprofile=coverage.out ./...`, 0 failing packages. No frontend coverage (Cypress does not produce any) |
+| Coverage | Go unit tests only: `go test -coverprofile=coverage.out ./...`, 0 failing packages. No frontend coverage (Cypress does not produce any). This is not the Section 10 coverage measure, see F2 |
 
 Steps, from the repository root:
 
@@ -37,7 +37,7 @@ Notes for the next run:
 | Security | 0 vulnerabilities, 0 security hotspots, rating A. Community Build has no taint analysis ("limited security analysis") |
 | Reliability | 3 issues (1 bug), rating C, all in the frontend |
 | Maintainability | 300 code smells, about 85 hours of estimated effort, rating A |
-| Coverage | 67.8% line coverage on 17k coverable lines |
+| Coverage | 67.8% line coverage on 17k coverable lines, from unit tests only |
 | Duplication | 34.2% of 37k lines |
 
 By area:
@@ -64,9 +64,11 @@ By area:
 
 The single bug sets the reliability rating to C. Fixing or accepting F1 raises it to A.
 
-### F2. Coverage below the 80 percent target for `application` and `application-status`
+### F2. SonarQube coverage is not the Section 10 coverage measure
 
-SonarQube reports 74.3% and 66.6%. This is not the figure the Section 10 target is measured with: SonarQube counts every line in the folder, including `cmd/server` and the PostgreSQL and RabbitMQ adapters, which are tested by integration tests (build tag `integration`) that this run did not include. `go test -cover` per package, as in CI, reports per package instead. No bug logged. Proposed for the team: decide whether the 80 percent target applies to the SonarQube figure or to the per-package figure, and record it in Section 10.
+SonarQube reports 74.3% for `application` and 66.6% for `application-status`. These figures are not used to judge the 80 percent target in AGENTS.md Section 10. AGENTS.md Section 15 (11 Nov 2026, JT-49) already defines how that target is measured: line coverage on production code, excluding generated gomock files, with unit and integration tests together, and the unit-only figure reported alongside.
+
+This run matches the production-code scope (mocks, tests and generated code are excluded in `sonar-project.properties`) but imported only the unit-test profile. The PostgreSQL and RabbitMQ adapters, which are tested by integration tests (build tag `integration`), therefore count as uncovered here. The SonarQube figures are a unit-only view, comparable to the unit-only figure the rule reports alongside, not to the target itself. No bug logged.
 
 ### F3. Duplication of 34.2% (40.3% in `services`)
 
