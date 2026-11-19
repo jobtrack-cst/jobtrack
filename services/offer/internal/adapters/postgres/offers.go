@@ -61,6 +61,21 @@ func (r *Offers) GetByID(ctx context.Context, rawID string) (domain.Offer, error
 	return o, nil
 }
 
+func (r *Offers) GetByApplicationID(ctx context.Context, rawID string) (domain.Offer, error) {
+	id, err := domain.NormalizeID(rawID, domain.ErrInvalidApplicationID)
+	if err != nil {
+		return domain.Offer{}, err
+	}
+	o, err := scanOffer(r.pool.QueryRow(ctx, `SELECT `+offerColumns+` FROM offers WHERE application_id=$1`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Offer{}, domain.ErrOfferNotFound
+	}
+	if err != nil {
+		return domain.Offer{}, offerDBError(ctx)
+	}
+	return o, nil
+}
+
 func (r *Offers) Decide(ctx context.Context, id, applicantID string, next domain.OfferStatus, at time.Time) (domain.Offer, error) {
 	if next != domain.OfferStatusAccepted && next != domain.OfferStatusDeclined {
 		return domain.Offer{}, domain.ErrOfferNotPending

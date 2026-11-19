@@ -52,6 +52,21 @@ func (h *OfferHandler) GetOffer(ctx context.Context, req *offerv1.GetOfferReques
 	return &offerv1.GetOfferResponse{Offer: offerToProto(o)}, nil
 }
 
+func (h *OfferHandler) GetOfferByApplication(ctx context.Context, req *offerv1.GetOfferByApplicationRequest) (*offerv1.GetOfferByApplicationResponse, error) {
+	caller, err := callerFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	o, err := h.offers.GetOfferByApplication(ctx, caller, req.GetApplicationId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &offerv1.GetOfferByApplicationResponse{Offer: offerToProto(o)}, nil
+}
+
 func (h *OfferHandler) AcceptOffer(ctx context.Context, req *offerv1.AcceptOfferRequest) (*offerv1.AcceptOfferResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {

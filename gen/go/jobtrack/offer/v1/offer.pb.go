@@ -530,6 +530,94 @@ func (x *DeclineOfferResponse) GetOffer() *Offer {
 	return nil
 }
 
+type GetOfferByApplicationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ApplicationId string                 `protobuf:"bytes,1,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOfferByApplicationRequest) Reset() {
+	*x = GetOfferByApplicationRequest{}
+	mi := &file_jobtrack_offer_v1_offer_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOfferByApplicationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOfferByApplicationRequest) ProtoMessage() {}
+
+func (x *GetOfferByApplicationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_offer_v1_offer_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOfferByApplicationRequest.ProtoReflect.Descriptor instead.
+func (*GetOfferByApplicationRequest) Descriptor() ([]byte, []int) {
+	return file_jobtrack_offer_v1_offer_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetOfferByApplicationRequest) GetApplicationId() string {
+	if x != nil {
+		return x.ApplicationId
+	}
+	return ""
+}
+
+type GetOfferByApplicationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Offer         *Offer                 `protobuf:"bytes,1,opt,name=offer,proto3" json:"offer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOfferByApplicationResponse) Reset() {
+	*x = GetOfferByApplicationResponse{}
+	mi := &file_jobtrack_offer_v1_offer_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOfferByApplicationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOfferByApplicationResponse) ProtoMessage() {}
+
+func (x *GetOfferByApplicationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_offer_v1_offer_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOfferByApplicationResponse.ProtoReflect.Descriptor instead.
+func (*GetOfferByApplicationResponse) Descriptor() ([]byte, []int) {
+	return file_jobtrack_offer_v1_offer_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetOfferByApplicationResponse) GetOffer() *Offer {
+	if x != nil {
+		return x.Offer
+	}
+	return nil
+}
+
 var File_jobtrack_offer_v1_offer_proto protoreflect.FileDescriptor
 
 const file_jobtrack_offer_v1_offer_proto_rawDesc = "" +
@@ -562,15 +650,20 @@ const file_jobtrack_offer_v1_offer_proto_rawDesc = "" +
 	"\x13DeclineOfferRequest\x12\x19\n" +
 	"\boffer_id\x18\x01 \x01(\tR\aofferId\"F\n" +
 	"\x14DeclineOfferResponse\x12.\n" +
+	"\x05offer\x18\x01 \x01(\v2\x18.jobtrack.offer.v1.OfferR\x05offer\"E\n" +
+	"\x1cGetOfferByApplicationRequest\x12%\n" +
+	"\x0eapplication_id\x18\x01 \x01(\tR\rapplicationId\"O\n" +
+	"\x1dGetOfferByApplicationResponse\x12.\n" +
 	"\x05offer\x18\x01 \x01(\v2\x18.jobtrack.offer.v1.OfferR\x05offer*{\n" +
 	"\vOfferStatus\x12\x1c\n" +
 	"\x18OFFER_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14OFFER_STATUS_PENDING\x10\x01\x12\x19\n" +
 	"\x15OFFER_STATUS_ACCEPTED\x10\x02\x12\x19\n" +
-	"\x15OFFER_STATUS_DECLINED\x10\x032\xa4\x04\n" +
+	"\x15OFFER_STATUS_DECLINED\x10\x032\xd2\x05\n" +
 	"\fOfferService\x12\x8b\x01\n" +
 	"\tMakeOffer\x12#.jobtrack.offer.v1.MakeOfferRequest\x1a$.jobtrack.offer.v1.MakeOfferResponse\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/applications/{application_id}/offers\x12r\n" +
-	"\bGetOffer\x12\".jobtrack.offer.v1.GetOfferRequest\x1a#.jobtrack.offer.v1.GetOfferResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/offers/{offer_id}\x12\x85\x01\n" +
+	"\bGetOffer\x12\".jobtrack.offer.v1.GetOfferRequest\x1a#.jobtrack.offer.v1.GetOfferResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/offers/{offer_id}\x12\xab\x01\n" +
+	"\x15GetOfferByApplication\x12/.jobtrack.offer.v1.GetOfferByApplicationRequest\x1a0.jobtrack.offer.v1.GetOfferByApplicationResponse\"/\x82\xd3\xe4\x93\x02)\x12'/v1/applications/{application_id}/offer\x12\x85\x01\n" +
 	"\vAcceptOffer\x12%.jobtrack.offer.v1.AcceptOfferRequest\x1a&.jobtrack.offer.v1.AcceptOfferResponse\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/v1/offers/{offer_id}/accept\x12\x89\x01\n" +
 	"\fDeclineOffer\x12&.jobtrack.offer.v1.DeclineOfferRequest\x1a'.jobtrack.offer.v1.DeclineOfferResponse\"(\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/offers/{offer_id}/declineBCZAgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/offer/v1;offerv1b\x06proto3"
 
@@ -587,40 +680,45 @@ func file_jobtrack_offer_v1_offer_proto_rawDescGZIP() []byte {
 }
 
 var file_jobtrack_offer_v1_offer_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_jobtrack_offer_v1_offer_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_jobtrack_offer_v1_offer_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_jobtrack_offer_v1_offer_proto_goTypes = []any{
-	(OfferStatus)(0),              // 0: jobtrack.offer.v1.OfferStatus
-	(*Offer)(nil),                 // 1: jobtrack.offer.v1.Offer
-	(*MakeOfferRequest)(nil),      // 2: jobtrack.offer.v1.MakeOfferRequest
-	(*MakeOfferResponse)(nil),     // 3: jobtrack.offer.v1.MakeOfferResponse
-	(*GetOfferRequest)(nil),       // 4: jobtrack.offer.v1.GetOfferRequest
-	(*GetOfferResponse)(nil),      // 5: jobtrack.offer.v1.GetOfferResponse
-	(*AcceptOfferRequest)(nil),    // 6: jobtrack.offer.v1.AcceptOfferRequest
-	(*AcceptOfferResponse)(nil),   // 7: jobtrack.offer.v1.AcceptOfferResponse
-	(*DeclineOfferRequest)(nil),   // 8: jobtrack.offer.v1.DeclineOfferRequest
-	(*DeclineOfferResponse)(nil),  // 9: jobtrack.offer.v1.DeclineOfferResponse
-	(*v1.ResourceTimestamps)(nil), // 10: jobtrack.common.v1.ResourceTimestamps
+	(OfferStatus)(0),                      // 0: jobtrack.offer.v1.OfferStatus
+	(*Offer)(nil),                         // 1: jobtrack.offer.v1.Offer
+	(*MakeOfferRequest)(nil),              // 2: jobtrack.offer.v1.MakeOfferRequest
+	(*MakeOfferResponse)(nil),             // 3: jobtrack.offer.v1.MakeOfferResponse
+	(*GetOfferRequest)(nil),               // 4: jobtrack.offer.v1.GetOfferRequest
+	(*GetOfferResponse)(nil),              // 5: jobtrack.offer.v1.GetOfferResponse
+	(*AcceptOfferRequest)(nil),            // 6: jobtrack.offer.v1.AcceptOfferRequest
+	(*AcceptOfferResponse)(nil),           // 7: jobtrack.offer.v1.AcceptOfferResponse
+	(*DeclineOfferRequest)(nil),           // 8: jobtrack.offer.v1.DeclineOfferRequest
+	(*DeclineOfferResponse)(nil),          // 9: jobtrack.offer.v1.DeclineOfferResponse
+	(*GetOfferByApplicationRequest)(nil),  // 10: jobtrack.offer.v1.GetOfferByApplicationRequest
+	(*GetOfferByApplicationResponse)(nil), // 11: jobtrack.offer.v1.GetOfferByApplicationResponse
+	(*v1.ResourceTimestamps)(nil),         // 12: jobtrack.common.v1.ResourceTimestamps
 }
 var file_jobtrack_offer_v1_offer_proto_depIdxs = []int32{
 	0,  // 0: jobtrack.offer.v1.Offer.status:type_name -> jobtrack.offer.v1.OfferStatus
-	10, // 1: jobtrack.offer.v1.Offer.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
+	12, // 1: jobtrack.offer.v1.Offer.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
 	1,  // 2: jobtrack.offer.v1.MakeOfferResponse.offer:type_name -> jobtrack.offer.v1.Offer
 	1,  // 3: jobtrack.offer.v1.GetOfferResponse.offer:type_name -> jobtrack.offer.v1.Offer
 	1,  // 4: jobtrack.offer.v1.AcceptOfferResponse.offer:type_name -> jobtrack.offer.v1.Offer
 	1,  // 5: jobtrack.offer.v1.DeclineOfferResponse.offer:type_name -> jobtrack.offer.v1.Offer
-	2,  // 6: jobtrack.offer.v1.OfferService.MakeOffer:input_type -> jobtrack.offer.v1.MakeOfferRequest
-	4,  // 7: jobtrack.offer.v1.OfferService.GetOffer:input_type -> jobtrack.offer.v1.GetOfferRequest
-	6,  // 8: jobtrack.offer.v1.OfferService.AcceptOffer:input_type -> jobtrack.offer.v1.AcceptOfferRequest
-	8,  // 9: jobtrack.offer.v1.OfferService.DeclineOffer:input_type -> jobtrack.offer.v1.DeclineOfferRequest
-	3,  // 10: jobtrack.offer.v1.OfferService.MakeOffer:output_type -> jobtrack.offer.v1.MakeOfferResponse
-	5,  // 11: jobtrack.offer.v1.OfferService.GetOffer:output_type -> jobtrack.offer.v1.GetOfferResponse
-	7,  // 12: jobtrack.offer.v1.OfferService.AcceptOffer:output_type -> jobtrack.offer.v1.AcceptOfferResponse
-	9,  // 13: jobtrack.offer.v1.OfferService.DeclineOffer:output_type -> jobtrack.offer.v1.DeclineOfferResponse
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	1,  // 6: jobtrack.offer.v1.GetOfferByApplicationResponse.offer:type_name -> jobtrack.offer.v1.Offer
+	2,  // 7: jobtrack.offer.v1.OfferService.MakeOffer:input_type -> jobtrack.offer.v1.MakeOfferRequest
+	4,  // 8: jobtrack.offer.v1.OfferService.GetOffer:input_type -> jobtrack.offer.v1.GetOfferRequest
+	10, // 9: jobtrack.offer.v1.OfferService.GetOfferByApplication:input_type -> jobtrack.offer.v1.GetOfferByApplicationRequest
+	6,  // 10: jobtrack.offer.v1.OfferService.AcceptOffer:input_type -> jobtrack.offer.v1.AcceptOfferRequest
+	8,  // 11: jobtrack.offer.v1.OfferService.DeclineOffer:input_type -> jobtrack.offer.v1.DeclineOfferRequest
+	3,  // 12: jobtrack.offer.v1.OfferService.MakeOffer:output_type -> jobtrack.offer.v1.MakeOfferResponse
+	5,  // 13: jobtrack.offer.v1.OfferService.GetOffer:output_type -> jobtrack.offer.v1.GetOfferResponse
+	11, // 14: jobtrack.offer.v1.OfferService.GetOfferByApplication:output_type -> jobtrack.offer.v1.GetOfferByApplicationResponse
+	7,  // 15: jobtrack.offer.v1.OfferService.AcceptOffer:output_type -> jobtrack.offer.v1.AcceptOfferResponse
+	9,  // 16: jobtrack.offer.v1.OfferService.DeclineOffer:output_type -> jobtrack.offer.v1.DeclineOfferResponse
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_jobtrack_offer_v1_offer_proto_init() }
@@ -634,7 +732,7 @@ func file_jobtrack_offer_v1_offer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobtrack_offer_v1_offer_proto_rawDesc), len(file_jobtrack_offer_v1_offer_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

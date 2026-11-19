@@ -15,14 +15,15 @@ func TestOfferContract_PublicRPCsAndHTTPBindings(t *testing.T) {
 		t.Fatalf("unexpected package or service count: %s, %d", file.Package(), file.Services().Len())
 	}
 	service := file.Services().ByName("OfferService")
-	if service == nil || service.Methods().Len() != 4 {
-		t.Fatal("expected only OfferService with four public methods")
+	if service == nil || service.Methods().Len() != 5 {
+		t.Fatal("expected only OfferService with five public methods")
 	}
 	for _, tc := range []struct {
 		method, verb, path, body string
 	}{
 		{"MakeOffer", "POST", "/v1/applications/{application_id}/offers", "*"},
 		{"GetOffer", "GET", "/v1/offers/{offer_id}", ""},
+		{"GetOfferByApplication", "GET", "/v1/applications/{application_id}/offer", ""},
 		{"AcceptOffer", "POST", "/v1/offers/{offer_id}/accept", "*"},
 		{"DeclineOffer", "POST", "/v1/offers/{offer_id}/decline", "*"},
 	} {
@@ -83,6 +84,8 @@ func TestOfferContract_ResourceAndRequestFields(t *testing.T) {
 		{"MakeOfferResponse", []string{"offer"}},
 		{"GetOfferRequest", []string{"offer_id"}},
 		{"GetOfferResponse", []string{"offer"}},
+		{"GetOfferByApplicationRequest", []string{"application_id"}},
+		{"GetOfferByApplicationResponse", []string{"offer"}},
 		{"AcceptOfferRequest", []string{"offer_id"}},
 		{"AcceptOfferResponse", []string{"offer"}},
 		{"DeclineOfferRequest", []string{"offer_id"}},
