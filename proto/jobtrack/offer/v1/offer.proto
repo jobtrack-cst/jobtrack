@@ -27,6 +27,12 @@ service OfferService {
     option (google.api.http) = {get: "/v1/offers/{offer_id}"};
   }
 
+  // GetOfferByApplication permits only the stored applicant or employer to view
+  // the one lifetime offer for this application, using authenticated metadata.
+  rpc GetOfferByApplication(GetOfferByApplicationRequest) returns (GetOfferByApplicationResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/offer"};
+  }
+
   // AcceptOffer is limited to the intended applicant identified by authenticated
   // metadata. At runtime it publishes the existing offer.accepted event.
   rpc AcceptOffer(AcceptOfferRequest) returns (AcceptOfferResponse) {
@@ -96,5 +102,13 @@ message DeclineOfferRequest {
 }
 
 message DeclineOfferResponse {
+  Offer offer = 1;
+}
+
+message GetOfferByApplicationRequest {
+  string application_id = 1;
+}
+
+message GetOfferByApplicationResponse {
   Offer offer = 1;
 }

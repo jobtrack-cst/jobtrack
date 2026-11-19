@@ -119,6 +119,45 @@ func local_request_OfferService_GetOffer_0(ctx context.Context, marshaler runtim
 	return msg, metadata, err
 }
 
+func request_OfferService_GetOfferByApplication_0(ctx context.Context, marshaler runtime.Marshaler, client OfferServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetOfferByApplicationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["application_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "application_id")
+	}
+	protoReq.ApplicationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "application_id", err)
+	}
+	msg, err := client.GetOfferByApplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_OfferService_GetOfferByApplication_0(ctx context.Context, marshaler runtime.Marshaler, server OfferServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetOfferByApplicationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["application_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "application_id")
+	}
+	protoReq.ApplicationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "application_id", err)
+	}
+	msg, err := server.GetOfferByApplication(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_OfferService_AcceptOffer_0(ctx context.Context, marshaler runtime.Marshaler, client OfferServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq AcceptOfferRequest
@@ -255,6 +294,26 @@ func RegisterOfferServiceHandlerServer(ctx context.Context, mux *runtime.ServeMu
 		}
 		forward_OfferService_GetOffer_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_OfferService_GetOfferByApplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/jobtrack.offer.v1.OfferService/GetOfferByApplication", runtime.WithHTTPPathPattern("/v1/applications/{application_id}/offer"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_OfferService_GetOfferByApplication_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_OfferService_GetOfferByApplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_OfferService_AcceptOffer_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -369,6 +428,23 @@ func RegisterOfferServiceHandlerClient(ctx context.Context, mux *runtime.ServeMu
 		}
 		forward_OfferService_GetOffer_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_OfferService_GetOfferByApplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/jobtrack.offer.v1.OfferService/GetOfferByApplication", runtime.WithHTTPPathPattern("/v1/applications/{application_id}/offer"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_OfferService_GetOfferByApplication_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_OfferService_GetOfferByApplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_OfferService_AcceptOffer_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -407,15 +483,17 @@ func RegisterOfferServiceHandlerClient(ctx context.Context, mux *runtime.ServeMu
 }
 
 var (
-	pattern_OfferService_MakeOffer_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "applications", "application_id", "offers"}, ""))
-	pattern_OfferService_GetOffer_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2}, []string{"v1", "offers", "offer_id"}, ""))
-	pattern_OfferService_AcceptOffer_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "offers", "offer_id", "accept"}, ""))
-	pattern_OfferService_DeclineOffer_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "offers", "offer_id", "decline"}, ""))
+	pattern_OfferService_MakeOffer_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "applications", "application_id", "offers"}, ""))
+	pattern_OfferService_GetOffer_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2}, []string{"v1", "offers", "offer_id"}, ""))
+	pattern_OfferService_GetOfferByApplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "applications", "application_id", "offer"}, ""))
+	pattern_OfferService_AcceptOffer_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "offers", "offer_id", "accept"}, ""))
+	pattern_OfferService_DeclineOffer_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "offers", "offer_id", "decline"}, ""))
 )
 
 var (
-	forward_OfferService_MakeOffer_0    = runtime.ForwardResponseMessage
-	forward_OfferService_GetOffer_0     = runtime.ForwardResponseMessage
-	forward_OfferService_AcceptOffer_0  = runtime.ForwardResponseMessage
-	forward_OfferService_DeclineOffer_0 = runtime.ForwardResponseMessage
+	forward_OfferService_MakeOffer_0             = runtime.ForwardResponseMessage
+	forward_OfferService_GetOffer_0              = runtime.ForwardResponseMessage
+	forward_OfferService_GetOfferByApplication_0 = runtime.ForwardResponseMessage
+	forward_OfferService_AcceptOffer_0           = runtime.ForwardResponseMessage
+	forward_OfferService_DeclineOffer_0          = runtime.ForwardResponseMessage
 )
