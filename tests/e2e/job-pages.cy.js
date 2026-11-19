@@ -1,5 +1,7 @@
 // JT-73 gateway-stubbed UI workflows; live steps are in docs/testing/jt-73-frontend.md.
 const gateway = 'http://localhost:8000';
+// Keep the applicant app-bar photo request independent of a running gateway.
+beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
 const jobId = '22222222-2222-4222-8222-222222222222';
 const categoryId = '33333333-3333-4333-8333-333333333333';
 const tagId = '44444444-4444-4444-8444-444444444444';
