@@ -34,6 +34,7 @@ export function ApplicationsPage() {
       <Button component={Link} to={`${base}/messages/${a.applicationId}`}>Messages</Button>
       <Button component={Link} to={`${base}/applications/${a.applicationId}/status`}>Status</Button>
       <Button component={Link} to={`${base}/applications/${a.applicationId}/interviews`}>Interviews</Button>
+      <Button component={Link} to={`${base}/offers?applicationId=${encodeURIComponent(a.applicationId)}`}>View Offer</Button>
       {employer && <Button component={Link} to={`${base}/applications/${a.applicationId}/review`}>Review</Button>}
       {employer ? <Button component={Link} to={`${base}/offers/new/${a.applicationId}`}>Make offer</Button>
         : <Button disabled={busy || a.withdrawn} onClick={() => { setSelected(a); setError(''); }}>Withdraw</Button>}

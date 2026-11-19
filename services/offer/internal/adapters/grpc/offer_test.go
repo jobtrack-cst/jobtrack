@@ -3,6 +3,11 @@ package grpc
 import (
 	"context"
 	"errors"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -62,7 +67,8 @@ func TestOfferHandler_IdentityRequiredForEveryRPC(t *testing.T) {
 			_, b := h.GetOffer(tc.ctx, &offerv1.GetOfferRequest{})
 			_, c := h.AcceptOffer(tc.ctx, &offerv1.AcceptOfferRequest{})
 			_, d := h.DeclineOffer(tc.ctx, &offerv1.DeclineOfferRequest{})
-			for _, err := range []error{a, b, c, d} {
+			_, e := h.GetOfferByApplication(tc.ctx, &offerv1.GetOfferByApplicationRequest{})
+			for _, err := range []error{a, b, c, d, e} {
 				if status.Code(err) != codes.Unauthenticated {
 					t.Fatal(err)
 				}
@@ -197,5 +203,75 @@ func TestOfferHandler_MakeOffer_InvalidTermsNeverReachRepositories(t *testing.T)
 				t.Fatalf("got %v, %v; want nil response and INVALID_ARGUMENT", response, err)
 			}
 		})
+	}
+}
+
+func TestOfferHandler_GetOfferByApplication(t *testing.T) {
+	for _, tc := range []struct {
+		name, user, role, id string
+		repoErr              error
+		code                 codes.Code
+	}{
+		{"applicant", applicantID, "applicant", offerID, nil, codes.OK},
+		{"employer", employerID, "employer", offerID, nil, codes.OK},
+		{"unrelated applicant", offerID, "applicant", offerID, nil, codes.PermissionDenied},
+		{"unrelated employer", offerID, "employer", offerID, nil, codes.PermissionDenied},
+		{"admin", applicantID, "admin", offerID, nil, codes.PermissionDenied},
+		{"wrong role matching ID", applicantID, "employer", offerID, nil, codes.PermissionDenied},
+		{"missing identity", "", "applicant", offerID, nil, codes.Unauthenticated},
+		{"malformed identity", "bad", "applicant", offerID, nil, codes.Unauthenticated},
+		{"unknown role", applicantID, "other", offerID, nil, codes.Unauthenticated},
+		{"invalid application", applicantID, "applicant", "bad", nil, codes.InvalidArgument},
+		{"empty application", applicantID, "applicant", "", nil, codes.InvalidArgument},
+		{"missing offer", applicantID, "applicant", offerID, domain.ErrOfferNotFound, codes.NotFound},
+		{"database failure", applicantID, "applicant", offerID, errors.New("private database details"), codes.Internal},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := mocks.NewMockOfferRepository(gomock.NewController(t))
+			o := domain.Offer{ID: offerID, ApplicationID: offerID, ApplicantID: applicantID, EmployerID: employerID, Terms: "terms", Status: domain.OfferStatusPending, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+			if tc.code != codes.Unauthenticated && tc.code != codes.InvalidArgument {
+				repo.EXPECT().GetByApplicationID(gomock.Any(), offerID).Return(o, tc.repoErr)
+			}
+			h := NewOfferHandler(app.NewOffers(repo, nil, nil))
+			r, err := h.GetOfferByApplication(identity(tc.user, tc.role), &offerv1.GetOfferByApplicationRequest{ApplicationId: tc.id})
+			if status.Code(err) != tc.code {
+				t.Fatalf("got %v, want %v", err, tc.code)
+			}
+			if tc.code == codes.OK {
+				if !proto.Equal(r.GetOffer(), offerToProto(o)) {
+					t.Fatalf("incorrect response: %v", r)
+				}
+			} else if r != nil {
+				t.Fatal("offer exposed on failure")
+			}
+		})
+	}
+	h := NewOfferHandler(app.NewOffers(nil, nil, nil))
+	if r, err := h.GetOfferByApplication(identity(applicantID, "applicant"), nil); r != nil || status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("nil request: %v, %v", r, err)
+	}
+}
+
+func TestOfferHandler_GetOfferByApplication_HTTPBinding(t *testing.T) {
+	repo := mocks.NewMockOfferRepository(gomock.NewController(t))
+	o := domain.Offer{ID: offerID, ApplicationID: offerID, ApplicantID: applicantID, EmployerID: employerID, Terms: "terms", Status: domain.OfferStatusPending}
+	repo.EXPECT().GetByApplicationID(gomock.Any(), offerID).Return(o, nil)
+	mux := runtime.NewServeMux(runtime.WithMetadata(func(context.Context, *http.Request) metadata.MD {
+		return metadata.Pairs("x-user-id", applicantID, "x-user-role", "applicant")
+	}))
+	if err := offerv1.RegisterOfferServiceHandlerServer(context.Background(), mux, NewOfferHandler(app.NewOffers(repo, nil, nil))); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRecorder()
+	mux.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/v1/applications/"+offerID+"/offer", nil))
+	if r.Code != http.StatusOK {
+		t.Fatalf("HTTP %d: %s", r.Code, r.Body.String())
+	}
+	var response offerv1.GetOfferByApplicationResponse
+	if err := protojson.Unmarshal(r.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.GetOffer().GetOfferId() != offerID {
+		t.Fatal(&response)
 	}
 }
