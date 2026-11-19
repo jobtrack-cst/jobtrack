@@ -4,10 +4,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	"github.com/jobtrack-cst/jobtrack/services/applicant-profile/internal/ports"
 )
 
-func healthHandler(checker ports.HealthChecker) http.Handler {
+func healthHandler(checker ports.HealthChecker, collectors ...*requestmetrics.Recorder) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		health, err := checker.CheckHealth(r.Context())
@@ -19,11 +20,11 @@ func healthHandler(checker ports.HealthChecker) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-	mux.Handle("GET /metrics", metricsHandler(checker))
+	mux.Handle("GET /metrics", metricsHandler(checker, collectors...))
 	return mux
 }
 
-func metricsHandler(checker ports.HealthChecker) http.HandlerFunc {
+func metricsHandler(checker ports.HealthChecker, collectors ...*requestmetrics.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		health, err := checker.CheckHealth(r.Context())
 		ready := "0"
@@ -35,5 +36,8 @@ func metricsHandler(checker ports.HealthChecker) http.HandlerFunc {
 		_, _ = io.WriteString(w, "# HELP jobtrack_service_ready Whether the service readiness check succeeds.\n"+
 			"# TYPE jobtrack_service_ready gauge\n"+
 			"jobtrack_service_ready "+ready+"\n")
+		for _, collector := range collectors {
+			collector.WritePrometheus(w)
+		}
 	}
 }

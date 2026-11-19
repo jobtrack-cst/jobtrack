@@ -18,6 +18,7 @@ import (
 	applicantprofilev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/applicant_profile/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
+	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/applicant-profile/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/applicant-profile/internal/adapters/postgres"
 	"github.com/jobtrack-cst/jobtrack/services/applicant-profile/internal/adapters/rabbitmq"
@@ -223,12 +224,15 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 ) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
+	requestMetrics := requestmetrics.New("applicant-profile")
+	opts = append([]grpc.ServerOption{grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor())}, opts...)
 	grpcServer := grpc.NewServer(opts...)
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
 	if register != nil {
 		register(grpcServer)
 	}
-	httpServer := &http.Server{Handler: healthHandler(checker), ReadHeaderTimeout: 5 * time.Second}
+	requestMetrics.RegisterGRPC(grpcServer)
+	httpServer := &http.Server{Handler: healthHandler(checker, requestMetrics), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)
 	go func() {
 		_ = grpcServer.Serve(grpcListener)

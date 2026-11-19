@@ -363,7 +363,7 @@ func TestServe_RegistersHealthAndShutsDownBothServers(t *testing.T) {
 	}
 	body, err = io.ReadAll(response.Body)
 	response.Body.Close()
-	if err != nil || response.StatusCode != http.StatusOK || !strings.HasSuffix(string(body), "jobtrack_service_ready 1\n") {
+	if err != nil || response.StatusCode != http.StatusOK || !strings.Contains(string(body), "\njobtrack_service_ready 1\n") || !strings.Contains(string(body), "# TYPE jobtrack_requests_total counter\n") || !strings.Contains(string(body), "# TYPE jobtrack_request_duration_seconds histogram\n") {
 		t.Fatalf("metrics response %d %q %v", response.StatusCode, body, err)
 	}
 	if got := response.Header.Get("Content-Type"); got != "text/plain; version=0.0.4; charset=utf-8" {
