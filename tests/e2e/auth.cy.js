@@ -1,5 +1,7 @@
 const gateway = 'http://localhost:8000';
 const user = (role = 'ROLE_APPLICANT') => ({ userId: '11111111-1111-4111-8111-111111111111', email: 'pema@example.test', fullName: 'Pema', role });
+// The applicant app bar reads its photo; keep stubbed auth independent of Compose.
+beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
 function signIn(role = 'ROLE_APPLICANT', seconds = 3600) {
   cy.intercept('POST', `${gateway}/v1/auth/login`, (req) => {
     expect(req.body).to.deep.equal({ email: 'pema@example.test', password: 'password123' });
@@ -42,11 +44,12 @@ describe('JT-63 authentication and routing', () => {
       cy.location('pathname').should('eq', '/login');
     });
   }
-  it('does not persist the session across reloads', () => {
+  it('revalidates and restores the session across reloads', () => {
     signIn();
     cy.location('pathname').should('eq', '/applicant');
     cy.reload();
-    cy.location('pathname').should('eq', '/login');
+    cy.wait('@me');
+    cy.location('pathname').should('eq', '/applicant');
   });
   it('rejects an unsupported account role', () => {
     signIn('ROLE_UNSPECIFIED');

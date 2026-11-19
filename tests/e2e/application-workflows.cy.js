@@ -1,4 +1,6 @@
 const gateway = 'http://localhost:8000';
+// Keep the applicant app-bar photo request independent of a running gateway.
+beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
 beforeEach(() => {
   cy.intercept('GET', `${gateway}/v1/locations?*`, { locations: [{ locationId: '30000000-0000-4000-8000-000000000001', name: 'Thimphu' }] });
 });
@@ -380,9 +382,9 @@ describe('JT-108 offer discovery', () => {
       cy.contains('a', 'Applications').click();
       cy.contains('a', 'View Offer').click(); cy.wait('@byApplication');
       cy.contains(offerId).should('be.visible');
-      // Auth intentionally keeps JWTs in memory, so reload requires login.
-      cy.reload(); cy.location('pathname').should('eq', '/login');
-      login(role); navigate(`${base}/offers?applicationId=${applicationId}`);
+      // JT-106 revalidates the session and preserves the offer deep link.
+      cy.reload(); cy.location('pathname').should('eq', `${base}/offers`);
+      cy.location('search').should('eq', `?applicationId=${applicationId}`);
       cy.wait('@byApplication');
       cy.contains(offer.terms).should('be.visible');
     });

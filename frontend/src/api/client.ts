@@ -2,8 +2,10 @@
 const gateway = 'http://localhost:8000';
 let accessToken: string | null = null;
 let unauthorized = () => {};
+let authGeneration = 0;
 
 export function configureAuth(token: string | null, onUnauthorized: () => void) {
+  authGeneration++;
   accessToken = token;
   unauthorized = onUnauthorized;
 }
@@ -22,6 +24,7 @@ export class ApiError extends Error {
 export async function api<T>(path: string, options: { method?: string; body?: unknown; public?: boolean } = {}): Promise<T> {
   if (!path.startsWith('/v1/') || path.includes('..')) throw new Error('Invalid API path');
   const token = accessToken;
+  const generation = authGeneration;
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (!options.public && token) headers.Authorization = `Bearer ${token}`;
@@ -37,7 +40,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   }
   if (!response.ok) {
     // A late response from an old session must not log out a newer login.
-    if (response.status === 401 && !options.public && token === accessToken) unauthorized();
+    if (response.status === 401 && !options.public && generation === authGeneration) unauthorized();
     let code: number | undefined;
     try {
       const body: unknown = await response.json();

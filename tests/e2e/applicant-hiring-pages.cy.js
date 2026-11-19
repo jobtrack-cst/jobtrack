@@ -1,6 +1,8 @@
 // JT-83 pages. Gateway responses are stubbed, so these tests check the UI and
 // the requests it sends, not live services (see docs/testing/jt-83-test-cases.md).
 const gateway = 'http://localhost:8000';
+// Keep the applicant app-bar photo request independent of a running gateway.
+beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
 const userId = '11111111-1111-4111-8111-111111111111';
 const year = new Date().getFullYear();
 

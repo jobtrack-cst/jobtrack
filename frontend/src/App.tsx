@@ -57,7 +57,8 @@ function Home() {
   return <Navigate to={session && session.expiresAt > Date.now() ? landingPath(session.user.role) : '/login'} replace />;
 }
 export default function App() {
-  const { session, signOut } = useAuth();
+  const { session, initializing, signOut } = useAuth();
+  if (initializing) return <Container component="main" sx={{ py: 4 }}><Typography role="status">Restoring session…</Typography></Container>;
   return <>
     <AppBar position="static"><Toolbar>
       <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>JobTrack</Typography>
