@@ -87,7 +87,7 @@ The out-of-scope items in charter Section 4.4 (payments, real SMS and email, res
 | Area | Deliverable | Status |
 |---|---|---|
 | Initiation and planning | Project proposal, charter, Definition of Done and working agreement, sprint calendar, risk register, product backlog in Jira | Done (`docs/pm`, Jira) |
-| Initiation and planning | Stakeholder register, SRS, WBS, quality management plan | TBD: not in `docs/pm`; confirm where they are |
+| Initiation and planning | Stakeholder register, SRS, WBS, quality management plan | Not in the repo (checked 19 Nov). TBD (20 Nov): confirm with the team whether they were submitted separately for SWE303; if not, record them as not delivered in Section 5.2 |
 | Design | Architecture and service catalogue (AGENTS.md), `.proto` and event contracts | Done |
 | Development | Source code for 20 services, gateway, 5 functions and frontend; Dockerfiles, Kubernetes and Knative manifests, CI pipeline | TBD (20 Nov): confirm the Kustomize manifests in `deploy/k8s` |
 | Testing | Test plan, test case document with traceability, coverage and SonarQube reports, load test report, defect log in Jira | Load test report Done (JT-96); the rest TBD (20 Nov, from JT-97) |
