@@ -21,7 +21,7 @@ spec:
       # Above the 4 minute run limit in the function.
       timeoutSeconds: 300
       containers:
-        - image: jobtrack-deadline-reminder:local
+        - image: dev.local/jobtrack-deadline-reminder:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

@@ -1,0 +1,41 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: notification-dispatcher
+  namespace: default
+  labels:
+    app: notification-dispatcher
+    jobtrack.io/function: "true"
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+    spec:
+      containerConcurrency: 1
+      timeoutSeconds: 60
+      containers:
+        - image: dev.local/jobtrack-notification-dispatcher:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SERVICE_NAME
+              value: notification-dispatcher
+            - name: AUTH_ADDR
+              value: auth.default.svc.cluster.local:9090
+            - name: NOTIFICATION_INBOX_ADDR
+              value: notification-inbox.default.svc.cluster.local:9090
+            - name: EMAIL_SENDER_URL
+              value: http://email-sender.default.svc.cluster.local/send-email
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: notification-dispatcher-credentials
+                  key: internal-token
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            periodSeconds: 10
