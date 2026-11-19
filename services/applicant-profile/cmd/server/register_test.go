@@ -26,6 +26,7 @@ const stubApplicantID = "11111111-1111-4111-8111-111111111111"
 type stubProfiles struct {
 	mu       sync.Mutex
 	profiles map[string]domain.Profile
+	photos   map[string]domain.Photo
 }
 
 func (s *stubProfiles) Create(_ context.Context, p domain.Profile) error {
@@ -61,6 +62,34 @@ func (s *stubProfiles) Replace(_ context.Context, id string, c domain.ProfileCon
 	p.ProfileContent, p.UpdatedAt = c, at
 	s.profiles[id] = p
 	return p, nil
+}
+
+// PutPhoto and GetPhoto keep the stub a full ports.ProfileRepository (JT-103);
+// the photo rules are tested in the domain, app, gRPC and postgres packages.
+func (s *stubProfiles) PutPhoto(_ context.Context, id string, photo domain.Photo, at time.Time) (domain.Profile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.profiles[id]
+	if !ok {
+		return domain.Profile{}, domain.ErrProfileNotFound
+	}
+	if s.photos == nil {
+		s.photos = map[string]domain.Photo{}
+	}
+	s.photos[id] = photo
+	p.HasPhoto, p.UpdatedAt = true, at
+	s.profiles[id] = p
+	return p, nil
+}
+
+func (s *stubProfiles) GetPhoto(_ context.Context, id string) (domain.Photo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	photo, ok := s.photos[id]
+	if !ok {
+		return domain.Photo{}, domain.ErrPhotoNotFound
+	}
+	return photo, nil
 }
 
 // recordingRegistrar keeps what registerApplicantProfile registers.

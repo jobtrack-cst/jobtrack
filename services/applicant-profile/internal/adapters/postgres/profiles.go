@@ -19,6 +19,10 @@ var _ ports.ProfileRepository = (*Profiles)(nil)
 
 func NewProfiles(pool *pgxpool.Pool) *Profiles { return &Profiles{pool: pool} }
 
+// hasPhotoColumn only checks that a photo row exists, so profile reads never
+// load the image bytes (JT-103).
+const hasPhotoColumn = "EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.applicant_id = applicant_profiles.applicant_id)"
+
 // Create inserts the profile with its education and skills in one transaction.
 func (r *Profiles) Create(ctx context.Context, p domain.Profile) error {
 	return r.inTx(ctx, "create applicant profile failed", func(tx pgx.Tx) error {
@@ -45,18 +49,31 @@ func (r *Profiles) Get(ctx context.Context, applicantID string) (domain.Profile,
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	p := domain.Profile{ApplicantID: applicantID}
-	err = tx.QueryRow(ctx,
-		`SELECT applicant_id, summary, created_at, updated_at FROM applicant_profiles WHERE applicant_id = $1`,
-		applicantID).Scan(&p.ApplicantID, &p.Summary, &p.CreatedAt, &p.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Profile{}, domain.ErrProfileNotFound
+	p, err := readProfile(ctx, tx, applicantID)
+	if errors.Is(err, domain.ErrProfileNotFound) {
+		return domain.Profile{}, err
 	}
 	if err != nil {
 		return domain.Profile{}, hideDriverError(ctx, "get applicant profile failed")
 	}
+	return p, nil
+}
+
+// readProfile reads the profile row, whether a photo exists, and both lists.
+func readProfile(ctx context.Context, tx pgx.Tx, applicantID string) (domain.Profile, error) {
+	p := domain.Profile{ApplicantID: applicantID}
+	err := tx.QueryRow(ctx,
+		`SELECT applicant_id, summary, created_at, updated_at, `+hasPhotoColumn+`
+		 FROM applicant_profiles WHERE applicant_id = $1`,
+		applicantID).Scan(&p.ApplicantID, &p.Summary, &p.CreatedAt, &p.UpdatedAt, &p.HasPhoto)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Profile{}, domain.ErrProfileNotFound
+	}
+	if err != nil {
+		return domain.Profile{}, err
+	}
 	if p.Education, p.Skills, err = readLists(ctx, tx, applicantID); err != nil {
-		return domain.Profile{}, hideDriverError(ctx, "get applicant profile failed")
+		return domain.Profile{}, err
 	}
 	// Store and return UTC, as AGENTS.md Section 9 requires.
 	p.CreatedAt, p.UpdatedAt = p.CreatedAt.UTC(), p.UpdatedAt.UTC()
@@ -71,8 +88,8 @@ func (r *Profiles) Replace(ctx context.Context, applicantID string, c domain.Pro
 	err := r.inTx(ctx, "update applicant profile failed", func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx,
 			`UPDATE applicant_profiles SET summary = $2, updated_at = $3
-			 WHERE applicant_id = $1 RETURNING created_at`,
-			applicantID, c.Summary, updatedAt).Scan(&p.CreatedAt)
+			 WHERE applicant_id = $1 RETURNING created_at, `+hasPhotoColumn,
+			applicantID, c.Summary, updatedAt).Scan(&p.CreatedAt, &p.HasPhoto)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrProfileNotFound
 		}
@@ -92,6 +109,52 @@ func (r *Profiles) Replace(ctx context.Context, applicantID string, c domain.Pro
 	}
 	p.CreatedAt = p.CreatedAt.UTC()
 	return p, nil
+}
+
+// PutPhoto updates the profile row first: it fails with ErrProfileNotFound
+// when there is no profile, and its row lock makes concurrent uploads for one
+// applicant run one after the other. Only updated_at changes on the profile
+// (JT-103).
+func (r *Profiles) PutPhoto(ctx context.Context, applicantID string, photo domain.Photo, now time.Time) (domain.Profile, error) {
+	var updated domain.Profile
+	err := r.inTx(ctx, "put profile photo failed", func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE applicant_profiles SET updated_at = $2 WHERE applicant_id = $1`, applicantID, now)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return domain.ErrProfileNotFound
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO profile_photos (applicant_id, content_type, content, updated_at)
+			 VALUES ($1, $2, $3, $4)
+			 ON CONFLICT (applicant_id) DO UPDATE
+			 SET content_type = EXCLUDED.content_type, content = EXCLUDED.content, updated_at = EXCLUDED.updated_at`,
+			applicantID, photo.ContentType, photo.Content, now); err != nil {
+			return err
+		}
+		updated, err = readProfile(ctx, tx, applicantID)
+		return err
+	})
+	if err != nil {
+		return domain.Profile{}, err
+	}
+	return updated, nil
+}
+
+// GetPhoto is the only query that reads the image bytes.
+func (r *Profiles) GetPhoto(ctx context.Context, applicantID string) (domain.Photo, error) {
+	var photo domain.Photo
+	err := r.pool.QueryRow(ctx,
+		`SELECT content_type, content FROM profile_photos WHERE applicant_id = $1`, applicantID,
+	).Scan(&photo.ContentType, &photo.Content)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Photo{}, domain.ErrPhotoNotFound
+	}
+	if err != nil {
+		return domain.Photo{}, hideDriverError(ctx, "get profile photo failed")
+	}
+	return photo, nil
 }
 
 // insertLists stores each entry with its position so the order is kept.

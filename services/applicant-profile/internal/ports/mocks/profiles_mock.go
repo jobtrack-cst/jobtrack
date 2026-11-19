@@ -71,6 +71,36 @@ func (mr *MockProfileRepositoryMockRecorder) Get(ctx, applicantID any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockProfileRepository)(nil).Get), ctx, applicantID)
 }
 
+// GetPhoto mocks base method.
+func (m *MockProfileRepository) GetPhoto(ctx context.Context, applicantID string) (domain.Photo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPhoto", ctx, applicantID)
+	ret0, _ := ret[0].(domain.Photo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPhoto indicates an expected call of GetPhoto.
+func (mr *MockProfileRepositoryMockRecorder) GetPhoto(ctx, applicantID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPhoto", reflect.TypeOf((*MockProfileRepository)(nil).GetPhoto), ctx, applicantID)
+}
+
+// PutPhoto mocks base method.
+func (m *MockProfileRepository) PutPhoto(ctx context.Context, applicantID string, photo domain.Photo, now time.Time) (domain.Profile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutPhoto", ctx, applicantID, photo, now)
+	ret0, _ := ret[0].(domain.Profile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutPhoto indicates an expected call of PutPhoto.
+func (mr *MockProfileRepositoryMockRecorder) PutPhoto(ctx, applicantID, photo, now any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPhoto", reflect.TypeOf((*MockProfileRepository)(nil).PutPhoto), ctx, applicantID, photo, now)
+}
+
 // Replace mocks base method.
 func (m *MockProfileRepository) Replace(ctx context.Context, applicantID string, content domain.ProfileContent, updatedAt time.Time) (domain.Profile, error) {
 	m.ctrl.T.Helper()

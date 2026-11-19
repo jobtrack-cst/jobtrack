@@ -15,15 +15,18 @@ func TestApplicantProfileContract_PublicRPCsAndHTTPBindings(t *testing.T) {
 		t.Fatalf("unexpected package or service count: %s, %d", file.Package(), file.Services().Len())
 	}
 	service := file.Services().ByName("ApplicantProfileService")
-	if service == nil || service.Methods().Len() != 3 {
-		t.Fatal("expected only ApplicantProfileService with three public RPCs")
+	// JT-103 added the two photo RPCs (approved on 19 Nov 2026, AGENTS.md Section 15).
+	if service == nil || service.Methods().Len() != 5 {
+		t.Fatal("expected only ApplicantProfileService with five public RPCs")
 	}
 	for _, tc := range []struct {
-		method, verb, body string
+		method, verb, path, body string
 	}{
-		{"CreateMyProfile", "POST", "*"},
-		{"GetMyProfile", "GET", ""},
-		{"UpdateMyProfile", "PUT", "*"},
+		{"CreateMyProfile", "POST", "/v1/applicant/profile", "*"},
+		{"GetMyProfile", "GET", "/v1/applicant/profile", ""},
+		{"UpdateMyProfile", "PUT", "/v1/applicant/profile", "*"},
+		{"PutMyProfilePhoto", "PUT", "/v1/applicant/profile/photo", "*"},
+		{"GetMyProfilePhoto", "GET", "/v1/applicant/profile/photo", ""},
 	} {
 		t.Run(tc.method, func(t *testing.T) {
 			method := service.Methods().ByName(protoreflect.Name(tc.method))
@@ -51,7 +54,7 @@ func TestApplicantProfileContract_PublicRPCsAndHTTPBindings(t *testing.T) {
 			default:
 				t.Fatalf("unexpected HTTP pattern %T", pattern)
 			}
-			if verb != tc.verb || path != "/v1/applicant/profile" || rule.GetBody() != tc.body || rule.GetResponseBody() != "" || len(rule.GetAdditionalBindings()) != 0 {
+			if verb != tc.verb || path != tc.path || rule.GetBody() != tc.body || rule.GetResponseBody() != "" || len(rule.GetAdditionalBindings()) != 0 {
 				t.Errorf("unexpected HTTP binding: %v", rule)
 			}
 		})
@@ -74,7 +77,7 @@ func TestApplicantProfileContract_ResourcesAndEditableFields(t *testing.T) {
 		message string
 		fields  []string
 	}{
-		{"ApplicantProfile", []string{"applicant_id", "summary", "education", "skills", "timestamps"}},
+		{"ApplicantProfile", []string{"applicant_id", "summary", "education", "skills", "timestamps", "has_photo"}},
 		{"Education", []string{"institution", "qualification", "start_year", "end_year"}},
 		{"CreateMyProfileRequest", []string{"summary", "education", "skills"}},
 		{"GetMyProfileRequest", nil},
@@ -82,6 +85,10 @@ func TestApplicantProfileContract_ResourcesAndEditableFields(t *testing.T) {
 		{"CreateMyProfileResponse", []string{"profile"}},
 		{"GetMyProfileResponse", []string{"profile"}},
 		{"UpdateMyProfileResponse", []string{"profile"}},
+		{"PutMyProfilePhotoRequest", []string{"content_type", "content"}},
+		{"PutMyProfilePhotoResponse", []string{"profile"}},
+		{"GetMyProfilePhotoRequest", nil},
+		{"GetMyProfilePhotoResponse", []string{"content_type", "content"}},
 	}
 	// Exact message and enum counts reject unintended events or extra resources.
 	if file.Messages().Len() != len(cases) || file.Enums().Len() != 0 {
@@ -106,6 +113,10 @@ func TestApplicantProfileContract_ResourcesAndEditableFields(t *testing.T) {
 				switch name {
 				case "start_year", "end_year":
 					kind = protoreflect.Int32Kind
+				case "has_photo":
+					kind = protoreflect.BoolKind
+				case "content":
+					kind = protoreflect.BytesKind
 				case "education":
 					kind, typeName = protoreflect.MessageKind, "jobtrack.applicant_profile.v1.Education"
 				case "timestamps":
@@ -122,7 +133,7 @@ func TestApplicantProfileContract_ResourcesAndEditableFields(t *testing.T) {
 			}
 		})
 	}
-	for _, name := range []protoreflect.Name{"CreateMyProfileRequest", "UpdateMyProfileRequest"} {
+	for _, name := range []protoreflect.Name{"CreateMyProfileRequest", "UpdateMyProfileRequest", "PutMyProfilePhotoRequest", "GetMyProfilePhotoRequest"} {
 		if file.Messages().ByName(name).Fields().ByName("applicant_id") != nil {
 			t.Errorf("%s must derive applicant identity from metadata", name)
 		}
