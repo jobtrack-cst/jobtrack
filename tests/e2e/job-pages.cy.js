@@ -91,7 +91,10 @@ describe('JT-73 employer jobs', () => {
     field('Location').type('Thimphu{esc}'); field('Deadline').type('2030-01-20T12:00');
     cy.contains('button', 'Create draft').click(); cy.wait('@create');
     cy.location('pathname').should('eq', `/employer/jobs/${jobId}`);
-    field('Title').clear().type('Updated intern'); cy.contains('button', 'Save changes').click(); cy.wait('@update');
+    // Navigation can update the URL before the loaded edit form replaces the create form.
+    cy.contains('button', 'Save changes').should('be.enabled');
+    field('Title').should('have.value', job.title).clear();
+    field('Title').type('Updated intern'); cy.contains('button', 'Save changes').click(); cy.wait('@update');
     cy.contains('Job updated.').should('be.visible');
     cy.contains('button', exact('Publish job')).click();
     cy.contains('button', 'Cancel').click(); cy.get('@publish.all').should('have.length', 0);
