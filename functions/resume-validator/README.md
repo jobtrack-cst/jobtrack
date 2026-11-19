@@ -12,34 +12,37 @@ Configuration: `SERVICE_NAME=resume-validator`, `RESUME_ADDR`, `RABBITMQ_URL`,
 only the JT-44 internal client interceptor attaches it to GetResumeFile.
 No database or local files are used. `/healthz` and `/metrics` report process health.
 
-The validator checks exact `application/pdf`, 1..2,000,000 decoded bytes, a PDF
-1.0..1.7 or 2.0 header at byte zero, and terminal `startxref`/`%%EOF`. For a
-standalone classic xref table it checks subsection counts, entry syntax, in-use
-object offsets and object/generation numbers, trailer `/Size` and `/Root`, and
-the referenced direct catalog dictionary. A bare `xref` token is insufficient.
-Catalog identification requires the root dictionary's actual top-level `/Type`
-entry to have the name value `/Catalog`; names are decoded with PDF `#xx`
-escapes and compared exactly. Literal/hex strings, comments, nested dictionaries,
-arrays and unrelated entries cannot supply that entry. Unrelated values are
-skipped lexically; malformed tokens, duplicate decoded keys, missing `endobj`
-and nesting beyond 32 levels fail closed. Literal-string escapes and nested
-parentheses are handled without interpreting their contents as PDF entries.
-This is a bounded structural/signature gate, not a complete PDF parser, rendering
-check or malware scanner; it does not validate the full page/object graph.
+The validator checks exact `application/pdf`, 1..2,000,000 decoded upload bytes,
+a PDF 1.0..1.7 or 2.0 header at byte zero, and terminal `startxref`/`%%EOF`.
+JT-107 extends the original JT-62 classic-only scope to classic cross-reference
+tables, cross-reference streams, hybrid files and incremental updates. The final
+`startxref` selects the current revision; `/Prev` links supply earlier entries,
+with newer entries (including deletions) taking precedence. Multiple `%%EOF`
+markers are valid. A bare `xref` or `/Type /XRef` token is insufficient.
 
-**Product Owner-approved scope (12 Nov 2026, Jira JT-62):** supported PDFs are
-limited to classic cross-reference tables with directly accessible catalog
-objects. Cross-reference streams, compressed object-stream catalogs, and hybrid
-or incremental layouts requiring `/XRefStm` or `/Prev` resolution are unsupported
-and must be rejected. General PDF-format compatibility is outside JT-62 scope.
-The implementation fails closed for these layouts and publishes `resume.rejected`;
-valid PDFs within the supported subset can become VALIDATED after the checks above.
+Classic tables retain subsection, entry, object offset/generation and trailer
+checks. Xref streams require a real `/Type /XRef` dictionary, valid `/Size`, `/W`,
+optional `/Index`, exact decoded entry length and valid object references.
+Metadata streams support unfiltered or FlateDecode data, including PNG predictors
+10..15 with one 8-bit component. Compressed catalog objects are resolved through
+validated `/ObjStm` headers and type-2 xref entries. Stream lengths and terminators
+are checked; unsupported encodings or external streams fail closed.
 
-The old optimistic xref-stream signature branch was removed rather than claiming
-structural support without a resolver. No PDF parser dependency was introduced.
-The compressed-catalog specimen tests required unsupported-layout rejection; it
-is not a positive compatibility test. The investigation and approved scope are
-recorded in the test document.
+Catalog identification still requires the root dictionary's actual top-level
+`/Type /Catalog` name. The existing lexer handles escaped names, strings,
+comments, nested values and duplicate keys without interpreting embedded text
+as dictionary entries. Malformed tokens and nesting beyond 32 levels fail closed.
+The parser bounds object-number space to 100,000 entries, revision traversal to
+128 sections and total decoded metadata to 16,000,000 bytes to prevent unbounded
+work. These bounds can reject unusually complex but otherwise valid PDFs.
+
+This remains a structural/signature gate, not a full PDF parser, page renderer
+or malware scanner. It does not validate the full page/object graph. Less common
+stream filters, multi-component/non-8-bit predictors and indirect metadata-stream
+lengths remain unsupported. No parser dependency, contract, transport or service
+security changes are introduced. Historical JT-62 unsupported-layout evidence is
+retained in its test document; [JT-107 test cases](../../docs/testing/jt-107-test-cases.md)
+record the expanded scope and current verification.
 
 Successful validation publishes `resume.validated`; failed format checks publish
 `resume.rejected` with a fixed reason. Fetch failures and unconfirmed publishes
@@ -84,11 +87,11 @@ Knative attempts registry resolution for mutable tags even with IfNotPresent.
 
 `cmd/verify` is a deployment test utility, not an HTTP sink. Run it on the
 application network with `RESUME_ADDR` and `RABBITMQ_URL`. It creates a synthetic
-applicant identity, uploads a minimal PDF, a prefix-spoofed PDF and the bare-xref
-regression through the real public gRPC service, observes source/result events on an exclusive broker queue,
+applicant identity, uploads classic, xref-stream, compressed-catalog, hybrid and incremental PDFs,
+a truncated PDF, a prefix-spoofed PDF and the bare-xref regression through the real public gRPC service, observes source/result events on an exclusive broker queue,
 and polls GetResume for VALIDATED/REJECTED. It does not publish synthetic source
 or result events and never edits the database. The temporary observation queue is
-deleted when its connection closes. The three synthetic resume records remain.
+deleted when its connection closes. The eight synthetic resume records remain.
 A text/plain upload must return INVALID_ARGUMENT: the existing upload contract
 prevents a plain non-PDF from being stored and later transitioning to REJECTED.
 

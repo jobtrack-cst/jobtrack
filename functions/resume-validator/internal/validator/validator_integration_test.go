@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jobtrack-cst/jobtrack/functions/resume-validator/internal/testpdf"
 	"github.com/jobtrack-cst/jobtrack/functions/resume-validator/internal/validator"
 	eventsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/events/v1"
 	resumev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1"
@@ -77,6 +78,12 @@ func TestValidator_IntegrationBrokerForwarderInternalRPCAndOutcome(t *testing.T)
 		kind    string
 	}{
 		{"valid direct catalog", pdf(0), "resume.validated"},
+		{"xref stream", testpdf.XrefStream(true, true), "resume.validated"},
+		{"hybrid", testpdf.Hybrid(), "resume.validated"},
+		{"truncated stream", testpdf.XrefStream(true, true)[:100], "resume.rejected"},
+		{"compressed catalog", testpdf.CompressedCatalog(), "resume.validated"},
+		{"incremental classic", testpdf.Incremental(pdf(0), false), "resume.validated"},
+		{"incremental stream", testpdf.Incremental(testpdf.XrefStream(true, true), true), "resume.validated"},
 		{"literal string spoof", pdfWithCatalog(`<< /Bogus (/Type /Catalog) /Pages 2 0 R >>`), "resume.rejected"},
 		{"comment spoof", pdfWithCatalog("<< % /Type /Catalog\n/Pages 2 0 R >>"), "resume.rejected"},
 		{"nested dictionary spoof", pdfWithCatalog(`<< /Bogus << /Type /Catalog >> /Pages 2 0 R >>`), "resume.rejected"},
@@ -126,7 +133,7 @@ func TestValidator_IntegrationBrokerForwarderInternalRPCAndOutcome(t *testing.T)
 					rejected := new(eventsv1.ResumeRejected)
 					require.NoError(t, result.Data.UnmarshalTo(rejected))
 					require.Equal(t, resumeID, rejected.ResumeId)
-					require.Equal(t, "invalid PDF catalog signature", rejected.Reason)
+					require.Equal(t, validator.Validate("application/pdf", tc.content), rejected.Reason)
 				}
 			case <-ctx.Done():
 				t.Fatal("no real validator result received")

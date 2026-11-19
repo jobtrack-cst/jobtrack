@@ -64,8 +64,17 @@ func run() error {
 		name string
 		data []byte
 		want resumev1.ResumeValidationStatus
-	}{{"valid", pdf, resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_VALIDATED}, {"spoof", []byte("%PDF-1.7\nthis is plain text pretending to be PDF"), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_REJECTED}, {"bare-xref", testpdf.BareXref(), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_REJECTED}} {
-		upload, err := client.UploadResume(ctx, &resumev1.UploadResumeRequest{FileName: "jt62-" + tc.name + ".pdf", ContentType: "application/pdf", Content: tc.data})
+	}{
+		{"valid", pdf, resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_VALIDATED},
+		{"xref-stream", testpdf.XrefStream(true, true), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_VALIDATED},
+		{"compressed-catalog", testpdf.CompressedCatalog(), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_VALIDATED},
+		{"incremental", testpdf.Incremental(testpdf.XrefStream(true, true), true), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_VALIDATED},
+		{"hybrid", testpdf.Hybrid(), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_VALIDATED},
+		{"truncated", testpdf.XrefStream(true, true)[:100], resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_REJECTED},
+		{"spoof", []byte("%PDF-1.7\nthis is plain text pretending to be PDF"), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_REJECTED},
+		{"bare-xref", testpdf.BareXref(), resumev1.ResumeValidationStatus_RESUME_VALIDATION_STATUS_REJECTED},
+	} {
+		upload, err := client.UploadResume(ctx, &resumev1.UploadResumeRequest{FileName: "jt107-" + tc.name + ".pdf", ContentType: "application/pdf", Content: tc.data})
 		if err != nil {
 			return fmt.Errorf("upload %s: %w", tc.name, err)
 		}
