@@ -2,13 +2,15 @@
 export const maxResumeBytes = 2_000_000;
 export const maxFileNameLength = 255;
 const pdfSignature = [0x25, 0x50, 0x44, 0x46, 0x2d]; // "%PDF-"
+// The resume service rejects these in a file name: slash, backslash and NUL (JT-48).
+const forbiddenInFileName = ['/', '\\', '\u0000'];
 
 export type Checked = { ok: true; fileName: string; content: string } | { ok: false; message: string };
 
 export async function checkResume(file: File): Promise<Checked> {
   const fileName = file.name.trim();
   const nameLength = Array.from(fileName).length;
-  if (nameLength < 1 || nameLength > maxFileNameLength || /[/\\\u0000]/.test(fileName)) {
+  if (nameLength < 1 || nameLength > maxFileNameLength || forbiddenInFileName.some(c => fileName.includes(c))) {
     return { ok: false, message: `The file name must have 1 to ${maxFileNameLength} characters and no slashes.` };
   }
   if (file.type !== 'application/pdf') return { ok: false, message: 'Only PDF files can be uploaded.' };

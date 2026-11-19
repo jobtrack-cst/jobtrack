@@ -398,6 +398,31 @@ services:
     stop_grace_period: 25s
     restart: unless-stopped
 
+
+  # JT-71: Notification dispatcher. Consumes events and writes to inbox + email-sender.
+  notification-dispatcher:
+    profiles: [functions]
+    image: ${NOTIFICATION_DISPATCHER_IMAGE:-jobtrack-notification-dispatcher:local}
+    build:
+      context: ../..
+      dockerfile: functions/notification-dispatcher/Dockerfile
+    environment:
+      SERVICE_NAME: notification-dispatcher
+      HTTP_PORT: "8080"
+      AUTH_ADDR: auth:9090
+      NOTIFICATION_INBOX_ADDR: notification-inbox:9090
+      EMAIL_SENDER_URL: http://email-sender:8080/send-email
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
+    depends_on:
+      auth:
+        condition: service_healthy
+      notification-inbox:
+        condition: service_healthy
+      email-sender:
+        condition: service_started
+    stop_grace_period: 35s
+    restart: unless-stopped
+
   # JT-86 weekly summary. Triggered by hand in Compose (JT-61); k3d uses a PingSource.
   weekly-summary:
     profiles: [functions]
@@ -719,6 +744,51 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # JT-93: opt-in on the 16 GiB host; no application credentials or host gRPC ports.
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=512MB
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    mem_limit: 256m
+    restart: unless-stopped
+
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:12.1.0
+    environment:
+      # Empty defaults keep the base profile usable without monitoring credentials.
+      # The entrypoint below refuses empty or example credentials when activated.
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    entrypoint: ["/bin/sh", "/etc/grafana/start-monitoring.sh"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./monitoring/start-grafana.sh:/etc/grafana/start-monitoring.sh:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+    mem_limit: 256m
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   rabbitmq-data:
+  prometheus-data:
+  grafana-data:

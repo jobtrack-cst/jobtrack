@@ -3,7 +3,7 @@
 - Jira task: JT-25
 - Owner: Jigden Shakya (Scrum Master). Backup: Kinley Tobgay Lhendrup
 - Status: Agreed by the team (3 Nov 2026)
-- Last updated: 3 Nov 2026 (review policy updated to match the JT-16 team decision)
+- Last updated: 19 Nov 2026 (sprint calendar aligned with AGENTS.md Section 14, JT-67)
 
 This document records how the JobTrack team works together. If it conflicts with AGENTS.md, AGENTS.md wins and this file is corrected through a pull request.
 
@@ -71,11 +71,12 @@ For documentation-only tasks (for example PM documents), points 2, 3 and 6 apply
 | Sprint | Dates | Goal |
 |---|---|---|
 | Sprint 0 | Mon 2 Nov to Tue 3 Nov | Development foundation: repo, contracts for all 20 services, golden template, CI, local environment, proven cluster setup |
-| Sprint 1 | Wed 4 Nov to Fri 6 Nov | All 20 services and the gateway running with basic operations |
-| Sprint 2 | Sat 7 Nov to Mon 9 Nov | Core flow working end to end with events and the first functions |
-| Sprint 3 | Tue 10 Nov to Thu 12 Nov | Full business logic, all 5 functions, frontend for all roles, integration tests |
-| Sprint 4 | Fri 13 Nov to Sun 15 Nov | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
-| Buffer | Mon 16 Nov to Tue 17 Nov | Only if needed |
+| Sprint 1 | Fri 6 Nov to Sun 8 Nov | All 20 services and the gateway running with basic operations |
+| Sprint 2 | Mon 9 Nov to Fri 13 Nov (extended by two days on 11 Nov) | Core flow working end to end with events and the first functions |
+| Sprint 3 | Sat 14 Nov to Mon 16 Nov | Full business logic, all 5 functions, frontend for all roles, integration tests |
+| Sprint 4 | Tue 17 Nov to Fri 20 Nov (extended by one day on 19 Nov) | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
+
+There is no buffer. Planned project completion: 20 Nov 2026 (schedule revised on 11 Nov 2026 and Sprint 4 extended by one day on 19 Nov 2026; see AGENTS.md Sections 14 and 15).
 
 Presentation date: not yet announced (likely to be postponed).
 
@@ -87,7 +88,7 @@ Presentation date: not yet announced (likely to be postponed).
 | Daily stand-up | Every sprint day (see Section 2) | 15 minutes |
 | Sprint review and retrospective (combined) | Last day of each sprint | 1 hour |
 
-- Sprint lengths stay fixed. If a sprint goal is met early, the team pulls the next items from the backlog.
+- Sprint lengths stay fixed, except the agreed Sprint 2 extension (11 Nov 2026) and the one-day Sprint 4 extension (19 Nov 2026), both recorded in the AGENTS.md Decision log. If a sprint goal is met early, the team pulls the next items from the backlog.
 - The risk register (`docs/pm/risk-register.md`, JT-26) is reviewed at every retrospective.
 
 ---

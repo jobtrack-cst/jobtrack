@@ -6,7 +6,7 @@
 | Owner | Jigden Shakya (Scrum Master). Backup: Kinley Tobgay Lhendrup |
 | Planning date | 17 Nov 2026 (plan agreed with Phuntsho Namgyel as Product Owner; JT-90, JT-102, JT-103, the deployment scope and the slip order confirmed by Phuntsho on 18 Nov 2026) |
 | Sprint started | 17 Nov 2026, 09:00 (Jira sprint 38) |
-| Sprint dates | 17 Nov 09:00 to 19 Nov 23:59 |
+| Sprint dates | 17 Nov 09:00 to 20 Nov 23:59 (extended by one day on 19 Nov; planned end 19 Nov 23:59) |
 | Related documents | `docs/pm/sprint-3-review.md`, `docs/pm/sprint-3-planning.md`, `docs/pm/risk-register.md` (version 1.5), AGENTS.md (Sections 14 and 15) |
 
 ---
@@ -15,7 +15,7 @@
 
 End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze. Committed minimum: the Must tasks (39 points).
 
-Sprint 4 is the last sprint. It ends on 19 Nov 2026, the planned project completion date. There is no Sprint 5 and no extension.
+Sprint 4 is the last sprint. It ends on 20 Nov 2026, the planned project completion date, after the one-day extension agreed on 19 Nov 2026 (AGENTS.md Section 15). There is no Sprint 5 and no further extension.
 
 ---
 
@@ -150,7 +150,7 @@ Recorded in the AGENTS.md Decision log (Section 15), agreed with Phuntsho as Pro
 - JT-90 is moved from the backlog into Sprint 4 as a Must and assigned to Jigden as job-posting backup (17 Nov; approved by Phuntsho on 18 Nov).
 - WEB303 deployment: all 5 functions run on Knative in k3d, and the 20 services stay in Docker Compose. JT-92 verifies the functions, their triggers, connectivity and scale to zero. Open action: confirm this against the official WEB303 assessment requirements (Phuntsho, 18 Nov).
 - JT-102 and JT-103 (profile images) are approved as Should tasks after JT-66: JPEG or PNG, a 1 MB limit, file signature validation, ownership checks and additive protobuf changes. Each proto diff needs Phuntsho's explicit approval before implementation (Phuntsho, 18 Nov).
-- Slip order: JT-66 first, then JT-102 and JT-103, then other Should tasks; never cut a Must. No Sprint 5 and no extension (Phuntsho, 18 Nov).
+- Slip order: JT-66 first, then JT-102 and JT-103, then other Should tasks; never cut a Must. No Sprint 5 and no extension (Phuntsho, 18 Nov); on 19 Nov Sprint 4 was extended by one day to 20 Nov, with no further extension (AGENTS.md Section 15).
 
 ---
 
@@ -167,7 +167,7 @@ Recorded in the AGENTS.md Decision log (Section 15), agreed with Phuntsho as Pro
 ## 9. After Sprint 4
 
 - There is no Sprint 5. Unfinished Should tasks are recorded as not delivered in the closure report (JT-100), not moved.
-- Feature freeze at the end of Sprint 4 (19 Nov).
+- Feature freeze at the end of Sprint 4 (20 Nov, after the one-day extension).
 - The final presentation and submission dates are not yet announced (AGENTS.md Section 16).
 
 ---
