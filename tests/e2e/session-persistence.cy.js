@@ -152,6 +152,7 @@ describe('JT-106 session persistence', () => {
     })).as('me');
     visitStored(credentials(), '/admin');
     cy.contains('[role=status]', 'Restoring session').should('be.visible');
+    cy.wrap(null).should(() => expect(release).to.be.a('function'));
     cy.clock(Date.now(), ['Date']);
     cy.tick(3600001);
     cy.then(() => release());
