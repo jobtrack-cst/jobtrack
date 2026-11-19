@@ -19,10 +19,12 @@ import (
 	savedjobsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/saved_jobs/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/adapters/grpc"
 	"github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/adapters/postgres"
+	"github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/adapters/rabbitmq"
 	"github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/saved-jobs/internal/ports"
 	"google.golang.org/grpc"
@@ -36,6 +38,7 @@ type config struct {
 	databaseURL   string
 	migrationsDir string
 	internalToken string
+	rabbitMQURL   string
 }
 
 func main() {
@@ -88,11 +91,25 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if strings.TrimSpace(cfg.internalToken) == "" {
 		return config{}, errors.New("INTERNAL_TOKEN is required")
 	}
+	cfg.rabbitMQURL = getenv("RABBITMQ_URL")
+	if strings.TrimSpace(cfg.rabbitMQURL) == "" {
+		return config{}, errors.New("RABBITMQ_URL is required")
+	}
 	return cfg, nil
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
-	return runWithDatabase(ctx, cfg, logger, openDatabase, runServers)
+	return runWithDatabase(ctx, cfg, logger, openDatabase,
+		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, pool *pgxpool.Pool) error {
+			savedJobs := app.NewSavedJobs(postgres.NewSavedJobsRepository(pool))
+			consume := func(ctx context.Context) error {
+				return events.Consume(ctx, rabbitmq.JobClosedConsumerConfig(cfg.rabbitMQURL, logger, savedJobs))
+			}
+			// The consumer stops with the servers, before the database pool closes (JT-70).
+			return runWithConsumer(ctx, consume, func(ctx context.Context) error {
+				return runServers(ctx, cfg, logger, checker, pool)
+			})
+		})
 }
 
 type databaseHandle struct {

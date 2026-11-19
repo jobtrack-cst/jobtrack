@@ -56,6 +56,7 @@ func TestLoadConfig(t *testing.T) {
 				"GRPC_PORT":      "9090",
 				"HTTP_PORT":      "8080",
 				"INTERNAL_TOKEN": "test-token-visible-ascii",
+				"RABBITMQ_URL":   "amqp://broker",
 			},
 			want: config{
 				serviceName:   "saved-jobs",
@@ -64,6 +65,7 @@ func TestLoadConfig(t *testing.T) {
 				grpcPort:      9090,
 				httpPort:      8080,
 				internalToken: "test-token-visible-ascii",
+				rabbitMQURL:   "amqp://broker",
 			},
 		},
 		{
@@ -80,6 +82,16 @@ func TestLoadConfig(t *testing.T) {
 				"DATABASE_URL": "postgres://localhost",
 			},
 			wantErr: "INTERNAL_TOKEN is required",
+		},
+		{
+			name: "missing RABBITMQ_URL",
+			env: map[string]string{
+				"SERVICE_NAME":   "saved-jobs",
+				"DATABASE_URL":   "postgres://localhost",
+				"INTERNAL_TOKEN": "test-token-visible-ascii",
+				"RABBITMQ_URL":   " ",
+			},
+			wantErr: "RABBITMQ_URL is required",
 		},
 	}
 
