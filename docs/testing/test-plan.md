@@ -8,8 +8,8 @@
 | Jira | JT-22 (parent JT-15, Testing and Quality Assurance) |
 | Owner | Kinley Tobgay Lhendrup (testing and QA lead) |
 | Backup | Jigden Shakya |
-| Status | Draft for team review |
-| Version | 0.2, 9 Nov 2026 |
+| Status | Final; updated in JT-97 to match what was done. Results are in [test-summary-report.md](test-summary-report.md) |
+| Version | 1.0, 19 Nov 2026 (0.2, 9 Nov 2026, was the draft for team review) |
 | Source of truth | [AGENTS.md](../../AGENTS.md). If this plan conflicts with it, AGENTS.md wins and this plan is corrected through a pull request. |
 
 ## 2. Scope
@@ -37,19 +37,22 @@ Internal RPC protection is only partly in place (AGENTS.md Section 6). Layer 1 (
 | Unit | Go testing, testify, gomock | `*_test.go` next to the code, mainly `internal/domain` and `internal/app` | Table-driven tests. Mock ports, not concrete adapters. |
 | Integration | Testcontainers | `internal/adapters/...` with build tag `integration` | Real PostgreSQL and RabbitMQ in containers |
 | Contract | `buf breaking` in CI, event fixtures | `tests/contract` | Consumers test against shared JSON fixtures of each event |
-| End to end and GUI | Cypress | `tests/e2e` | Main workflow through the real UI |
-| Load | Apache JMeter | `tests/load` | Deadline-rush scenario, 200 concurrent users |
-| Code quality | SonarQube (local) | report in `docs/testing` | Run once per sprint |
+| GUI | Cypress | `tests/e2e/*.cy.js` | Each page with the gateway stubbed by `cy.intercept`; runs in CI (`npm test`) |
+| End to end | Cypress | `tests/e2e/stack` | Main workflow through the real UI and services against the running Docker Compose stack, no stubs; runs locally (`npm run test:stack`), not in CI (JT-95) |
+| Load | Apache JMeter | `tests/load` | Deadline-rush scenario, 200 concurrent users, run from a second laptop against Docker Compose (JT-84, JT-96) |
+| Code quality | SonarQube (local, in Docker) | report in `docs/testing` | Run on `main` with `sonar-project.properties`: Sprint 3 (JT-84) and the final summary (JT-97) |
 
 Test design techniques: equivalence partitioning, boundary values and state transitions. Test names describe behaviour, for example `TestApplication_Submit_RejectsClosedJob`.
 
-Coverage target: at least 80 percent line coverage on `application` and `application-status`. Other services need meaningful tests for every business rule.
+Coverage target: at least 80 percent line coverage on `application` and `application-status`, measured with unit and integration tests together on production code, excluding generated gomock files, with the unit-only figure reported alongside (AGENTS.md Section 15, JT-49). Other services need meaningful tests for every business rule.
 
 Commands:
 
 - Unit tests: `go test ./...`
 - Integration tests: `go test -tags=integration ./...`
-- Coverage: `go test -coverprofile=coverage.out ./...` then `go tool cover -func=coverage.out`
+- Coverage: `go test -coverprofile=coverage.out ./...` then `go tool cover -func=coverage.out`; add `-tags=integration` for the unit plus integration figure
+- Cypress: `npm test` (stubbed, as in CI) and `npm run test:stack` (against the stack) in `frontend`, see `tests/e2e/README.md`
+- Load: `tests/load/README.md`
 
 CI runs both the unit and coverage suite and the integration suite on every pull request (JT-20).
 
@@ -78,7 +81,7 @@ No other tools are added without team agreement (AGENTS.md Section 7).
 |---|---|---|
 | Local development | Unit and integration tests, service checks | Docker Compose with Postgres, RabbitMQ, Mailpit and the services. Gateway on host port 8000. gRPC port 9090 is never published. |
 | CI | Automatic checks on every pull request and push to `main` | GitHub Actions: gofmt, `go vet`, unit tests with coverage, integration tests, `buf` checks, generated code check, Docker builds |
-| Cluster | Function tests, end-to-end and load tests | k3d with Knative Serving and Eventing on Phuntsho's laptop (16 GiB RAM, Docker Desktop about 7.75 GiB). Capacity for all 20 services is not yet proven (AGENTS.md Section 16). |
+| Cluster | Function tests, end-to-end and load tests | k3d with Knative Serving and Eventing on Phuntsho's laptop (16 GiB RAM, Docker Desktop about 7.75 GiB). Capacity for all 20 services is not yet proven (AGENTS.md Section 16). The end-to-end and load tests ran against Docker Compose instead (JT-95, JT-96). |
 
 Test data is synthetic. Local `.env` passwords use letters and digits only, and no secrets are committed.
 
@@ -112,11 +115,11 @@ End-to-end and load testing start when:
 
 ### Exit criteria (system level)
 
-System testing is complete by the end of Sprint 4 (17 Nov) when:
+System testing is complete by the end of Sprint 4 when (results in [test-summary-report.md](test-summary-report.md)):
 
-- The Cypress main workflow test in `tests/e2e` passes.
+- The Cypress main workflow test in `tests/e2e/stack` passes against the running Docker Compose stack (JT-95).
 - The JMeter deadline-rush scenario with 200 concurrent users has been run and its report saved in `docs/testing`.
-- A SonarQube report has been saved in `docs/testing` for each sprint.
+- A SonarQube report has been saved in `docs/testing` for each sprint from Sprint 3, when SonarQube was set up (JT-84), and for the final run (JT-97).
 - Proposed: no Critical bug is open, and every open Major bug is agreed with the Product Owner.
 
 ## 7. Defect process
@@ -155,5 +158,6 @@ Severity is the impact, set by the tester. Priority is how soon to fix it, set o
 
 ## 8. Open questions for team review
 
-- Pass thresholds for the load test (response time and error rate) are not yet set.
+- Pass thresholds for the load test (response time and error rate) were not set; the load reports record measured values and the hardware used.
+- Resolved: the coverage target is measured with unit and integration tests together, excluding gomock files (AGENTS.md Section 15, JT-49).
 - The team should confirm the severity labels and the Proposed criteria above.

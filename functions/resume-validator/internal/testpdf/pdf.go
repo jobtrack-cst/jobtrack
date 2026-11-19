@@ -61,8 +61,7 @@ func pageObjects() []string {
 }
 
 // CompressedCatalog is a PDF 1.5 specimen with catalog 1 inside FlateDecode
-// object stream 6 and a type-2 entry in cross-reference stream 7. This documents
-// the unsupported layout; it is not evidence of parser support.
+// object stream 6 and a type-2 entry in cross-reference stream 7.
 func CompressedCatalog() []byte {
 	var b bytes.Buffer
 	b.WriteString("%PDF-1.5\n")
@@ -97,5 +96,99 @@ func CompressedCatalog() []byte {
 	fmt.Fprintf(&b, "7 0 obj\n<< /Type /XRef /Size 8 /Root 1 0 R /W [1 4 2] /Length %d >>\nstream\n", len(entries))
 	b.Write(entries)
 	fmt.Fprintf(&b, "\nendstream\nendobj\nstartxref\n%d\n%%%%EOF\n", offsets[7])
+	return b.Bytes()
+}
+
+// XrefStream builds a PDF 1.7 with a direct catalog and a cross-reference
+// stream. Flate and PNG Up prediction exercise common producer encodings.
+func XrefStream(flate, predictor bool) []byte {
+	var b bytes.Buffer
+	b.WriteString("%PDF-1.7\n")
+	offsets := []int{0}
+	for i, body := range pageObjects() {
+		offsets = append(offsets, b.Len())
+		fmt.Fprintf(&b, "%d 0 obj\n%s\nendobj\n", i+1, body)
+	}
+	offsets = append(offsets, b.Len())
+	entries := make([]byte, len(offsets)*7)
+	binary.BigEndian.PutUint16(entries[5:7], 65535)
+	for id := 1; id < len(offsets); id++ {
+		entry := entries[id*7 : (id+1)*7]
+		entry[0] = 1
+		binary.BigEndian.PutUint32(entry[1:5], uint32(offsets[id]))
+	}
+	options := ""
+	if predictor {
+		var encoded []byte
+		previous := make([]byte, 7)
+		for at := 0; at < len(entries); at += 7 {
+			encoded = append(encoded, 2)
+			for i := 0; i < 7; i++ {
+				encoded = append(encoded, entries[at+i]-previous[i])
+			}
+			copy(previous, entries[at:at+7])
+		}
+		entries = encoded
+		options += " /DecodeParms << /Predictor 12 /Columns 7 >>"
+	}
+	if flate {
+		var compressed bytes.Buffer
+		w := zlib.NewWriter(&compressed)
+		_, _ = w.Write(entries)
+		_ = w.Close()
+		entries = compressed.Bytes()
+		options += " /Filter /FlateDecode"
+	}
+	fmt.Fprintf(&b, "6 0 obj\n<< /Type /XRef /Size 7 /Root 1 0 R /W [1 4 2] /Length %d%s >>\nstream\n", len(entries), options)
+	b.Write(entries)
+	fmt.Fprintf(&b, "\nendstream\nendobj\nstartxref\n%d\n%%%%EOF\n", offsets[6])
+	return b.Bytes()
+}
+
+// Incremental appends a replacement catalog, leaving the original EOF intact.
+// The newest section intentionally omits unchanged objects, requiring /Prev.
+func Incremental(base []byte, stream bool) []byte {
+	previous := bytes.LastIndex(base, []byte("startxref\n")) + len("startxref\n")
+	var prev int
+	_, _ = fmt.Sscanf(string(base[previous:]), "%d", &prev)
+	var size int
+	sizeAt := bytes.LastIndex(base[:previous], []byte("/Size "))
+	_, _ = fmt.Sscanf(string(base[sizeAt:]), "/Size %d", &size)
+	var b bytes.Buffer
+	b.Write(base)
+	rootOffset := b.Len()
+	b.WriteString("1 0 obj\n<< /Type /Catalog /Pages 2 0 R /Lang (en) >>\nendobj\n")
+	at := b.Len()
+	if stream {
+		entries := make([]byte, 14)
+		entries[0] = 1
+		entries[7] = 1
+		binary.BigEndian.PutUint32(entries[1:5], uint32(rootOffset))
+		binary.BigEndian.PutUint32(entries[8:12], uint32(at))
+		fmt.Fprintf(&b, "8 0 obj\n<< /Type /XRef /Size 9 /Root 1 0 R /Prev %d /Index [1 1 8 1] /W [1 4 2] /Length 14 >>\nstream\n", prev)
+		b.Write(entries)
+		b.WriteString("\nendstream\nendobj\n")
+	} else {
+		fmt.Fprintf(&b, "xref\n1 1\n%010d 00000 n \ntrailer\n<< /Size %d /Root 1 0 R /Prev %d >>\n", rootOffset, size, prev)
+	}
+	fmt.Fprintf(&b, "startxref\n%d\n%%%%EOF\n", at)
+	return b.Bytes()
+}
+
+// Hybrid supplies compressed catalog entries through /XRefStm in the trailer.
+func Hybrid() []byte {
+	base := CompressedCatalog()
+	at := bytes.LastIndex(base, []byte("startxref\n"))
+	var streamOffset int
+	_, _ = fmt.Sscanf(string(base[at+len("startxref\n"):]), "%d", &streamOffset)
+	var b bytes.Buffer
+	b.Write(base[:at])
+	xref := b.Len()
+	b.WriteString("xref\n0 1\n0000000000 65535 f \n2 6\n")
+	for id := 2; id <= 7; id++ {
+		offset := bytes.Index(base, []byte(fmt.Sprintf("%d 0 obj\n", id)))
+		fmt.Fprintf(&b, "%010d 00000 n \n", offset)
+	}
+	fmt.Fprintf(&b, "trailer\n<< /Size 8 /Root 1 0 R /XRefStm %d >>\nstartxref\n%d\n%%%%EOF\n", streamOffset, xref)
 	return b.Bytes()
 }
