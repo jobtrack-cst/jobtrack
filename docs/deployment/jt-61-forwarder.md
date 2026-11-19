@@ -116,3 +116,29 @@ Tests exercise a transport-only HTTP sink, not validator business logic. The rea
 validator image exists and event IDs and acknowledgments are correlated in both
 Compose and k3d. A passing integration test or Kubernetes dry run does not satisfy it.
 See `docs/testing/jt-61-test-cases.md` for actual execution results.
+
+## JT-71: Notification Dispatcher Forwarder
+
+The notification-dispatcher function (JT-71) is event-driven and requires its own forwarder in Docker Compose.
+
+### Queue
+- Source queue: notification-dispatcher.events
+- Dead queue: notification-dispatcher.events.dead
+
+### Event types (8)
+- application.submitted
+- application.status_changed
+- interview.scheduled
+- offer.made
+- message.sent
+- job_alert.matched
+- employer.verified
+- deadline.reminder
+
+### Compose service
+Defined in deploy/compose/docker-compose.yml as notification-dispatcher-forwarder, running in the functions profile.
+
+### Verification
+- Check the queue exists: docker compose exec rabbitmq rabbitmqctl list_queues | grep notification-dispatcher
+- Check the forwarder logs: docker compose logs notification-dispatcher-forwarder
+- Publish a test event with rabbitmqadmin to verify the notification flow
