@@ -67,6 +67,33 @@ func (h *ApplicantProfileHandler) UpdateMyProfile(ctx context.Context, req *appl
 	return &applicantprofilev1.UpdateMyProfileResponse{Profile: profileToProto(p)}, nil
 }
 
+// PutMyProfilePhoto stores or replaces the caller's photo (JT-103).
+func (h *ApplicantProfileHandler) PutMyProfilePhoto(ctx context.Context, req *applicantprofilev1.PutMyProfilePhotoRequest) (*applicantprofilev1.PutMyProfilePhotoResponse, error) {
+	caller, err := applicantFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	p, err := h.profiles.PutPhoto(ctx, caller, req.GetContentType(), req.GetContent())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &applicantprofilev1.PutMyProfilePhotoResponse{Profile: profileToProto(p)}, nil
+}
+
+// GetMyProfilePhoto returns the stored, already validated content type, so a
+// client never receives a type that was not checked (JT-103).
+func (h *ApplicantProfileHandler) GetMyProfilePhoto(ctx context.Context, _ *applicantprofilev1.GetMyProfilePhotoRequest) (*applicantprofilev1.GetMyProfilePhotoResponse, error) {
+	caller, err := applicantFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	photo, err := h.profiles.GetPhoto(ctx, caller)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &applicantprofilev1.GetMyProfilePhotoResponse{ContentType: photo.ContentType, Content: photo.Content}, nil
+}
+
 // applicantFrom trusts x-user-id and x-user-role only because the gateway
 // sets them and strips any client-sent values (JT-31). The role is checked
 // before any input, so other roles learn nothing about the validation rules.
@@ -113,6 +140,7 @@ func profileToProto(p domain.Profile) *applicantprofilev1.ApplicantProfile {
 			CreatedAt: timestamppb.New(p.CreatedAt),
 			UpdatedAt: timestamppb.New(p.UpdatedAt),
 		},
+		HasPhoto: p.HasPhoto,
 	}
 }
 
@@ -124,13 +152,14 @@ func toStatus(err error) error {
 		errors.Is(err, domain.ErrInvalidInstitution), errors.Is(err, domain.ErrInvalidQualification),
 		errors.Is(err, domain.ErrInvalidStartYear), errors.Is(err, domain.ErrInvalidEndYear),
 		errors.Is(err, domain.ErrTooManySkills), errors.Is(err, domain.ErrInvalidSkill),
-		errors.Is(err, domain.ErrDuplicateSkill):
+		errors.Is(err, domain.ErrDuplicateSkill), errors.Is(err, domain.ErrInvalidPhotoSize),
+		errors.Is(err, domain.ErrInvalidPhotoType), errors.Is(err, domain.ErrInvalidPhotoContent):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrUnauthenticated):
 		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, domain.ErrApplicantRoleRequired):
 		return status.Error(codes.PermissionDenied, err.Error())
-	case errors.Is(err, domain.ErrProfileNotFound):
+	case errors.Is(err, domain.ErrProfileNotFound), errors.Is(err, domain.ErrPhotoNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrProfileExists):
 		return status.Error(codes.AlreadyExists, err.Error())

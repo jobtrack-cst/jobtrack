@@ -10,6 +10,7 @@ import { OffersPage } from './features/offer/OffersPage';
 import { MessagesPage } from './features/messaging/MessagesPage';
 import { JobAlertsPage } from './features/job-alert/JobAlertsPage';
 import { ProfilePage } from './features/applicant-profile/ProfilePage';
+import { ProfilePhoto } from './features/applicant-profile/ProfilePhoto';
 import { ResumesPage } from './features/resume/ResumesPage';
 import { StatusPage } from './features/application-status/StatusPage';
 import { ReviewPage } from './features/review/ReviewPage';
@@ -60,7 +61,9 @@ export default function App() {
   return <>
     <AppBar position="static"><Toolbar>
       <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>JobTrack</Typography>
-      {session && <Button color="inherit" onClick={signOut}>Log out</Button>}
+      {/* Applicants see their own photo or initials (JT-103); other roles have no photo. */}
+      {session?.user.role === 'ROLE_APPLICANT' && <ProfilePhoto key={session.user.userId} userId={session.user.userId} name={session.user.fullName} size={32} />}
+      {session && <Button color="inherit" onClick={signOut} sx={{ ml: 2 }}>Log out</Button>}
     </Toolbar></AppBar>
     <Container component="main" sx={{ py: 4 }}>
       <Routes>
