@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Alert, Autocomplete, Button, Card, CardContent, Chip, CircularProgress, Stack, TextField, Typography } from '@mui/material';
 import { gatewayMessage, grpcCode, isNotFound, length } from '../application-status/shared';
+import { useAuth } from '../auth/AuthProvider';
 import { createMyProfile, getMyProfile, updateMyProfile, type Education, type ProfileInput } from './api';
+import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 
 // JT-50 limits, checked here so the user sees the problem before saving.
 const limits = { summary: 2000, education: 20, text: 150, skills: 50, skill: 50, firstYear: 1950 };
@@ -47,6 +49,8 @@ const saveMessages = {
 };
 
 export function ProfilePage() {
+  const { session } = useAuth();
+  const [hasPhoto, setHasPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [exists, setExists] = useState(false);
@@ -63,9 +67,10 @@ export function ProfilePage() {
     getMyProfile().then(({ profile }) => {
       if (!active) return;
       setExists(true); setSummary(profile.summary ?? ''); setRows((profile.education ?? []).map(toRow)); setSkills(profile.skills ?? []);
+      setHasPhoto(profile.hasPhoto === true);
     }, reason => {
       if (!active) return;
-      if (isNotFound(reason)) { setExists(false); setSummary(''); setRows([]); setSkills([]); }
+      if (isNotFound(reason)) { setExists(false); setSummary(''); setRows([]); setSkills([]); setHasPhoto(false); }
       else setLoadError(gatewayMessage(reason, { [grpcCode.permissionDenied]: saveMessages[grpcCode.permissionDenied] }));
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -77,6 +82,7 @@ export function ProfilePage() {
     try {
       const { profile } = await (exists ? updateMyProfile : createMyProfile)(toInput(summary, rows, skills));
       setExists(true); setSummary(profile.summary ?? ''); setRows((profile.education ?? []).map(toRow)); setSkills(profile.skills ?? []);
+      setHasPhoto(profile.hasPhoto === true);
       setNotice(exists ? 'Profile updated.' : 'Profile created.');
     } catch (reason) { setError(gatewayMessage(reason, saveMessages)); }
     finally { setBusy(false); }
@@ -86,7 +92,10 @@ export function ProfilePage() {
   if (loadError) return <Stack spacing={2}><Alert severity="error">{loadError}</Alert><Button onClick={() => setRevision(n => n + 1)}>Try again</Button></Stack>;
   return <Stack spacing={2} component="form" onSubmit={e => { e.preventDefault(); void save(); }}>
     <Typography variant="h4" component="h1">My profile</Typography>
-    {!exists && <Alert severity="info">You do not have a profile yet. Fill in the details and create it.</Alert>}
+    {!exists && <Alert severity="info">You do not have a profile yet. Fill in the details and create it. You can add a photo after that.</Alert>}
+    {/* The upload only changes the photo and updated_at, so unsaved form edits are kept (JT-103). */}
+    {exists && session && <ProfilePhotoUpload userId={session.user.userId} name={session.user.fullName} hasPhoto={hasPhoto}
+      onUploaded={profile => setHasPhoto(profile.hasPhoto === true)} />}
     <TextField label="Summary" name="summary" multiline minRows={3} value={summary} disabled={busy}
       helperText={`${length(summary)} of ${limits.summary} characters`} onChange={e => setSummary(e.target.value)} />
     <Typography variant="h6" component="h2">Education</Typography>
