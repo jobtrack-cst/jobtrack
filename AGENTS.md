@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 18 Nov 2026 (JT-95 Cypress main workflow against the running stack)
+- Last updated: 19 Nov 2026 (JT-67 Sprint 4 extended by one day)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -530,17 +530,17 @@ A task or story is Done only when:
 | Sprint 1 | 6 to 8 Nov | All 20 services and the gateway running in Docker Compose with their basic public operations and tests |
 | Sprint 2 | 9 to 13 Nov | Core flow working end to end with events and the first functions |
 | Sprint 3 | 14 to 16 Nov | Full business logic, all 5 functions, frontend for all roles, integration tests |
-| Sprint 4 | 17 to 19 Nov | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
+| Sprint 4 | 17 to 20 Nov (extended by one day on 19 Nov) | End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze |
 
-Planned project completion: 19 Nov 2026 (schedule revised on 11 Nov 2026, see Section 15). There is no buffer. Sprint 4 ends on 19 Nov, so any slip affects the final date directly (see the risk register in `docs/pm`).
+Planned project completion: 20 Nov 2026 (schedule revised on 11 Nov 2026 and Sprint 4 extended by one day on 19 Nov 2026, see Section 15). There is no buffer. Sprint 4 ends on 20 Nov, so any slip affects the final date directly (see the risk register in `docs/pm`).
 
 Presentation date: not yet announced (likely to be postponed).
 
-Ceremonies: sprint planning (1 hour), daily stand-up (15 minutes), combined sprint review and retrospective (1 hour). Sprint lengths stay fixed (the only change so far is the agreed Sprint 2 extension, Section 15, 11 Nov 2026); if a goal is met early, pull the next items from the backlog.
+Ceremonies: sprint planning (1 hour), daily stand-up (15 minutes), combined sprint review and retrospective (1 hour). Sprint lengths stay fixed (the only changes are the agreed Sprint 2 extension, Section 15, 11 Nov 2026, and the one-day Sprint 4 extension, Section 15, 19 Nov 2026); if a goal is met early, pull the next items from the backlog.
 
 ### Current sprint
 
-- Sprint: Sprint 4 (17 to 19 Nov, Jira sprint 38), started on 17 Nov 2026 at 09:00. This is the last sprint: there is no Sprint 5 and no extension.
+- Sprint: Sprint 4 (17 to 20 Nov, Jira sprint 38), started on 17 Nov 2026 at 09:00 and extended on 19 Nov 2026 to end on 20 Nov 2026 at 23:59 (Asia/Thimphu). This is the last sprint: there is no Sprint 5 and no further extension.
 - Goal: End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze. Committed minimum: the Must tasks (39 points).
 - Tasks: the 8 Sprint 3 carryovers (19 points), JT-90 from the backlog and JT-91 to JT-103: 22 issues, 57 points (39 Must, 18 Should), plus JT-104 (bug, unestimated). See Jira and `docs/pm/sprint-4-planning.md`, which lists the dependencies of every task.
 - Scope: Cypress end to end against the running Compose stack (JT-95), the JMeter 200-user run (JT-96), UAT (JT-99), Prometheus and Grafana in Compose (JT-93), all 5 functions deployed to k3d (JT-92), the remaining Sprint 3 work (notification-dispatcher JT-71, job-search JT-69, frontend job pages JT-73), and the final documentation and reports.
@@ -701,9 +701,10 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 17 Nov 2026 | JT-90 (job-posting did not publish `job.closed` on moderation removal) moved from the backlog into Sprint 4 as a Must and assigned to Jigden as job-posting backup (approved by Phuntsho as Product Owner on 18 Nov 2026, JT-98) | Restores the 3 Nov 2026 rule that a moderation removal publishes `job.closed`, while Sangay, the owner, works on JT-71 |
 | 18 Nov 2026 | WEB303 deployment: all 5 functions run on Knative in k3d and the 20 services stay in Docker Compose; JT-92 verifies the functions, their triggers, connectivity and scale to zero. Open action: confirm this against the official WEB303 assessment requirements (Phuntsho as Product Owner, JT-98) | JT-29 verified Knative for the functions on the 16 GiB host, but not capacity for all 20 services in k3d (Section 16) |
 | 18 Nov 2026 | JT-102 (company logo) and JT-103 (applicant profile photo) approved as Should tasks that slip after JT-66: JPEG or PNG only, a 1 MB limit, file signature validation, ownership checks and additive protobuf changes. Each proto diff needs Phuntsho's explicit approval before implementation (Phuntsho as Product Owner and contracts lead, JT-98) | Follows the resume upload pattern (JT-48) and the rule that contract changes need agreement (Section 0) |
-| 18 Nov 2026 | Sprint 4 slip order: JT-66 first, then JT-102 and JT-103, then the other Should tasks; a Must task is never cut. There is no Sprint 5 and no extension: an unfinished Should task is recorded as not delivered in the closure report (JT-100) (Phuntsho as Product Owner, JT-98) | Sprint 4 ends on the planned completion date (19 Nov) with no buffer, and Sprint 3 carried 19 points into it |
+| 18 Nov 2026 | Sprint 4 slip order: JT-66 first, then JT-102 and JT-103, then the other Should tasks; a Must task is never cut. There is no Sprint 5 and no extension: an unfinished Should task is recorded as not delivered in the closure report (JT-100) (Phuntsho as Product Owner, JT-98) | Sprint 4 ends on the planned completion date (19 Nov) with no buffer, and Sprint 3 carried 19 points into it. The "no extension" part is superseded by the 19 Nov 2026 row below |
 | 18 Nov 2026 | JT-102 `employer.proto` change approved by Phuntsho as Product Owner and contracts lead at 17:16: new RPCs `PutCompanyLogo` (`PUT /v1/employer/profile/logo`, body `"*"`, with `content_type` and `content` bytes) and `GetCompanyLogo` (`GET /v1/companies/{employer_id}/logo`, returns `content_type` and `content`), and `bool has_logo = 9` on `CompanyProfile`. Additive only, following the resume pattern, with no delete RPC. JPEG or PNG only, 1 MB limit, file signature validation and ownership checks; image bytes are never included in normal profile responses. Before coding, Sangay confirms the exact diff for Team B in the PR, and the PR must pass `buf lint`, `buf breaking` and CI. JT-102 stays a Should task and must not delay Must tasks (JT-98) | Adds logo upload without changing existing fields or responses, meeting the 18 Nov profile image conditions |
 | 18 Nov 2026 | Cypress against the running stack: specs that need the Docker Compose stack live in `tests/e2e/stack/`, are excluded from `cypress.config.cjs` (so CI's `npm test` stays stubbed) and run locally with `npm run test:stack` (`frontend/cypress.stack.config.cjs`); CI does not run them. They use no `cy.intercept`, create synthetic accounts unique per run, read the admin login with `cy.env()` from `CYPRESS_ADMIN_EMAIL` and `CYPRESS_ADMIN_PASSWORD` (Cypress 16), and wait for event-driven changes by refreshing the page. `stack/main-workflow.cy.js` covers the main workflow from employer registration to the accepted offer and the status history (JT-95, approved by Jigden during JT-95) | Shows the real UI and services working together without making CI depend on a running stack |
+| 19 Nov 2026 | Sprint 4 extended by one day: it now ends on 20 Nov 2026 at 23:59 (Asia/Thimphu), and planned project completion moves from 19 to 20 Nov 2026, still with no buffer. Scope, the Must and Should priorities, the slip order and ownership in Sections 2, 4 and 5 are unchanged; an unfinished Should task is still recorded as not delivered in the closure report (JT-100) at the end of 20 Nov. This replaces only the "no extension" part of the 18 Nov 2026 slip order row; there is no Sprint 5 and no further extension. Agreed by Phuntsho as Product Owner with Jigden as Scrum Master on 19 Nov 2026 (JT-67) | JT-73 merged only at midday on 19 Nov, leaving too little time for UAT (JT-99), the remaining Must tasks and the JT-102 job card follow-up |
 
 
 ---
