@@ -131,10 +131,10 @@ Each failure is logged as a Jira Bug with a severity label (`severity-critical`,
 | AC1: UAT script with scenarios per role, traced, with expected results | Met | Scenarios: 34 scenarios for employer, applicant, admin and access, each traced to its Epic and implementing task, with expected results |
 | AC2: At least one session per role on the full Compose stack, by a non-builder, results recorded | Met | Sessions: one session per role on 19 Nov 2026 on the full Compose stack (--profile functions), each by a tester who did not build those features; 34 run, 29 Pass, 3 Fail, 2 Not run |
 | AC3: Every failure logged as a Jira Bug with severity and steps, assigned to the owner | Met | Bugs found: JT-105 to JT-108 logged as Jira Bugs with severity labels and steps to reproduce, assigned to the service owners and linked to JT-99 |
-| AC4: UAT sign-off by the Product Owner recorded | Pending | Sign-off |
+| AC4: UAT sign-off by the Product Owner recorded | Met | Sign-off: Accepted with conditions by Phuntsho Namgyel on 19 Nov 2026 (PR #88) |
 
 ## Sign-off
 
 | Product Owner | Decision | Date | Conditions |
 |---|---|---|---|
-| Phuntsho Namgyel | <Accepted / Accepted with conditions / Not accepted> | <date> | <open bugs agreed, if any> |
+| Phuntsho Namgyel | Accepted with conditions | 19 Nov 2026 | 29 Pass, 3 Fail, 2 Not run; core workflow verified, no Critical defects. JT-105 and JT-107: fix and retest by 20 Nov 2026, 23:59 Bhutan time. JT-108: accepted as a known issue; the manual offer-ID workaround is documented in JT-100. JT-106: documented as a Minor known issue in JT-100. The two Not run scenarios stay recorded as Not run. Any condition not met by the deadline is disclosed in JT-100. Employer access to applicant resumes approved for backlog consideration, pending a separate issue and contract review. Recorded from the Product Owner comment on PR #88. |
