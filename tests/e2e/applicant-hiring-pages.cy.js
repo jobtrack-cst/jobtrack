@@ -42,6 +42,8 @@ describe('JT-83 applicant profile', () => {
     education: [{ institution: 'Synthetic College', qualification: 'BSc', startYear: 2020, endYear: 2024 }],
     skills: ['Go', 'React'],
   };
+  // A saved profile opens read-only (JT-109); Edit profile switches to the form.
+  const editProfile = () => cy.contains('button', 'Edit profile').click();
 
   it('creates a profile when the applicant has none', () => {
     cy.intercept('GET', `${gateway}/v1/applicant/profile`, { statusCode: 404, body: { code: 5, message: 'private' } }).as('load');
@@ -63,7 +65,9 @@ describe('JT-83 applicant profile', () => {
     cy.contains('button', 'Create profile').click();
     cy.wait('@create');
     cy.contains('Profile created.').should('be.visible');
-    cy.contains('button', 'Save profile').should('be.enabled');
+    cy.contains('Synthetic College, BSc, 2020 to 2024').should('be.visible');
+    cy.get('textarea[name=summary]').should('not.exist');
+    cy.contains('button', 'Edit profile').should('be.visible');
   });
 
   it('updates an existing profile with PUT, sending an ongoing entry as end year 0', () => {
@@ -71,6 +75,7 @@ describe('JT-83 applicant profile', () => {
     login();
     cy.contains('a', 'Profile').click();
     cy.wait('@load');
+    editProfile();
     field('Summary').should('have.value', 'Synthetic summary');
     field('End year').clear();
     cy.intercept('PUT', `${gateway}/v1/applicant/profile`, req => {
@@ -81,13 +86,15 @@ describe('JT-83 applicant profile', () => {
     cy.contains('button', 'Save profile').click();
     cy.wait('@update');
     cy.contains('Profile updated.').should('be.visible');
-    field('End year').should('have.value', '');
+    cy.contains('Synthetic College, BSc, 2020 to ongoing').should('be.visible');
+    cy.contains('button', 'Edit profile').should('be.visible');
   });
 
   it('removes an education entry and clears the list', () => {
     cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile });
     login();
     cy.contains('a', 'Profile').click();
+    editProfile();
     cy.contains('button', 'Remove entry 1').click();
     cy.contains('No education entries.').should('be.visible');
     cy.intercept('PUT', `${gateway}/v1/applicant/profile`, req => {
@@ -111,6 +118,7 @@ describe('JT-83 applicant profile', () => {
       cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile });
       login();
       cy.contains('a', 'Profile').click();
+      editProfile();
       field('Summary').should('have.value', 'Synthetic summary');
       change();
       cy.get('[role=alert]').should('contain', message);
@@ -122,6 +130,7 @@ describe('JT-83 applicant profile', () => {
     cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile });
     login();
     cy.contains('a', 'Profile').click();
+    editProfile();
     fill('Institution', 'x'.repeat(150));
     field('Institution').should('have.value', 'x'.repeat(150));
     field('Start year').clear().type(String(year + 1));
@@ -134,6 +143,8 @@ describe('JT-83 applicant profile', () => {
     cy.intercept('PUT', `${gateway}/v1/applicant/profile`, { statusCode: 400, body: { code: 3, message: 'private-input' } });
     login();
     cy.contains('a', 'Profile').click();
+    editProfile();
+    field('Summary').type(' changed');
     cy.contains('button', 'Save profile').click();
     cy.get('[role=alert]').should('contain', 'The profile was not saved').and('not.contain', 'private-input');
     cy.contains('button', 'Save profile').should('be.enabled');
@@ -146,7 +157,59 @@ describe('JT-83 applicant profile', () => {
     cy.contains('The request failed').should('be.visible');
     cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile });
     cy.contains('button', 'Try again').click();
+    cy.contains('Synthetic summary').should('be.visible');
+  });
+
+  it('shows the saved profile read-only with an Edit button (JT-109)', () => {
+    cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile });
+    login();
+    cy.contains('a', 'Profile').click();
+    cy.contains('Synthetic summary').should('be.visible');
+    cy.contains('Synthetic College, BSc, 2020 to 2024').should('be.visible');
+    cy.get('main .MuiChip-root').should('have.length', 2).and('contain', 'Go').and('contain', 'React');
+    cy.get('main input, main textarea').not('[type=file]').should('not.exist');
+    cy.contains('button', 'Save profile').should('not.exist');
+    cy.contains('button', 'Edit profile').should('be.visible');
+  });
+
+  it('shows empty sections of a saved profile read-only (JT-109)', () => {
+    cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile: { applicantId: userId } });
+    login();
+    cy.contains('a', 'Profile').click();
+    cy.contains('No summary.').should('be.visible');
+    cy.contains('No education entries.').should('be.visible');
+    cy.contains('No skills.').should('be.visible');
+  });
+
+  it('cancels an edit without saving and restores the saved values (JT-109)', () => {
+    cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile });
+    cy.intercept('PUT', `${gateway}/v1/applicant/profile`, { profile }).as('update');
+    login();
+    cy.contains('a', 'Profile').click();
+    editProfile();
+    field('Summary').clear().type('Unsaved change');
+    cy.contains('button', 'Remove entry 1').click();
+    cy.contains('button', 'Cancel').click();
+    cy.contains('Synthetic summary').should('be.visible');
+    cy.contains('Synthetic College, BSc, 2020 to 2024').should('be.visible');
+    cy.contains('Unsaved change').should('not.exist');
+    editProfile();
     field('Summary').should('have.value', 'Synthetic summary');
+    cy.get('@update.all').should('have.length', 0);
+  });
+
+  it('disables Save until something changes (JT-109)', () => {
+    cy.intercept('GET', `${gateway}/v1/applicant/profile`, { profile });
+    login();
+    cy.contains('a', 'Profile').click();
+    editProfile();
+    cy.contains('button', 'Save profile').should('be.disabled');
+    cy.contains('No changes to save.').should('be.visible');
+    field('Summary').type('!');
+    cy.contains('button', 'Save profile').should('be.enabled');
+    cy.contains('No changes to save.').should('not.exist');
+    field('Summary').type('{backspace}');
+    cy.contains('button', 'Save profile').should('be.disabled');
   });
 
   it('does not show the profile link to employers', () => {
