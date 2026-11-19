@@ -128,3 +128,22 @@ Pods appear when an event arrives (cold start ~5-10s and disappear ~60s after th
 ## Evidence
 
 Screenshots and logs captured in `docs/testing/jt-92-*.png` and `docs/testing/jt-92-runtime-evidence.json`.
+
+## Known deployment overrides (from verification on 19 Nov 2026)
+
+1. **Weekly Summary EMAIL_SENDER_URL** — the Knative Service address differs from the Compose hostname. Set it to the actual email-sender Knative URL, e.g. `http://email-sender.default.127.0.0.1.sslip.io/send-email`.
+2. **Notification Dispatcher readiness probe** — the Knative Service manifest uses `path: /` with `port: 8080`. If the probe fails, override it to match the function's actual readiness endpoint.
+3. **Security-context warnings** — Knative pods may log warnings about `securityContext` fields being ignored. These are cosmetic; the pods still run with the intended `USER 10001:10001` from the Dockerfile.
+4. **Sample event @type field** — the verification guide RabbitMQ event samples now include the required protobuf `@type` field (e.g. `"@type":"type.googleapis.com/jobtrack.events.v1.DeadlineReminder"`). Without it, the inner data parses as empty.
+
+## Verification evidence
+
+The 19 Nov 2026 run confirmed:
+- All 5 Knative Services Ready
+- Both forwarders 1/1
+- Both PingSources Ready
+- Scale-to-zero observed on all functions
+- Emails delivered to Mailpit (email-sender, weekly-summary, notification-dispatcher)
+- Notification-dispatcher end-to-end passed after PR 86 (envelope parsing fix)
+- Deadline Reminder manual run returned HTTP 204
+- Resume Validator rejection path verified
