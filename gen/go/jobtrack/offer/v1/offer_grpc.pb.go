@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OfferService_MakeOffer_FullMethodName    = "/jobtrack.offer.v1.OfferService/MakeOffer"
-	OfferService_GetOffer_FullMethodName     = "/jobtrack.offer.v1.OfferService/GetOffer"
-	OfferService_AcceptOffer_FullMethodName  = "/jobtrack.offer.v1.OfferService/AcceptOffer"
-	OfferService_DeclineOffer_FullMethodName = "/jobtrack.offer.v1.OfferService/DeclineOffer"
+	OfferService_MakeOffer_FullMethodName             = "/jobtrack.offer.v1.OfferService/MakeOffer"
+	OfferService_GetOffer_FullMethodName              = "/jobtrack.offer.v1.OfferService/GetOffer"
+	OfferService_GetOfferByApplication_FullMethodName = "/jobtrack.offer.v1.OfferService/GetOfferByApplication"
+	OfferService_AcceptOffer_FullMethodName           = "/jobtrack.offer.v1.OfferService/AcceptOffer"
+	OfferService_DeclineOffer_FullMethodName          = "/jobtrack.offer.v1.OfferService/DeclineOffer"
 )
 
 // OfferServiceClient is the client API for OfferService service.
@@ -40,6 +41,9 @@ type OfferServiceClient interface {
 	MakeOffer(ctx context.Context, in *MakeOfferRequest, opts ...grpc.CallOption) (*MakeOfferResponse, error)
 	// GetOffer requires runtime role and ownership checks; viewing rules are open.
 	GetOffer(ctx context.Context, in *GetOfferRequest, opts ...grpc.CallOption) (*GetOfferResponse, error)
+	// GetOfferByApplication permits only the stored applicant or employer to view
+	// the one lifetime offer for this application, using authenticated metadata.
+	GetOfferByApplication(ctx context.Context, in *GetOfferByApplicationRequest, opts ...grpc.CallOption) (*GetOfferByApplicationResponse, error)
 	// AcceptOffer is limited to the intended applicant identified by authenticated
 	// metadata. At runtime it publishes the existing offer.accepted event.
 	AcceptOffer(ctx context.Context, in *AcceptOfferRequest, opts ...grpc.CallOption) (*AcceptOfferResponse, error)
@@ -70,6 +74,16 @@ func (c *offerServiceClient) GetOffer(ctx context.Context, in *GetOfferRequest, 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetOfferResponse)
 	err := c.cc.Invoke(ctx, OfferService_GetOffer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *offerServiceClient) GetOfferByApplication(ctx context.Context, in *GetOfferByApplicationRequest, opts ...grpc.CallOption) (*GetOfferByApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOfferByApplicationResponse)
+	err := c.cc.Invoke(ctx, OfferService_GetOfferByApplication_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +125,9 @@ type OfferServiceServer interface {
 	MakeOffer(context.Context, *MakeOfferRequest) (*MakeOfferResponse, error)
 	// GetOffer requires runtime role and ownership checks; viewing rules are open.
 	GetOffer(context.Context, *GetOfferRequest) (*GetOfferResponse, error)
+	// GetOfferByApplication permits only the stored applicant or employer to view
+	// the one lifetime offer for this application, using authenticated metadata.
+	GetOfferByApplication(context.Context, *GetOfferByApplicationRequest) (*GetOfferByApplicationResponse, error)
 	// AcceptOffer is limited to the intended applicant identified by authenticated
 	// metadata. At runtime it publishes the existing offer.accepted event.
 	AcceptOffer(context.Context, *AcceptOfferRequest) (*AcceptOfferResponse, error)
@@ -132,6 +149,9 @@ func (UnimplementedOfferServiceServer) MakeOffer(context.Context, *MakeOfferRequ
 }
 func (UnimplementedOfferServiceServer) GetOffer(context.Context, *GetOfferRequest) (*GetOfferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetOffer not implemented")
+}
+func (UnimplementedOfferServiceServer) GetOfferByApplication(context.Context, *GetOfferByApplicationRequest) (*GetOfferByApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOfferByApplication not implemented")
 }
 func (UnimplementedOfferServiceServer) AcceptOffer(context.Context, *AcceptOfferRequest) (*AcceptOfferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AcceptOffer not implemented")
@@ -196,6 +216,24 @@ func _OfferService_GetOffer_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OfferService_GetOfferByApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOfferByApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OfferServiceServer).GetOfferByApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OfferService_GetOfferByApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OfferServiceServer).GetOfferByApplication(ctx, req.(*GetOfferByApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OfferService_AcceptOffer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AcceptOfferRequest)
 	if err := dec(in); err != nil {
@@ -246,6 +284,10 @@ var OfferService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetOffer",
 			Handler:    _OfferService_GetOffer_Handler,
+		},
+		{
+			MethodName: "GetOfferByApplication",
+			Handler:    _OfferService_GetOfferByApplication_Handler,
 		},
 		{
 			MethodName: "AcceptOffer",

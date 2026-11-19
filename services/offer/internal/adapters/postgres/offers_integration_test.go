@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jobtrack-cst/jobtrack/services/offer/internal/adapters/postgres"
+	"github.com/jobtrack-cst/jobtrack/services/offer/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/offer/internal/domain"
 )
 
@@ -244,5 +245,81 @@ func TestOffers_MigrationConstraints(t *testing.T) {
 	var foreignKeys int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_constraint WHERE conrelid='offers'::regclass AND contype='f'`).Scan(&foreignKeys); err != nil || foreignKeys != 0 {
 		t.Fatal(foreignKeys, err)
+	}
+}
+
+func TestOffers_GetByApplicationID_LookupAndOwnership(t *testing.T) {
+	ctx, pool := startParticipantsDB(t)
+	repo := postgres.NewOffers(pool)
+	want := syntheticOffer()
+	if _, err := repo.Create(ctx, want); err != nil {
+		t.Fatal(err)
+	}
+	// A different application must never resolve to the existing offer.
+	for _, tc := range []struct {
+		name, id string
+		wantErr  error
+	}{
+		{"existing", want.ApplicationID, nil},
+		{"uppercase", strings.ToUpper(want.ApplicationID), nil},
+		{"unknown", uuid.NewString(), domain.ErrOfferNotFound},
+		{"offer ID is not application ID", want.ID, domain.ErrOfferNotFound},
+		{"invalid", "bad", domain.ErrInvalidApplicationID},
+		{"empty", "", domain.ErrInvalidApplicationID},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := repo.GetByApplicationID(ctx, tc.id)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("got %v want %v", err, tc.wantErr)
+			}
+			if err == nil && got != want {
+				t.Fatalf("got %+v want %+v", got, want)
+			}
+			if err != nil && got != (domain.Offer{}) {
+				t.Fatal("offer exposed on failure")
+			}
+		})
+	}
+	svc := app.NewOffers(repo, nil, nil)
+	for _, tc := range []struct {
+		name, id, role string
+		wantErr        error
+	}{
+		{"applicant", want.ApplicantID, "applicant", nil},
+		{"employer", want.EmployerID, "employer", nil},
+		{"unrelated applicant", uuid.NewString(), "applicant", domain.ErrPermissionDenied},
+		{"unrelated employer", uuid.NewString(), "employer", domain.ErrPermissionDenied},
+		{"wrong role", want.ApplicantID, "employer", domain.ErrPermissionDenied},
+		{"admin", want.EmployerID, "admin", domain.ErrPermissionDenied},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := svc.GetOfferByApplication(ctx, domain.Caller{UserID: tc.id, Role: tc.role}, want.ApplicationID)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("got %v want %v", err, tc.wantErr)
+			}
+			if err == nil && got != want {
+				t.Fatal(got)
+			}
+			if err != nil && got != (domain.Offer{}) {
+				t.Fatal("offer exposed on failure")
+			}
+		})
+	}
+	for _, next := range []domain.OfferStatus{domain.OfferStatusAccepted, domain.OfferStatusDeclined} {
+		o := syntheticOffer()
+		if _, err := repo.Create(ctx, o); err != nil {
+			t.Fatal(err)
+		}
+		final, err := repo.Decide(ctx, o.ID, o.ApplicantID, next, o.UpdatedAt.Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := repo.GetByApplicationID(ctx, o.ApplicationID); err != nil || got != final {
+			t.Fatalf("final lookup: %+v %v", got, err)
+		}
+	}
+	pool.Close()
+	if got, err := repo.GetByApplicationID(ctx, want.ApplicationID); err == nil || err.Error() != "offer database operation failed" || got != (domain.Offer{}) {
+		t.Fatalf("closed database: %+v %v", got, err)
 	}
 }

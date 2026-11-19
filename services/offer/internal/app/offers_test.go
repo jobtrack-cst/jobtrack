@@ -147,6 +147,56 @@ func TestOffers_GetOffer_Authorization(t *testing.T) {
 	}
 }
 
+func TestOffers_GetOfferByApplication_Authorization(t *testing.T) {
+	for _, tc := range []struct {
+		name, user, role string
+		want             error
+	}{
+		{"applicant", applicantID, "applicant", nil}, {"employer", employerID, "employer", nil},
+		{"uppercase caller", strings.ToUpper(applicantID), "applicant", nil},
+		{"unrelated applicant", strangerID, "applicant", domain.ErrPermissionDenied},
+		{"unrelated employer", strangerID, "employer", domain.ErrPermissionDenied},
+		{"admin", applicantID, "admin", domain.ErrPermissionDenied},
+		{"wrong role matching ID", applicantID, "employer", domain.ErrPermissionDenied},
+		{"missing identity", "", "applicant", domain.ErrUnauthenticated},
+		{"invalid role", applicantID, "other", domain.ErrUnauthenticated},
+		{"unknown offer", applicantID, "applicant", domain.ErrOfferNotFound},
+		{"database failure", applicantID, "applicant", infrastructure},
+		{"malformed identity", "bad", "applicant", domain.ErrUnauthenticated},
+		{"empty ID", applicantID, "applicant", domain.ErrInvalidApplicationID},
+		{"invalid ID", applicantID, "applicant", domain.ErrInvalidApplicationID},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockOfferRepository(ctrl)
+			id := applicationID
+			if tc.name == "empty ID" {
+				id = ""
+			}
+			if tc.name == "invalid ID" {
+				id = "bad"
+			}
+			if tc.want != domain.ErrUnauthenticated && tc.want != domain.ErrInvalidApplicationID {
+				var err error
+				if tc.name == "unknown offer" || tc.name == "database failure" {
+					err = tc.want
+				}
+				repo.EXPECT().GetByApplicationID(gomock.Any(), applicationID).Return(pending(), err)
+			}
+			got, err := app.NewOffers(repo, nil, nil).GetOfferByApplication(context.Background(), domain.Caller{UserID: tc.user, Role: tc.role}, id)
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("got %v want %v", err, tc.want)
+			}
+			if err != nil && got != (domain.Offer{}) {
+				t.Fatal("returned offer on failure")
+			}
+			if err == nil && got != pending() {
+				t.Fatal(got)
+			}
+		})
+	}
+}
+
 func TestOffers_Decisions(t *testing.T) {
 	for _, accept := range []bool{true, false} {
 		action := "decline"
