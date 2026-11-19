@@ -19,9 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ApplicantProfileService_CreateMyProfile_FullMethodName = "/jobtrack.applicant_profile.v1.ApplicantProfileService/CreateMyProfile"
-	ApplicantProfileService_GetMyProfile_FullMethodName    = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetMyProfile"
-	ApplicantProfileService_UpdateMyProfile_FullMethodName = "/jobtrack.applicant_profile.v1.ApplicantProfileService/UpdateMyProfile"
+	ApplicantProfileService_CreateMyProfile_FullMethodName   = "/jobtrack.applicant_profile.v1.ApplicantProfileService/CreateMyProfile"
+	ApplicantProfileService_GetMyProfile_FullMethodName      = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetMyProfile"
+	ApplicantProfileService_UpdateMyProfile_FullMethodName   = "/jobtrack.applicant_profile.v1.ApplicantProfileService/UpdateMyProfile"
+	ApplicantProfileService_PutMyProfilePhoto_FullMethodName = "/jobtrack.applicant_profile.v1.ApplicantProfileService/PutMyProfilePhoto"
+	ApplicantProfileService_GetMyProfilePhoto_FullMethodName = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetMyProfilePhoto"
 )
 
 // ApplicantProfileServiceClient is the client API for ApplicantProfileService service.
@@ -39,6 +41,16 @@ type ApplicantProfileServiceClient interface {
 	GetMyProfile(ctx context.Context, in *GetMyProfileRequest, opts ...grpc.CallOption) (*GetMyProfileResponse, error)
 	// UpdateMyProfile accepts only editable profile fields.
 	UpdateMyProfile(ctx context.Context, in *UpdateMyProfileRequest, opts ...grpc.CallOption) (*UpdateMyProfileResponse, error)
+	// PutMyProfilePhoto sets or replaces the caller's profile photo. Applicant
+	// role only, own profile only (NOT_FOUND if the caller has no profile).
+	// At runtime, content must be 1 to 1,000,000 bytes, content_type image/jpeg
+	// or image/png, and the file signature must match the type; every failure
+	// is INVALID_ARGUMENT.
+	PutMyProfilePhoto(ctx context.Context, in *PutMyProfilePhotoRequest, opts ...grpc.CallOption) (*PutMyProfilePhotoResponse, error)
+	// GetMyProfilePhoto returns the caller's own photo. Applicant role only.
+	// NOT_FOUND if the caller has no profile or no photo.
+	// Protobuf JSON encodes bytes as base64.
+	GetMyProfilePhoto(ctx context.Context, in *GetMyProfilePhotoRequest, opts ...grpc.CallOption) (*GetMyProfilePhotoResponse, error)
 }
 
 type applicantProfileServiceClient struct {
@@ -79,6 +91,26 @@ func (c *applicantProfileServiceClient) UpdateMyProfile(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *applicantProfileServiceClient) PutMyProfilePhoto(ctx context.Context, in *PutMyProfilePhotoRequest, opts ...grpc.CallOption) (*PutMyProfilePhotoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PutMyProfilePhotoResponse)
+	err := c.cc.Invoke(ctx, ApplicantProfileService_PutMyProfilePhoto_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *applicantProfileServiceClient) GetMyProfilePhoto(ctx context.Context, in *GetMyProfilePhotoRequest, opts ...grpc.CallOption) (*GetMyProfilePhotoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMyProfilePhotoResponse)
+	err := c.cc.Invoke(ctx, ApplicantProfileService_GetMyProfilePhoto_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ApplicantProfileServiceServer is the server API for ApplicantProfileService service.
 // All implementations must embed UnimplementedApplicantProfileServiceServer
 // for forward compatibility.
@@ -94,6 +126,16 @@ type ApplicantProfileServiceServer interface {
 	GetMyProfile(context.Context, *GetMyProfileRequest) (*GetMyProfileResponse, error)
 	// UpdateMyProfile accepts only editable profile fields.
 	UpdateMyProfile(context.Context, *UpdateMyProfileRequest) (*UpdateMyProfileResponse, error)
+	// PutMyProfilePhoto sets or replaces the caller's profile photo. Applicant
+	// role only, own profile only (NOT_FOUND if the caller has no profile).
+	// At runtime, content must be 1 to 1,000,000 bytes, content_type image/jpeg
+	// or image/png, and the file signature must match the type; every failure
+	// is INVALID_ARGUMENT.
+	PutMyProfilePhoto(context.Context, *PutMyProfilePhotoRequest) (*PutMyProfilePhotoResponse, error)
+	// GetMyProfilePhoto returns the caller's own photo. Applicant role only.
+	// NOT_FOUND if the caller has no profile or no photo.
+	// Protobuf JSON encodes bytes as base64.
+	GetMyProfilePhoto(context.Context, *GetMyProfilePhotoRequest) (*GetMyProfilePhotoResponse, error)
 	mustEmbedUnimplementedApplicantProfileServiceServer()
 }
 
@@ -112,6 +154,12 @@ func (UnimplementedApplicantProfileServiceServer) GetMyProfile(context.Context, 
 }
 func (UnimplementedApplicantProfileServiceServer) UpdateMyProfile(context.Context, *UpdateMyProfileRequest) (*UpdateMyProfileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateMyProfile not implemented")
+}
+func (UnimplementedApplicantProfileServiceServer) PutMyProfilePhoto(context.Context, *PutMyProfilePhotoRequest) (*PutMyProfilePhotoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PutMyProfilePhoto not implemented")
+}
+func (UnimplementedApplicantProfileServiceServer) GetMyProfilePhoto(context.Context, *GetMyProfilePhotoRequest) (*GetMyProfilePhotoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMyProfilePhoto not implemented")
 }
 func (UnimplementedApplicantProfileServiceServer) mustEmbedUnimplementedApplicantProfileServiceServer() {
 }
@@ -189,6 +237,42 @@ func _ApplicantProfileService_UpdateMyProfile_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ApplicantProfileService_PutMyProfilePhoto_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PutMyProfilePhotoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApplicantProfileServiceServer).PutMyProfilePhoto(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ApplicantProfileService_PutMyProfilePhoto_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApplicantProfileServiceServer).PutMyProfilePhoto(ctx, req.(*PutMyProfilePhotoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ApplicantProfileService_GetMyProfilePhoto_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyProfilePhotoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApplicantProfileServiceServer).GetMyProfilePhoto(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ApplicantProfileService_GetMyProfilePhoto_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApplicantProfileServiceServer).GetMyProfilePhoto(ctx, req.(*GetMyProfilePhotoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ApplicantProfileService_ServiceDesc is the grpc.ServiceDesc for ApplicantProfileService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -207,6 +291,14 @@ var ApplicantProfileService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateMyProfile",
 			Handler:    _ApplicantProfileService_UpdateMyProfile_Handler,
+		},
+		{
+			MethodName: "PutMyProfilePhoto",
+			Handler:    _ApplicantProfileService_PutMyProfilePhoto_Handler,
+		},
+		{
+			MethodName: "GetMyProfilePhoto",
+			Handler:    _ApplicantProfileService_GetMyProfilePhoto_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -32,6 +32,25 @@ service ApplicantProfileService {
       body: "*"
     };
   }
+
+  // PutMyProfilePhoto sets or replaces the caller's profile photo. Applicant
+  // role only, own profile only (NOT_FOUND if the caller has no profile).
+  // At runtime, content must be 1 to 1,000,000 bytes, content_type image/jpeg
+  // or image/png, and the file signature must match the type; every failure
+  // is INVALID_ARGUMENT.
+  rpc PutMyProfilePhoto(PutMyProfilePhotoRequest) returns (PutMyProfilePhotoResponse) {
+    option (google.api.http) = {
+      put: "/v1/applicant/profile/photo"
+      body: "*"
+    };
+  }
+
+  // GetMyProfilePhoto returns the caller's own photo. Applicant role only.
+  // NOT_FOUND if the caller has no profile or no photo.
+  // Protobuf JSON encodes bytes as base64.
+  rpc GetMyProfilePhoto(GetMyProfilePhotoRequest) returns (GetMyProfilePhotoResponse) {
+    option (google.api.http) = {get: "/v1/applicant/profile/photo"};
+  }
 }
 
 message ApplicantProfile {
@@ -41,6 +60,8 @@ message ApplicantProfile {
   repeated Education education = 3;
   repeated string skills = 4;
   jobtrack.common.v1.ResourceTimestamps timestamps = 5;
+  // True when a photo is stored. Profile reads never include the image bytes.
+  bool has_photo = 6;
 }
 
 message Education {
@@ -74,4 +95,21 @@ message UpdateMyProfileRequest {
 
 message UpdateMyProfileResponse {
   ApplicantProfile profile = 1;
+}
+
+message PutMyProfilePhotoRequest {
+  string content_type = 1;
+  // Protobuf JSON uses base64; size, type and signature are runtime checks.
+  bytes content = 2;
+}
+
+message PutMyProfilePhotoResponse {
+  ApplicantProfile profile = 1;
+}
+
+message GetMyProfilePhotoRequest {}
+
+message GetMyProfilePhotoResponse {
+  string content_type = 1;
+  bytes content = 2;
 }
