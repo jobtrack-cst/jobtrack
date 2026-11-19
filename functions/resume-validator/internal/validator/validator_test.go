@@ -94,6 +94,8 @@ func TestHandler_ContractAndFailures(t *testing.T) {
 		kind                 string
 	}{
 		{name: "validated", content: pdf(0), code: 204, kind: "resume.validated"},
+		{name: "validated xref stream", content: testpdf.XrefStream(true, true), code: 204, kind: "resume.validated"},
+		{name: "validated incremental", content: testpdf.Incremental(testpdf.CompressedCatalog(), false), code: 204, kind: "resume.validated"},
 		{name: "rejected catalog string spoof", content: pdfWithCatalog(`<< /Bogus (/Type /Catalog) /Pages 2 0 R >>`), code: 204, kind: "resume.rejected"},
 		{name: "rejected bare xref", content: testpdf.BareXref(), code: 204, kind: "resume.rejected"},
 		{name: "rejected spoof", content: []byte("%PDF-fake"), code: 204, kind: "resume.rejected"},
@@ -192,10 +194,9 @@ func TestHandler_RejectsMalformedCloudEventsBeforeFetching(t *testing.T) {
 	}
 }
 
-// This is a documented acceptance limitation, not a claim that the PDF is invalid.
-func TestValidate_CompressedCatalogIsExplicitlyUnsupported(t *testing.T) {
+func TestValidate_AcceptsCompressedCatalog(t *testing.T) {
 	content := testpdf.CompressedCatalog()
 	require.NotContains(t, string(content), "/Type /Catalog")
 	require.Contains(t, string(content), "/Type /ObjStm")
-	require.Equal(t, validator.UnsupportedLayout, validator.Validate("application/pdf", content))
+	require.Empty(t, validator.Validate("application/pdf", content))
 }
