@@ -51,3 +51,8 @@ func (s *SavedJobs) ListJobSavers(ctx context.Context, jobID string, pageSize in
 	}
 	return s.repo.ListJobSavers(ctx, jobID, pageSize, pageOffset)
 }
+
+// CloseJob applies a validated job.closed event (JT-70).
+func (s *SavedJobs) CloseJob(ctx context.Context, closure domain.JobClosure) (domain.ClosureOutcome, error) {
+	return s.repo.CloseJob(ctx, closure)
+}
