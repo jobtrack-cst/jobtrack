@@ -11,7 +11,7 @@ spec:
       containerConcurrency: 10
       timeoutSeconds: 15
       containers:
-        - image: jobtrack-resume-validator:local
+        - image: dev.local/jobtrack-resume-validator:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
