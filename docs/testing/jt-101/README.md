@@ -5,7 +5,51 @@ Git baseline: `b82cfb8b466bb7b28792f1671756ac690661e831`.
 
 Repository-root `AGENTS.md`, Jira JT-101 and the latest final-refinement request were read before editing. The existing uncommitted JT-101 work was preserved and extended; no reset, commit, push, PR, merge or Jira update was performed. All changes are frontend presentation, associated UI tests, local branding assets and documentation.
 
-## Latest header/account refinement
+## CI #262 follow-up: Tags Autocomplete (PR #98)
+
+Baseline for this follow-up: `61c95aff843d5dc20a4685de4cb0cb261c791f9c` on `JT-101-frontend-polish`. The working tree was clean at inspection. Repository-root `AGENTS.md` and the actual [Frontend checks log](https://github.com/jobtrack-cst/jobtrack/actions/runs/44628739496/job/135929423483) were read. CI #262 passed dependency installation, lint, typecheck and build, then passed 276/277 Cypress cases. Its only failure was `job-pages.cy.js`: “retries missing job options and enforces the tag count before saving”. Cypress correctly refused to click the Tags input because the Clear button covered it.
+
+**Cause and reproduction.** The shared theme makes icon-button targets at least 44 × 44 px. MUI Autocomplete's outlined input still reserved space based on 26 px icons: 39 px for one indicator and 65 px for both, including its gap/inset. The actual Clear/popup targets extended into the input area. Chip wrapping determines when a short input's click point lands under Clear, making the failure sensitive to available width and platform font metrics. The existing click helper uses a legitimate input target and remains unchanged. This is a UI spacing defect, rather than a reason to bypass Cypress actionability.
+
+The original spec passed **33/33** locally before the fix in CI-mode headless Electron. A new geometric regression then failed against the unchanged theme at 320 px: the input's right edge was **203 px**, while Clear began at **175 px**, a **28 px horizontal overrun** into the indicator gutter. The exact GitHub click timeout was not reproduced locally; the underlying spacing defect was. The regression first waits for job options to load before focusing, so it measures the enabled control.
+
+**Minimal fix.** `frontend/src/theme.ts` now reserves **57 px** for one 44 px indicator and **101 px** for two, retaining MUI's inset/gap. Applying this to the shared outlined Autocomplete rule also prevents the same mismatch in search, alert and location controls using the same theme. Icon targets, clear behavior and keyboard semantics stay intact. `JobForm.tsx` needs no change: its 20-tag validation, state and request payload are unchanged.
+
+`tests/e2e/job-pages.cy.js` adds one regression case. It loads 20 selected tags (including the existing tag absent from the lookup), checks input/indicator geometry, 44 px targets, ordinary input clicks and document overflow at **320, 390, 768, 1000, 1024 and 1280 px**. It then uses the keyboard to add tag 21, checks disabled saving, removes that tag with Backspace, checks recovery, clicks Clear, and selects another tag by keyboard. The original 20-selection retry/limit/recovery case and all its assertions remain intact. No force-click, fixed wait, actionability override, dependency or CI requirement change is used.
+
+Local verification uses macOS, Node 26.13.0 and the installed Cypress 16.2.0 / headless Electron 146, with `CI=1`. GitHub used Ubuntu and Node 22.23.5 with the same Cypress/Electron versions. This is a matching-browser local check, not a new GitHub Actions result. All npm commands below run from `frontend/` against the existing Vite server on port 5173.
+
+| Follow-up command/check | Actual result |
+| --- | --- |
+| Original `job-pages.cy.js`, unchanged theme/test | **33/33 passed** in 41 seconds. Exact CI timeout did not reproduce locally. |
+| Added geometry regression, unchanged theme | **33/34**, expected failure: input right edge 203 px exceeds Clear left edge 175 px at 320 px width. |
+| `env -u ELECTRON_RUN_AS_NODE CI=1 npm test -- --browser electron --spec ../tests/e2e/job-pages.cy.js` | First two fixed-theme runs: **34/34**, **34/34**, each 43 seconds. |
+| `env -u ELECTRON_RUN_AS_NODE CI=1 JT101_CAPTURE=1 npm test -- --browser electron --spec ../tests/e2e/job-pages.cy.js,../tests/e2e/frontend-polish.cy.js --env jt101JobFormCapture=true --config screenshotsFolder=/tmp/jobtrack-jt101-ci262-captures` | **40/40 passed**: a third **34/34** job-pages run (47 seconds), plus **6/6** presentation cases (30 seconds). All 36 regenerated existing AFTER images match their prior SHA-256 hashes. |
+| `env -u ELECTRON_RUN_AS_NODE CI=1 JT101_CAPTURE=1 npm test -- --browser electron --spec ../tests/e2e/job-pages.cy.js --env jt101JobFormCapture=true --config screenshotsFolder=/tmp/jobtrack-jt101-ci262-tag-captures` | Fourth consecutive **34/34 passed**, 46 seconds; six final Tags captures saved with full label/focus-border framing. |
+| `env -u ELECTRON_RUN_AS_NODE CI=1 npm test -- --browser electron` | **278/278 passed**, eleven specs, 5 minutes 39 seconds; zero failures, pending or skipped cases. Includes the original 277 cases and the added regression. |
+| `npm run test:stack -- --browser electron` with `CI=1`, `ELECTRON_RUN_AS_NODE` unset and admin credentials supplied privately | **11/11 passed**, 43 seconds, against the existing Compose services. Synthetic employer verification, publishing, resume validation, application, review, interview, offer acceptance and status history passed. No service restart/reconfiguration. |
+| `node ../tests/e2e/native-zoom.cjs` (optional existing check) | Chrome 157.0.8103.79: all three roles passed native 200% page zoom on the unchanged repeat (1280 px window / 640 px CSS viewport, DPR 2). The first run stopped with generic `Uncaught` after applicant/employer passed; a temporary copy with expanded error logging also passed all three roles. No repository script change was made. The cause of the initial intermittent failure was not established. |
+| `git diff --check`, source and image comparisons | Passed. Original job form, click helper and all original assertions match the baseline; all 45 prior PNG hashes match. Report links resolve. |
+| `npm run build` | Passed; **718.16 kB minified / 219.50 kB gzip**. The existing >500 kB Vite chunk warning remains. |
+| `npm run lint` | Passed. |
+| `npm run typecheck` | Passed. |
+
+The six new AFTER images below are real element captures of the Tags control with 20 synthetic selections. Widths are CSS viewport widths; the control itself is cropped with 12 px framing. For capture only, the sticky header temporarily uses normal flow, then its style is restored. No image editing is applied. The existing 45 PNGs (nine BEFORE and 36 AFTER) remain byte-for-byte unchanged.
+
+| Crowded Tags field | AFTER capture |
+| --- | --- |
+| 320 px | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-320.png) |
+| 390 px | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-390.png) |
+| 768 px | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-768.png) |
+| 1000 px (Cypress default width) | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-1000.png) |
+| 1024 px | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-1024.png) |
+| 1280 px | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-1280.png) |
+
+Changed files in this follow-up: `frontend/src/theme.ts`, `tests/e2e/job-pages.cy.js`, this report and the six new PNGs under `screenshots/after/job-pages.cy.js/`. No `JobForm.tsx`, route, data-* selector, API, auth, service, dependency or workflow file changed. GitHub CI #262 remains failed until the owner pushes this fix and a new workflow verifies it. The optional native-zoom helper had one unexplained intermittent failure before successful repeats; it is separate from the passing Cypress GUI/stack commands and remains a verification limitation. Commit, push, PR changes, merge and Jira updates remain owner actions.
+
+Earlier header/account results later in this report are historical results for that pass, not substitutes for this CI follow-up.
+
+## Previous header/account refinement
 
 The final account pass changes only `App.tsx` and the new `features/auth/AccountMenu.tsx` in production code. Existing uncommitted page, theme, branding and navigation work was retained. The trigger combines the existing applicant photo (with initials fallback), employer/admin initials, the display name above 600 px, an informational role label and a dropdown chevron. Long names truncate in the trigger and wrap in the menu; the complete identity is also in its accessible name. Employer/admin initials do not request applicant photos or introduce an image API.
 
@@ -42,7 +86,7 @@ Only signed-in AFTER evidence is refreshed in this pass: 24 existing role captur
 | Admin polish | Analytics highlights **existing** `jobsPublished`, `applicationsSubmitted` and `offersAccepted` counts, alongside the original full outcome/status tables. No new metric or calculation was introduced. Tables have clearer headers, alternating rows and tabular counts. Moderation actions wrap; verification and audit cards/forms inherit shared hierarchy and contrast. |
 | Forms, feedback and interactions | Defined primary/secondary/error/disabled treatments; restrained hover elevation and press feedback; visible focus; refined input focus, chips, tabs, icon-button defaults and confirmations. Shared loading and empty states retain existing conditions and messages. Heading entry animation is 180 ms; reduced motion disables animations/transitions. No component is keyed or remounted to force a page transition. |
 | Preserve functionality | API modules, request/response contracts, backend files, package manifests, role navigation destinations, validation and session code are unchanged. Source comparison verifies every pre-existing `Route path` declaration and `data-*` attribute against the pre-refinement snapshot. Existing Cypress assertions were not weakened. |
-| Before/after evidence | Original nine before PNGs are byte-for-byte unchanged; hashes are in [before-sha256.json](before-sha256.json). Thirty-six after PNGs cover role pages, homes, drawers and account menus, plus the six unchanged login/register captures. This account pass refreshes only the 24 affected role images and adds six menu images. |
+| Before/after evidence | Original nine before PNGs are byte-for-byte unchanged; hashes are in [before-sha256.json](before-sha256.json). Forty-two after PNGs cover role pages, homes, drawers, account menus, unchanged login/register views and six crowded Tags controls. The account pass refreshed 24 role images and added six menu images; the CI follow-up preserves those 36 images and adds only six Tags captures. |
 | Project workflow completion | CI, commit, push, PR creation, merge, Jira movement and time logging are left to the owner as requested. These project-level Definition of Done steps have not been performed. |
 
 ## Branding replacement
@@ -51,7 +95,7 @@ Replace **`frontend/public/branding/jobtrack-mark.svg`** with the team's local S
 
 For PNG, place **`frontend/public/branding/jobtrack-mark.png`** and change `markAsset` in **`frontend/src/components/Brand.tsx`** to `/branding/jobtrack-mark.png`. Rebuild using `npm run build` from `frontend/`. Keep the link's accessible name and the decorative image's empty alt text. Full instructions are also beside the asset; no admin setting, upload route, backend storage or profile-logo changes are involved.
 
-## Verification results
+## Previous header/account verification results
 
 All npm commands below run from `frontend/`, with the existing Vite server on port 5173. Runtime: Node v26.13.0, Cypress 16.2.0, Electron 146 headless, macOS. Electron is the installed default test browser; cross-browser results are not implied.
 
@@ -204,3 +248,5 @@ This includes the earlier uncommitted JT-101 work retained by this pass.
 - `tests/e2e/session-persistence.cy.js`
 - Nine original before PNGs under `docs/testing/jt-101/screenshots/before/frontend-polish.cy.js/` (retained unchanged).
 - Thirty-six after PNGs under `docs/testing/jt-101/screenshots/after/frontend-polish.cy.js/` (every filename linked above).
+
+- Six CI-follow-up Tags AFTER PNGs under `docs/testing/jt-101/screenshots/after/job-pages.cy.js/` (linked in the CI #262 section).

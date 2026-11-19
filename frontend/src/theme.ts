@@ -64,6 +64,11 @@ export const theme = createTheme({
       '&.Mui-focusVisible': { outline: '3px solid #246657', outlineOffset: 2 },
       transition: 'background-color 160ms ease, transform 160ms ease', '&:active': { transform: 'scale(.96)' },
     } } },
+    MuiAutocomplete: { styleOverrides: { root: {
+      // MUI reserves 26px per icon; our 44px targets need the same space in the input.
+      '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root': { paddingRight: 44 + 4 + 9 },
+      '&.MuiAutocomplete-hasPopupIcon.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root': { paddingRight: 88 + 4 + 9 },
+    } } },
     MuiPaper: { defaultProps: { elevation: 0 }, styleOverrides: { outlined: { borderColor: '#e1e5dc' } } },
     MuiCard: {
       defaultProps: { variant: 'outlined' },

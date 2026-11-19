@@ -369,6 +369,46 @@ describe('JT-73 recovery and boundaries', () => {
     field('Tags').type('{backspace}'); cy.contains('button', 'Save changes').should('be.enabled');
   });
 
+  it('keeps twenty wrapped tags clear of usable input and indicator targets at every width', () => {
+    const tags = Array.from({ length: 21 }, (_, i) => ({ tagId: `44444444-4444-4444-8444-${String(i).padStart(12, '0')}`, name: `Skill ${i}` }));
+    cy.intercept('GET', `${gateway}/v1/tags?*`, { tags, pagination: {} });
+    manage({ ...job, tagIds: [tagId, ...tags.slice(0, 19).map(tag => tag.tagId)] });
+    field('Tags').should('be.enabled');
+    for (const width of [320, 390, 768, 1000, 1024, 1280]) {
+      cy.viewport(width, 900);
+      field('Tags').scrollIntoView().focus().should($input => {
+        const input = $input[0].getBoundingClientRect();
+        const root = $input[0].closest('.MuiAutocomplete-root');
+        for (const button of root.querySelectorAll('.MuiAutocomplete-endAdornment button')) {
+          const target = button.getBoundingClientRect();
+          expect(input.right, `input ends before ${button.getAttribute('aria-label')} at ${width}px`).to.be.at.most(target.left);
+          expect(target.width).to.be.at.least(44);
+          expect(target.height).to.be.at.least(44);
+        }
+      });
+      field('Tags').click().should('have.attr', 'aria-expanded', 'true').type('{esc}');
+      cy.document().then(doc => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
+      cy.env(['jt101JobFormCapture']).then(({ jt101JobFormCapture }) => {
+        if (jt101JobFormCapture) {
+          cy.get('header').invoke('css', 'position', 'static');
+          field('Tags').closest('.MuiAutocomplete-root').screenshot(`job-tags-20-${width}`, { padding: 12, overwrite: true });
+          cy.get('header').invoke('css', 'position', '');
+        }
+      });
+    }
+    // Keyboard addition/removal keeps the original 20-tag boundary and recovery.
+    field('Tags').type('Skill 20{downarrow}{enter}{esc}');
+    cy.contains('Choose at most 20 tags.').should('be.visible');
+    cy.contains('button', 'Save changes').should('be.disabled');
+    field('Tags').type('{backspace}');
+    cy.contains('button', 'Save changes').should('be.enabled');
+    field('Tags').closest('.MuiAutocomplete-root').find('button[aria-label="Clear"]').click();
+    field('Tags').closest('.MuiAutocomplete-root').find('.MuiChip-root').should('not.exist');
+    field('Tags').type('Skill 0{downarrow}{enter}{esc}');
+    field('Tags').closest('.MuiAutocomplete-root').find('.MuiChip-root').should('have.length', 1).and('contain', 'Skill 0');
+    cy.contains('button', 'Save changes').should('be.enabled');
+  });
+
   it('validates search text limits and recovers from a network failure', () => {
     cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { forceNetworkError: true });
     login('ROLE_APPLICANT'); open('Search jobs');
