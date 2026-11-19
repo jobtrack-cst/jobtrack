@@ -1,6 +1,6 @@
 # Load tests
 
-JMeter plans for AGENTS.md Section 10 (Load: JMeter, `tests/load`, deadline-rush scenario, 200 concurrent users) and risk R8. Added in JT-84; the full 200-user run is JT-96.
+JMeter plans for AGENTS.md Section 10 (Load: JMeter, `tests/load`, deadline-rush scenario, 200 concurrent users) and risk R8. Added in JT-84; JT-96 added the measured login and search steps and ran the full 200-user scenario.
 
 ## Deadline-rush scenario (`deadline-rush.jmx`)
 
@@ -9,9 +9,9 @@ Many applicants apply for the same job just before its deadline. Each virtual us
 | Phase | Thread group | Steps per user | Measured |
 |---|---|---|---|
 | Preparation | `Prepare applicants (not measured)` (setUp group) | `01` register, `02` log in, `03` upload a small synthetic PDF, `04` poll until the resume is validated (1 s apart, at most `validationTries` times), `05` check it is validated | No: ignore labels `01` to `05` in the results |
-| Rush | `Deadline rush` | `11` view the job, `12` list my resumes, `13` submit an application. A synchronizing timer releases step `13` for all users at the same moment | Yes: labels `11` to `13` |
+| Rush | `Deadline rush` | `10` log in, `11` search jobs by the job's title, `12` view the job, `13` list my resumes, `14` submit an application. A synchronizing timer releases step `14` for all users at the same moment | Yes: labels `10` to `14` |
 
-Every request goes through the gateway, as the frontend does. Assertions check HTTP 200, a validated resume and a created application. The plan stores no passwords or tokens: the password and target come from properties, and each user's token and resume ID are kept in memory between the two thread groups.
+Every request goes through the gateway, as the frontend does. Assertions check HTTP 200, a validated resume, the target job in the search results and a created application. The plan stores no passwords or tokens: the password and target come from properties, each user's resume ID is kept in memory between the two thread groups, and the rush logs in again to get its own token.
 
 ## Properties
 
@@ -21,6 +21,7 @@ Every request goes through the gateway, as the frontend does. Assertions check H
 | `port` | `8000` | Gateway port |
 | `protocol` | `http` | `http` or `https` |
 | `jobId` | none (required) | A published job whose deadline is still ahead |
+| `searchQuery` | none (required) | Search term that finds the job, for example its exact title; step `11` fails if `jobId` is not on the first page of results |
 | `password` | none (required) | Password for the synthetic applicants, 8 to 72 bytes |
 | `users` | `5` | Virtual users (applicants) |
 | `rampUp` | `10` | Seconds to start the rush users |
@@ -42,6 +43,7 @@ Requirements: Apache JMeter 5.6.3 and Java 17 or later on the load machine (`bre
 
        host=<host-ip>
        jobId=<job id>
+       searchQuery=<the job's title>
        password=<a test password, 8 or more characters>
 
 5. Run without the GUI and write the results outside the repository. JMeter needs the parent folder of the report to exist:
@@ -52,7 +54,7 @@ Requirements: Apache JMeter 5.6.3 and Java 17 or later on the load machine (`bre
 
    For the full scenario use `-Jusers=200`. Raise `-JsetupRampUp` if registration slows the host.
 
-6. Open `/tmp/jt84-load/report/index.html`. Report the labels `11` to `13`: samples, error percentage, median, 90th and 95th percentile response times and throughput.
+6. Open `/tmp/jt84-load/report/index.html`. Report the labels `10` to `14`: samples, error percentage, median, 90th and 95th percentile response times and throughput.
 
 Each run leaves `users` synthetic applicants, resumes and applications in the target database. Run against a test stack only.
 
