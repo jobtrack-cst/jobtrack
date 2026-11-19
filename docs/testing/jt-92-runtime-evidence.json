@@ -1,0 +1,64 @@
+{
+  "task": "JT-92",
+  "date": "2026-11-19",
+  "cluster": "jobtrack-jt29",
+  "namespace": "default",
+  "verifier": "Phuntsho Namgyel (cluster host)",
+  "ksvc_status": {
+    "email-sender": "Ready",
+    "resume-validator": "Ready",
+    "deadline-reminder": "Ready",
+    "weekly-summary": "Ready",
+    "notification-dispatcher": "Ready"
+  },
+  "forwarders": {
+    "resume-validator-forwarder": "1/1",
+    "notification-dispatcher-forwarder": "1/1"
+  },
+  "pingSources": {
+    "weekly-summary": "Ready",
+    "deadline-reminder": "Ready"
+  },
+  "verification": {
+    "email-sender": {
+      "trigger": "POST /send-email via curl",
+      "expected": "204 + Mailpit inbox",
+      "observed": "Email received in Mailpit. PASS"
+    },
+    "resume-validator": {
+      "trigger": "RabbitMQ event resume.uploaded",
+      "expected": "resume.validated or resume.rejected published",
+      "observed": "Rejection path verified with test PDFs. Successful validation path not tested. PASS (rejection path)"
+    },
+    "deadline-reminder": {
+      "trigger": "POST / (manual run)",
+      "expected": "204 + deadline.reminder events published",
+      "observed": "HTTP 204 returned. Actual event publishing and scheduled executions not independently verified. PASS (manual run)"
+    },
+    "weekly-summary": {
+      "trigger": "POST / (manual run)",
+      "expected": "204 + admin emails in Mailpit",
+      "observed": "HTTP 204 + summary email received in Mailpit. PASS"
+    },
+    "notification-dispatcher": {
+      "trigger": "RabbitMQ event deadline.reminder via forwarder",
+      "event_id": "f76a3c81-0347-4d5a-9ddb-42baac469521",
+      "revision": "notification-dispatcher-00002",
+      "expected": "Notification in inbox DB + email in Mailpit",
+      "observed": "Forwarder logged event delivered. Dispatcher logged processing event event_type=deadline.reminder. Notification Inbox record confirmed in PostgreSQL. Email Job Deadline Approaching received in Mailpit. PASS"
+    }
+  },
+  "scale_to_zero": {
+    "observed": "All functions scaled to zero after inactivity. PASS"
+  },
+  "known_limitations": [
+    "Sample event in the verification guide needs the required protobuf @type field.",
+    "Weekly Summary EMAIL_SENDER_URL required a deployment-time override.",
+    "Notification Dispatcher readiness probe required a deployment-time override.",
+    "Kubernetes reported security-context warnings for the Knative pods.",
+    "Deadline Reminder actual event publishing and scheduled executions not independently verified.",
+    "Resume Validator successful validation path not tested (only rejection path)."
+  ],
+  "evidence": "Screenshots committed to docs/testing/jt-92-screenshots/.",
+  "notes": "Verified by Phuntsho on his laptop (jobtrack-jt29). The notification-dispatcher bug fix in PR 86 was required for the end-to-end pass."
+}

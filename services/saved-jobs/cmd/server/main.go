@@ -17,6 +17,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	savedjobsv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/saved_jobs/v1"
+	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
@@ -34,6 +35,7 @@ type config struct {
 	httpPort      int
 	databaseURL   string
 	migrationsDir string
+	internalToken string
 }
 
 func main() {
@@ -82,6 +84,10 @@ func loadConfig(getenv func(string) string) (config, error) {
 		return config{}, errors.New("DATABASE_URL is required")
 	}
 	cfg.migrationsDir = "services/saved-jobs/migrations"
+	cfg.internalToken = getenv("INTERNAL_TOKEN")
+	if strings.TrimSpace(cfg.internalToken) == "" {
+		return config{}, errors.New("INTERNAL_TOKEN is required")
+	}
 	return cfg, nil
 }
 
@@ -147,14 +153,21 @@ func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker po
 		return errors.New("bind HTTP listener failed; check HTTP_PORT availability")
 	}
 	defer httpListener.Close()
-	return serve(ctx, logger, checker, pool, grpcListener, httpListener)
+	return serve(ctx, cfg, logger, checker, pool, grpcListener, httpListener)
 }
 
-func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker, pool *pgxpool.Pool, grpcListener, httpListener net.Listener) error {
+func serve(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker, pool *pgxpool.Pool, grpcListener, httpListener net.Listener) error {
 	defer grpcListener.Close()
 	defer httpListener.Close()
+	internalAuth, err := authctx.InternalUnaryServerInterceptor(cfg.internalToken)
+	if err != nil {
+		return errors.New("INTERNAL_TOKEN is invalid")
+	}
 	requestMetrics := requestmetrics.New("saved-jobs")
-	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor()))
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(
+		requestMetrics.UnaryServerInterceptor(),
+		internalAuth,
+	))
 	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
 
 	// Initialize our repository and app layer

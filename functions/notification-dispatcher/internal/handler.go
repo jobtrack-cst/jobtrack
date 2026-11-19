@@ -120,7 +120,7 @@ func (h *Handler) handleApplicationSubmitted(ctx context.Context, event cloudeve
 		JobID         string `json:"job_id"`
 		EmployerID    string `json:"employer_id"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -146,7 +146,7 @@ func (h *Handler) handleApplicationStatusChanged(ctx context.Context, event clou
 		OldStatus     string `json:"old_status"`
 		NewStatus     string `json:"new_status"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -169,7 +169,7 @@ func (h *Handler) handleInterviewScheduled(ctx context.Context, event cloudevent
 		ApplicantID   string `json:"applicant_id"`
 		ScheduledAt   string `json:"scheduled_at"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -191,7 +191,7 @@ func (h *Handler) handleOfferMade(ctx context.Context, event cloudevents.Event) 
 		ApplicationID string `json:"application_id"`
 		ApplicantID   string `json:"applicant_id"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -214,7 +214,7 @@ func (h *Handler) handleMessageSent(ctx context.Context, event cloudevents.Event
 		RecipientID string `json:"recipient_id"`
 		MessageID   string `json:"message_id"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -232,7 +232,7 @@ func (h *Handler) handleJobAlertMatched(ctx context.Context, event cloudevents.E
 		JobID       string `json:"job_id"`
 		ApplicantID string `json:"applicant_id"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -249,7 +249,7 @@ func (h *Handler) handleEmployerVerified(ctx context.Context, event cloudevents.
 	var data struct {
 		EmployerID string `json:"employer_id"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -271,7 +271,7 @@ func (h *Handler) handleDeadlineReminder(ctx context.Context, event cloudevents.
 		ApplicantID string `json:"applicant_id"`
 		Deadline    string `json:"deadline"`
 	}
-	if err := event.DataAs(&data); err != nil {
+	if err := unwrapEnvelope(event, &data); err != nil {
 		return fmt.Errorf("failed to parse data: %w", err)
 	}
 
@@ -283,6 +283,23 @@ func (h *Handler) handleDeadlineReminder(ctx context.Context, event cloudevents.
 	}
 	if err := h.sendEmail(ctx, data.ApplicantID, title, body); err != nil {
 		return err
+	}
+	return nil
+}
+
+// unwrapEnvelope extracts the nested "data" field from the raw event body.
+// The forwarder sends the full domain envelope as the HTTP body.
+func unwrapEnvelope(event cloudevents.Event, target interface{}) error {
+	// First, unmarshal the raw body into an envelope wrapper
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := event.DataAs(&envelope); err != nil {
+		return fmt.Errorf("failed to parse envelope: %w", err)
+	}
+	// Then unmarshal the inner data into the target struct
+	if err := json.Unmarshal(envelope.Data, target); err != nil {
+		return fmt.Errorf("failed to parse event data: %w", err)
 	}
 	return nil
 }
