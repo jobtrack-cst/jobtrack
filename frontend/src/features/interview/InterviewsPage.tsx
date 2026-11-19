@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { Link, useParams } from 'react-router';
@@ -53,7 +54,7 @@ function InterviewsView({ applicationId }: { applicationId: string }) {
     <Button component={Link} to={`${base}/applications/${applicationId}/status`}>View status</Button>
     <Button disabled={busy || list.loading} onClick={list.refresh}>Refresh interviews</Button>
     <ResourceState loading={list.loading} error={list.error} />
-    {list.data && !list.data.interviews?.length && <Typography>No interviews scheduled on this page.</Typography>}
+    {list.data && !list.data.interviews?.length && <EmptyState>No interviews scheduled on this page.</EmptyState>}
     {list.data?.interviews?.map(i => <Card key={i.interviewId}><CardContent><Stack spacing={1}>
       <Typography variant="h6" component="h2">{formatTime(i.scheduledAt)}</Typography>
       <Typography sx={{ whiteSpace: 'pre-wrap' }}>{i.details || 'No details given.'}</Typography>

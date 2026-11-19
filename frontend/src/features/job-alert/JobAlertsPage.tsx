@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Autocomplete, Button, Card, CardContent, Dialog, DialogActions, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { errorMessage, Pager, ResourceState, useResource } from '../application/shared';
@@ -28,11 +29,11 @@ export function JobAlertsPage() {
     <ResourceState {...resource} /><ResourceState {...refs} />
     <Button disabled={busy || resource.loading || refs.loading} onClick={() => { resource.refresh(); refs.refresh(); }}>Refresh subscriptions</Button>
     {error && <Alert severity="error">{error}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
-    {resource.data && !resource.data.jobAlerts?.length && <Typography>No subscriptions on this page.</Typography>}
+    {resource.data && !resource.data.jobAlerts?.length && <EmptyState>No subscriptions on this page.</EmptyState>}
     {resource.data?.jobAlerts?.map(a => <Card key={a.alertId}><CardContent><Stack spacing={1}>
       <Typography>Categories: {a.categoryIds?.map(id => refs.data?.categories.find(c => c.categoryId === id)?.name ?? id).join(', ') || 'Any'}</Typography>
       <Typography>Tags: {a.tagIds?.map(id => refs.data?.tags.find(t => t.tagId === id)?.name ?? id).join(', ') || 'Any'}</Typography>
-      <Typography>Location: {a.location || 'Any'}</Typography><Button disabled={busy} onClick={() => setSelected(a.alertId)}>Delete subscription</Button>
+      <Typography>Location: {a.location || 'Any'}</Typography><Button color="error" disabled={busy} onClick={() => setSelected(a.alertId)}>Delete subscription</Button>
     </Stack></CardContent></Card>)}
     <Pager token={token} next={resource.data?.pagination?.nextPageToken} busy={busy || resource.loading} onPage={setToken} />
     <Stack component="form" spacing={2} onSubmit={e => { e.preventDefault(); if (valid) void change(async () => { await createAlert(categories.map(c => c.categoryId), tags.map(t => t.tagId), location); setCategories([]); setTags([]); setLocation(''); }, 'Subscription created.'); }}>
@@ -42,10 +43,10 @@ export function JobAlertsPage() {
         <MenuItem value="">Any</MenuItem>
         {refs.data?.locations.map(l => <MenuItem key={l.locationId} value={l.name}>{l.name}</MenuItem>)}
       </TextField>
-      <Button type="submit" disabled={busy || !valid}>Create subscription</Button>
+      <Button variant="contained" type="submit" disabled={busy || !valid}>Create subscription</Button>
     </Stack>
     <Dialog open={!!selected} onClose={() => { if (!busy) setSelected(''); }}><DialogTitle>Delete this subscription?</DialogTitle><DialogActions>
-      <Button disabled={busy} onClick={() => setSelected('')}>Cancel</Button><Button disabled={busy} onClick={() => void change(() => deleteAlert(selected), 'Subscription deleted.')}>Confirm deletion</Button>
+      <Button disabled={busy} onClick={() => setSelected('')}>Cancel</Button><Button variant="contained" color="error" disabled={busy} onClick={() => void change(() => deleteAlert(selected), 'Subscription deleted.')}>Confirm deletion</Button>
     </DialogActions></Dialog>
   </Stack>;
 }

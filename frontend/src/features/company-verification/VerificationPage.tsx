@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Button, Stack, TextField, Typography } from '@mui/material';
 import { Link } from 'react-router';
@@ -64,7 +65,7 @@ export function VerificationPage() {
     <Button disabled={busy || list.loading} onClick={list.refresh}>Refresh requests</Button>
     {list.loading && <ResourceState loading error="" />}
     {!list.loading && list.error && <><Alert severity="error">{list.error}</Alert><Button onClick={list.refresh}>Try again</Button></>}
-    {list.data && !list.data.requests?.length && <Typography>No requests on this page.</Typography>}
+    {list.data && !list.data.requests?.length && <EmptyState>No requests on this page.</EmptyState>}
     {list.data?.requests?.map(r => <RequestCard key={r.requestId} request={r} />)}
     <Pager next={list.data?.pagination?.nextPageToken} token={token} busy={busy || list.loading} onPage={setToken} />
   </Stack>;

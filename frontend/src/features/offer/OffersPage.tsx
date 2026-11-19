@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogTitle, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Button, Card, CardContent, Dialog, DialogActions, DialogTitle, Stack, TextField, Typography } from '@mui/material';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../../api/client';
 import { useAuth } from '../auth/AuthProvider';
@@ -59,7 +59,7 @@ export function OffersPage({ create = false }: { create?: boolean }) {
     <Stack component="form" spacing={2} onSubmit={e => { e.preventDefault(); void run(() => create ? makeOffer(id.trim(), terms.trim()) : (byApplication ? getOfferByApplication(id.trim()) : getOffer(id.trim())), !create && byApplication); }}>
       <TextField label={create || byApplication ? 'Application ID' : 'Offer ID'} required value={id} disabled={busy} onChange={e => { setId(e.target.value); setOffer(undefined); setError(''); setMissing(false); }} />
       {create && <TextField label="Offer terms" required multiline minRows={4} value={terms} disabled={busy || !!offer} onChange={e => setTerms(e.target.value)} helperText={`${Array.from(terms.trim()).length}/2000 characters`} />}
-      <Button type="submit" disabled={busy || !validId(id.trim()) || (create && (!!offer || !terms.trim() || Array.from(terms.trim()).length > 2000))}>{create ? 'Make offer' : 'Load offer'}</Button>
+      <Button variant="contained" type="submit" disabled={busy || !validId(id.trim()) || (create && (!!offer || !terms.trim() || Array.from(terms.trim()).length > 2000))}>{create ? 'Make offer' : 'Load offer'}</Button>
     </Stack>
     {!create && <Button disabled={busy} onClick={() => { setByApplication(!byApplication); setId(''); setOffer(undefined); setError(''); setMissing(false); }}>Use {byApplication ? 'offer' : 'application'} ID</Button>}
     {busy && <Typography role="status">Loading offer…</Typography>}
@@ -67,12 +67,15 @@ export function OffersPage({ create = false }: { create?: boolean }) {
     {error && <Alert severity="error">{error}</Alert>}
     {offer && <><Alert severity="success">{create ? 'Offer made. Offer ID: ' : 'Offer ID: '}{offer.offerId}</Alert>
       {create && <Button component={Link} to={`/employer/offers?applicationId=${encodeURIComponent(offer.applicationId)}`}>View Offer</Button>}
-      <Typography>Application: {offer.applicationId}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{offer.terms}</Typography><Typography>Status: {offer.status.replace('OFFER_STATUS_', '')}</Typography>
-      {applicant && offer.status === 'OFFER_STATUS_PENDING' && <Stack direction="row" spacing={2}>
-        <Button disabled={busy} onClick={() => setDecision('accept')}>Accept offer</Button><Button disabled={busy} onClick={() => setDecision('decline')}>Decline offer</Button>
+      <Card><CardContent><Stack spacing={2}>
+        <Typography variant="h6" component="h2">Offer terms</Typography>
+        <Typography className="record-id">Application: {offer.applicationId}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{offer.terms}</Typography><Typography variant="subtitle2" color="primary.dark">Status: {offer.status.replace('OFFER_STATUS_', '')}</Typography>
+      </Stack></CardContent></Card>
+      {applicant && offer.status === 'OFFER_STATUS_PENDING' && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+        <Button variant="contained" color="success" disabled={busy} onClick={() => setDecision('accept')}>Accept offer</Button><Button variant="outlined" color="error" disabled={busy} onClick={() => setDecision('decline')}>Decline offer</Button>
       </Stack>}</>}
     <Dialog open={!!decision} onClose={() => { if (!busy) setDecision(undefined); }}><DialogTitle>{decision === 'accept' ? 'Accept' : 'Decline'} this offer? This decision is final.</DialogTitle><DialogActions>
-      <Button disabled={busy} onClick={() => setDecision(undefined)}>Cancel</Button><Button disabled={busy} onClick={() => { if (offer && decision) void run(() => respondOffer(offer.offerId, decision), false, true); }}>Confirm decision</Button>
+      <Button disabled={busy} onClick={() => setDecision(undefined)}>Cancel</Button><Button variant="contained" color={decision === 'decline' ? 'error' : 'success'} disabled={busy} onClick={() => { if (offer && decision) void run(() => respondOffer(offer.offerId, decision), false, true); }}>Confirm decision</Button>
     </DialogActions></Dialog>
   </Stack>;
 }

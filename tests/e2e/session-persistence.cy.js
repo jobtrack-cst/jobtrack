@@ -1,3 +1,4 @@
+import { openAccountMenu } from './account-menu';
 const gateway = 'http://localhost:8000';
 const key = 'jobtrack.auth';
 beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
@@ -44,6 +45,7 @@ describe('JT-106 session persistence', () => {
       cy.location('pathname').should('eq', `${base}/report-job`);
       cy.location('search').should('eq', '?from=reload');
       cy.window().should(win => expect(JSON.parse(win.sessionStorage.getItem(key))).to.deep.equal(saved));
+      openAccountMenu();
       cy.contains('button', 'Log out').click();
       emptyStorage();
       cy.reload();
@@ -119,6 +121,7 @@ describe('JT-106 session persistence', () => {
   it('clears a confirmed session on protected 401', () => {
     cy.intercept('GET', `${gateway}/v1/auth/me`, { user: user('ROLE_EMPLOYER') });
     visitStored(credentials(), '/employer');
+    openAccountMenu();
     cy.contains('button', 'Log out').should('be.visible');
     cy.intercept('GET', `${gateway}/v1/auth/me`, { statusCode: 401, body: {} });
     client().then(module => module.api('/v1/auth/me').catch(error => expect(error.status).to.equal(401)));
@@ -133,6 +136,7 @@ describe('JT-106 session persistence', () => {
     } });
     submit();
     cy.location('pathname').should('eq', '/employer');
+    openAccountMenu();
     cy.contains('button', 'Log out').click();
     cy.location('pathname').should('eq', '/login');
   });
@@ -167,8 +171,16 @@ describe('JT-106 session persistence', () => {
 function provider() {
   cy.visit('/login');
   cy.window().then(async win => {
-    const { default: React } = await win.eval('import("/node_modules/.vite/deps/react.js")');
-    const { default: { createRoot } } = await win.eval('import("/node_modules/.vite/deps/react-dom_client.js")');
+    // Use the app's exact Vite module URLs, including its dependency cache version.
+    // Unversioned imports can create a second React dispatcher after chunk changes.
+    const loadedModule = file => {
+      const entry = win.performance.getEntriesByType('resource').find(resource =>
+        new URL(resource.name).pathname === `/node_modules/.vite/deps/${file}.js`);
+      expect(entry, `loaded ${file}`).to.exist;
+      return win.eval(`import(${JSON.stringify(entry.name)})`);
+    };
+    const { default: React } = await loadedModule('react');
+    const { default: { createRoot } } = await loadedModule('react-dom_client');
     const { AuthProvider, useAuth } = await win.eval('import("/src/features/auth/AuthProvider.tsx")');
     const host = win.document.createElement('div');
     win.document.body.appendChild(host);

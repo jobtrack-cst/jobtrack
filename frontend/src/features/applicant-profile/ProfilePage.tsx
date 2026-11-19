@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useEffect, useState } from 'react';
 import { Alert, Autocomplete, Button, Card, CardContent, Chip, CircularProgress, Stack, TextField, Typography } from '@mui/material';
 import { gatewayMessage, grpcCode, isNotFound, length } from '../application-status/shared';
@@ -48,18 +49,18 @@ const sameInput = (a: ProfileInput, b: ProfileInput) => JSON.stringify(a) === JS
 
 // Read-only view of the saved profile; Edit switches to the form (JT-109).
 function ProfileView({ saved }: { saved: Saved }) {
-  return <Stack spacing={2}>
+  return <Stack spacing={2} sx={{ p: { xs: 2.5, sm: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '14px' }}>
     <Typography variant="h6" component="h2">Summary</Typography>
     <Typography sx={{ whiteSpace: 'pre-line' }}>{saved.summary.trim() || 'No summary.'}</Typography>
     <Typography variant="h6" component="h2">Education</Typography>
-    {saved.rows.length === 0 ? <Typography>No education entries.</Typography>
+    {saved.rows.length === 0 ? <EmptyState>No education entries.</EmptyState>
       : <Stack component="ul" spacing={1} sx={{ m: 0, pl: 3 }}>
         {saved.rows.map((row, index) => <Typography component="li" key={index}>
           {row.institution}, {row.qualification}, {row.startYear} to {row.endYear || 'ongoing'}
         </Typography>)}
       </Stack>}
     <Typography variant="h6" component="h2">Skills</Typography>
-    {saved.skills.length === 0 ? <Typography>No skills.</Typography>
+    {saved.skills.length === 0 ? <EmptyState>No skills.</EmptyState>
       : <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
         {saved.skills.map(skill => <Chip key={skill} label={skill} />)}
       </Stack>}
@@ -142,12 +143,12 @@ export function ProfilePage() {
       <TextField label="Summary" name="summary" multiline minRows={3} value={summary} disabled={busy}
         helperText={`${length(summary)} of ${limits.summary} characters`} onChange={e => setSummary(e.target.value)} />
       <Typography variant="h6" component="h2">Education</Typography>
-      {rows.length === 0 && <Typography>No education entries.</Typography>}
+      {rows.length === 0 && <EmptyState>No education entries.</EmptyState>}
       {rows.map((row, index) => <Card key={index} variant="outlined"><CardContent><Stack spacing={2}>
         <Typography variant="subtitle1" component="h3">Education entry {index + 1}</Typography>
         <TextField label="Institution" required value={row.institution} disabled={busy} onChange={e => setRow(index, { institution: e.target.value })} />
         <TextField label="Qualification" required value={row.qualification} disabled={busy} onChange={e => setRow(index, { qualification: e.target.value })} />
-        <Stack direction="row" spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField label="Start year" required value={row.startYear} disabled={busy} slotProps={{ htmlInput: { inputMode: 'numeric' } }} onChange={e => setRow(index, { startYear: e.target.value.trim() })} />
           <TextField label="End year" value={row.endYear} disabled={busy} helperText="Leave empty if ongoing" slotProps={{ htmlInput: { inputMode: 'numeric' } }} onChange={e => setRow(index, { endYear: e.target.value.trim() })} />
         </Stack>
@@ -161,7 +162,7 @@ export function ProfilePage() {
       {problem && <Alert severity="warning">{problem}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
       {exists && !changed && <Typography variant="body2">No changes to save.</Typography>}
-      <Stack direction="row" spacing={2}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
         <Button type="submit" variant="contained" disabled={busy || !!problem || !changed}>{exists ? 'Save profile' : 'Create profile'}</Button>
         {exists && <Button disabled={busy} onClick={cancel}>Cancel</Button>}
       </Stack>

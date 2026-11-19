@@ -1,3 +1,4 @@
+import { openAccountMenu } from './account-menu';
 // JT-103 applicant profile photo. Gateway responses are stubbed, so these tests
 // check the UI and the requests it sends (see docs/testing/jt-103-test-cases.md).
 const gateway = 'http://localhost:8000';
@@ -149,6 +150,7 @@ describe('JT-103 applicant profile photo', () => {
 
   it('shows no photo and asks for none for employers', () => {
     login('ROLE_EMPLOYER');
+    openAccountMenu();
     cy.contains('button', 'Log out').should('be.visible');
     cy.get('header .MuiAvatar-root').should('not.exist');
     cy.get('@photo.all').should('have.length', 0);

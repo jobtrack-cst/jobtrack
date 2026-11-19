@@ -1,3 +1,4 @@
+import { openAccountMenu } from './account-menu';
 // JT-73 gateway-stubbed UI workflows; live steps are in docs/testing/jt-73-frontend.md.
 const gateway = 'http://localhost:8000';
 // Keep the applicant app-bar photo request independent of a running gateway.
@@ -329,9 +330,11 @@ describe('JT-73 notifications and routing', () => {
   it('restricts job routes and navigation to the correct role', () => {
     login('ROLE_APPLICANT'); cy.contains('nav a', exact('My jobs')).should('not.exist');
     visit('/employer/jobs'); cy.location('pathname').should('eq', '/applicant');
+    openAccountMenu();
     cy.contains('button', 'Log out').click(); login();
     cy.contains('nav a', exact('Search jobs')).should('not.exist'); cy.contains('nav a', exact('Saved jobs')).should('not.exist');
     visit('/applicant/saved-jobs'); cy.location('pathname').should('eq', '/employer');
+    openAccountMenu();
     cy.contains('button', 'Log out').click(); login('ROLE_ADMIN');
     visit('/employer/jobs/new'); cy.location('pathname').should('eq', '/admin');
   });

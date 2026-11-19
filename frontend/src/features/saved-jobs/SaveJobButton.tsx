@@ -14,7 +14,7 @@ export function SaveJobButton({ jobId }: { jobId: string }) {
     catch (reason) { setError(gatewayMessage(reason, savedMessages)); }
     finally { setBusy(false); }
   }
-  return <Stack spacing={1}><Button disabled={busy} onClick={() => void change()}>{saved ? 'Unsave job' : 'Save job'}</Button>
+  return <Stack spacing={1}><Button color={saved ? 'error' : 'primary'} disabled={busy} onClick={() => void change()}>{saved ? 'Unsave job' : 'Save job'}</Button>
     {saved && <Alert severity="success">Job saved.</Alert>}{error && <Alert severity="error">{error}</Alert>}
   </Stack>;
 }
