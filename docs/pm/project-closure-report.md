@@ -31,7 +31,7 @@ The project is the combined final project for WEB303 (Microservices and Serverle
 | Completion | 17 Nov 2026 (5 Nov baseline) | 20 Nov 2026 (revised to 19 Nov on 11 Nov, extended to 20 Nov on 19 Nov) |
 | Team | 4 members in two pairs | 4 members; work reassigned within pairs on 9 Nov and 17 Nov, ownership unchanged |
 | Scope | 244 story points in Jira (Sprints 0 to 4) | 242 points Done; only JT-72 (2 points) not delivered |
-| Effort | No hours were planned; baseline 186.5 h at the Sprint 0 rate | 213.4 h logged in Jira |
+| Effort | No hours were planned; baseline 186.5 h at the Sprint 0 rate | 214.4 h logged in Jira |
 | System | 20 microservices, gateway, 5 Knative functions, React frontend | All built; the 20 services and the gateway run in Docker Compose, the 5 functions run on Knative in k3d |
 | Tools | Jira (space JT), GitHub, GitHub Actions | As planned |
 
@@ -80,7 +80,8 @@ The project is the combined final project for WEB303 (Microservices and Serverle
 | Audit-log consumer (JT-72, Should, 2 points) | Section 4.1, Audit Log | Not started; audit-log stores no events, so the admin audit log page is empty | Recorded as not delivered following the Sprint 4 slip order; in the backlog |
 | Recording interview outcomes | Section 4.1, Interview | `interview.proto` has no outcome field or RPC; only scheduling and reading were built (JT-52) | Needs a contract change; not agreed (AGENTS.md Section 16) |
 | Employer view of applicant resumes | Section 3, review step | `GetResume` and `DownloadResume` are owner only | Open question; backlog consideration only (Section 10) |
-| NetworkPolicies for internal RPCs | AGENTS.md Section 6, layer 3 | Not written; layers 1 and 2 are in place | Open item (Section 10) |
+| Kubernetes manifests for the 20 services | Section 5, development; AGENTS.md Section 8 | `deploy/k8s` has only the `service-template` base; no service has Kustomize manifests | Follows from the reduced k3d scope agreed on 18 Nov, where the services run only in Docker Compose |
+| NetworkPolicies for internal RPCs | AGENTS.md Section 6, layer 3 | Not written, because the services do not run in k3d; layers 1 and 2 are in place | Open item (Section 10) |
 | Stakeholder register, SRS, WBS and quality management plan | Section 5, initiation and planning | Not in the repository (checked on 19 Nov), and no team member reported having made them | Recorded as not delivered |
 
 The out-of-scope items in charter Section 4.4 (payments, real SMS and email, resume parsing, mobile apps, production hosting, national systems, real personal data) stayed out of scope.
@@ -92,7 +93,7 @@ The out-of-scope items in charter Section 4.4 (payments, real SMS and email, res
 | Initiation and planning | Project proposal, charter, Definition of Done and working agreement, sprint calendar, risk register, product backlog in Jira | Done (`docs/pm`, Jira) |
 | Initiation and planning | Stakeholder register, SRS, WBS, quality management plan | Not delivered (Section 5.2) |
 | Design | Architecture and service catalogue (AGENTS.md), `.proto` and event contracts | Done |
-| Development | Source code for 20 services, gateway, 5 functions and frontend; Dockerfiles, Kubernetes and Knative manifests, CI pipeline | @@K8S@@ |
+| Development | Source code for 20 services, gateway, 5 functions and frontend; Dockerfiles, Kubernetes and Knative manifests, CI pipeline | Done for the source code, Dockerfiles, CI pipeline and Knative manifests (`deploy/knative`: all 5 functions and the forwarder). Kubernetes manifests in `deploy/k8s` exist only for `service-template`, so the 20 services have none (Section 5.2) |
 | Testing | Test plan, test case document with traceability, coverage and SonarQube reports, load test report, defect log in Jira | Done (`docs/testing`: test plan, test cases per task, test summary report with coverage, SonarQube and the defect log, load test report; bugs in Jira) |
 | Deployment | Running deployment on k3d, Grafana dashboards, deployment guide | Functions on k3d (JT-92), Grafana (JT-93), deployment documentation (JT-94) |
 | Closure | Sprint reviews, earned value report, final presentation, lessons-learned and closure report | Sprint 1 to 4 reviews, earned value report and this closure report done; final presentation not yet scheduled |
@@ -126,13 +127,13 @@ The project had no funding (charter Section 8). Cost is measured as hours logged
 | BAC | 244 points, 186.5 h |
 | PV | 244 points, 186.5 h |
 | EV | 242 points, 185.0 h |
-| AC | 213.4 h |
+| AC | 214.4 h |
 | SV | -2 points (-1.5 h) |
-| CV | -28.5 h |
+| CV | -29.5 h |
 | SPI | 0.99 |
-| CPI | 0.87 |
+| CPI | 0.86 |
 
-Interpretation: almost all of the planned scope was delivered (SPI 0.99), but only by adding three days to the schedule, which a point-based SPI does not show. The CPI stayed above 1 until Sprint 3 and fell to 0.87 in Sprint 4, which was mostly testing, UAT and documentation and included bug fixes without points: the project used about 14 percent more hours than the Sprint 0 rate predicts.
+Interpretation: almost all of the planned scope was delivered (SPI 0.99), but only by adding three days to the schedule, which a point-based SPI does not show. The CPI stayed above 1 until Sprint 3 and fell to 0.86 in Sprint 4, which was mostly testing, UAT and documentation and included bug fixes without points: the project used about 15 percent more hours than the Sprint 0 rate predicts.
 
 ---
 
