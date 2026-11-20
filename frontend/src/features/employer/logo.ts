@@ -1,5 +1,5 @@
 import { isNotFound } from '../application-status/shared';
-import { getCompanyLogo } from './api';
+import { getCompanyLogo, getCompanyProfile } from './api';
 
 // Same rules as the employer service (JT-102); the service stays authoritative.
 export const maxLogoBytes = 1_000_000;
@@ -61,4 +61,24 @@ export function loadLogo(employerId: string): Promise<string | null> {
 // After an upload the new logo is shown without fetching it again.
 export function rememberLogo(employerId: string, type: string, base64: string) {
   cache.set(employerId, Promise.resolve(dataUrl(type, base64)));
+  companies.delete(employerId);
+}
+
+// Name and logo for job cards. One profile read per employer per session;
+// null (no company profile) is remembered, other failures are retried.
+export interface CompanyBadge { name?: string; url: string | null }
+const companies = new Map<string, Promise<CompanyBadge | null>>();
+
+export function loadCompany(employerId: string): Promise<CompanyBadge | null> {
+  const cached = companies.get(employerId);
+  if (cached) return cached;
+  const request = getCompanyProfile(employerId).then(
+    // A response without a profile means nothing to show, never a crash.
+    async ({ profile }) => profile ? { name: profile.companyName, url: profile.hasLogo === true ? await loadLogo(employerId) : null } : null,
+    (error: unknown) => {
+      if (!isNotFound(error)) companies.delete(employerId);
+      return null;
+    });
+  companies.set(employerId, request);
+  return request;
 }

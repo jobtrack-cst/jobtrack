@@ -7,6 +7,7 @@ import { useLoad } from '../application-status/useLoad';
 import type { Job } from '../job-posting/api';
 import { jobStatus } from '../job-posting/shared';
 import { SaveJobButton } from '../saved-jobs/SaveJobButton';
+import { JobCompany } from '../employer/JobCompany';
 
 export function JobDetailsPage() {
   const { jobId = '' } = useParams();
@@ -18,7 +19,7 @@ export function JobDetailsPage() {
     {!validId(jobId) && <Alert severity="error">The job ID in the address is not valid.</Alert>}
     <ResourceState {...resource} /><Button disabled={resource.loading} onClick={resource.refresh}>Refresh job</Button>
     {job && <><Card sx={{ borderTop: '3px solid #c9a76b' }}><CardContent><Stack spacing={2}>
-      <Typography variant="h5" component="h2">{job.title}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{job.description}</Typography>
+      <Typography variant="h5" component="h2">{job.title}</Typography><JobCompany employerId={job.employerId} size={48} /><Typography sx={{ whiteSpace: 'pre-wrap' }}>{job.description}</Typography>
       <Stack spacing={0.5} sx={{ p: 2, bgcolor: '#f1f4eb', borderRadius: '10px' }}>
         <Typography>Location: {job.location || 'Not specified'}</Typography><Typography>Status: {jobStatus(job.status)}</Typography><Typography>Deadline: {formatTime(job.deadline)}</Typography>
       </Stack>
