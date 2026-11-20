@@ -17,6 +17,7 @@ function login(role = 'applicant') {
   cy.get('input[name=password]').type('synthetic-password', { log: false });
   cy.get('button[type=submit]').click();
   cy.location('pathname').should('eq', `/${role}`);
+  cy.contains('.workspace-content h1', `${role[0].toUpperCase()}${role.slice(1)} workspace`).should('be.visible');
 }
 
 function closed() {

@@ -5,7 +5,63 @@ Git baseline: `b82cfb8b466bb7b28792f1671756ac690661e831`.
 
 Repository-root `AGENTS.md`, Jira JT-101 and the latest final-refinement request were read before editing. The existing uncommitted JT-101 work was preserved and extended; no reset, commit, push, PR, merge or Jira update was performed. All changes are frontend presentation, associated UI tests, local branding assets and documentation.
 
-## CI #262 follow-up: Tags Autocomplete (PR #98)
+## CI #263 follow-up: account-menu synchronization (PR #98)
+
+Baseline: `6148595e380dee5e06844a2b5a0ca023a8c9f7c6`, branch `JT-101-frontend-polish`; the working tree was clean before this follow-up. Repository-root `AGENTS.md` and the [actual Frontend checks log](https://github.com/jobtrack-cst/jobtrack/actions/runs/44634587710/job/135949704631) were read. CI passed build/lint/typecheck but Cypress passed 276/278: the applicant account case failed waiting for the menu, and the job-role redirect case failed waiting for its paper. Both tag-limit cases from the previous fix passed.
+
+**Reproduced cause.** The unchanged focused specs initially passed 44/44 locally. A temporary copy of the account spec, with the same assertions/default timeouts and CDP CPU throttling rate 6, reproduced the menu failures: 2/10 passed, 8 failed. Browser event/DOM/router tracing established that the helper clicked before the login redirect's React commit. BrowserRouter updates browser history synchronously and schedules its React state through `React.startTransition`; `cy.location()` can therefore match the destination while the rendered route is still `/login`.
+
+The menu accepted the click and opened. The pending navigation then committed, so the existing route-scoped menu state correctly closed it. The observed locations had different pathnames and history keys; this was an actual redirect, not evidence of arbitrary `useLocation()` object churn. MUI's exit transition explains why one assertion can see the menu and the next find no paper. In the captured failure the helper saw `aria-expanded=false` and did click; its conditional did not skip that click. Waiting longer for the menu after that one early click cannot make it reopen.
+
+| Baseline trace time | Browser path | Rendered route | Workspace | Account state |
+| --- | --- | --- | --- | --- |
+| 1598 ms | `/applicant` | `/login` | absent | History changed; closed |
+| 1755 ms | `/applicant` | `/login` | absent | Trigger clicked |
+| 1848 ms | `/applicant` | `/login` | absent | Expanded; menu exists |
+| 2109 ms | `/applicant` | `/applicant` | present | Navigation committed; collapsed |
+| 2261 ms | `/applicant` | `/applicant` | present | Menu unmounted |
+
+The full job-spec diagnostic also reproduced its original failure: **33/34 passed** with the same CPU throttle and default timeouts. At the failing click, the browser had returned to `/applicant` but the authorized workspace was still absent. The newly opened menu's captured location was `/employer/jobs`; committing `/applicant` then collapsed and unmounted it. That trace is included in the same evidence file.
+
+**Synchronization fix.** `tests/e2e/account-menu.js` waits for the existing authorized workspace to be visible before opening the account menu. It uses a fresh Cypress trigger query, asserts the initially closed state, clicks once, then asserts expansion, visible menu and completed Grow transition. It no longer takes a one-time DOM snapshot and conditionally skips a click. No click is retried to hide an unexpected close.
+
+The account spec's login helper additionally checks the role-specific workspace heading after the URL assertion, so its native keyboard/touch tests also begin on the committed landing page. Every original permission, navigation, logout, focus, touch, menu and accessibility assertion remains. `AccountMenu.tsx`, router/layout, auth, APIs, the Autocomplete fix, dependencies and CI configuration are unchanged. This fixes test readiness; it preserves the product's intentional close-on-navigation behavior.
+
+**Verification conditions and reproduction.** All commands run from `frontend/` against the existing Vite server on port 5173, with `ELECTRON_RUN_AS_NODE` unset, `CI=1`, Cypress 16.2.0 and headless Electron 146. Local OS/runtime: macOS, Node 26.13.0; GitHub used Ubuntu/Node 22.23.5. CPU slowdown is an explicit CDP stress condition, not a claim to reproduce the runner's hardware. The temporary canonical-spec support hook contains only:
+
+```js
+beforeEach(() => cy.then(() => Cypress.automation('remote:debugger:protocol', {
+  command: 'Emulation.setCPUThrottlingRate', params: { rate: 6 },
+})));
+after(() => cy.then(() => Cypress.automation('remote:debugger:protocol', {
+  command: 'Emulation.setCPUThrottlingRate', params: { rate: 1 },
+})));
+```
+
+Saving that hook as `/tmp/jobtrack-jt101-ci263-throttle.js` allows the canonical stress command below to be repeated without the diagnostic tracing. It changes no test timeout, retry, skip, browser-actionability or application setting.
+
+| CI #263 follow-up command/check | Actual result |
+| --- | --- |
+| Unchanged `account-menu.cy.js` + `job-pages.cy.js`, normal headless Electron | **44/44 passed**, 1 minute 3 seconds; the intermittent failure required stress to reproduce locally. |
+| Unchanged account diagnostic, CPU rate 6 | **2/10 passed**, eight failures; menu opens before the redirect commits, then closes on navigation. |
+| Unchanged job diagnostic, CPU rate 6 | **33/34 passed**, 2 minutes 33 seconds; the exact job-role case fails through `openAccountMenu`, as in CI. |
+| Fixed diagnostic copies of both specs, CPU rate 6, same tracing/default assertions | **44/44 passed**, 3 minutes 2 seconds (account 38 seconds; job 2 minutes 23 seconds). |
+| `env -u ELECTRON_RUN_AS_NODE CI=1 npm test -- --browser electron --spec ../tests/e2e/account-menu.cy.js,../tests/e2e/job-pages.cy.js --config supportFile=/tmp/jobtrack-jt101-ci263-throttle.js` | Second CPU-rate-6 run, canonical specs without tracing: **44/44 passed**, 3 minutes 2 seconds (account 36 seconds; job 2 minutes 25 seconds). |
+| `env -u ELECTRON_RUN_AS_NODE CI=1 npm test -- --browser electron` — full run 1 | **278/278 passed**, 11 specs, 5 minutes 39 seconds; no failures, pending or skipped cases. Normal configuration, no diagnostic support file. |
+| Same full command — independent run 2, unchanged code | **278/278 passed**, 11 specs, 5 minutes 39 seconds; no failures, pending or skipped cases. Both previously failing scenarios and both Autocomplete boundary cases pass in each full run. |
+| `npm run test:stack -- --browser electron`, `CI=1`, private admin credentials, existing Compose services | **11/11 passed**, 47 seconds. Real employer registration/profile/verification, publishing, applicant resume validation/application, review, interview, offer acceptance and status history. No service restart or reconfiguration. |
+| `git diff --check` and source/artifact comparisons | Passed. All original account assertions remain; App, AccountMenu and job spec match the starting snapshot. All 51 existing PNG hashes match; report links resolve. |
+| `npm run build` | Passed. Unchanged production bundle: **718.16 kB / 219.50 kB gzip**; existing >500 kB Vite warning retained. |
+| `npm run lint` | Passed. |
+| `npm run typecheck` | Passed. |
+
+Final changes are limited to `tests/e2e/account-menu.js`, `tests/e2e/account-menu.cy.js`, this report and `docs/testing/jt-101/ci263-account-menu-reproduction.json`. The original job-spec source is byte-for-byte unchanged. No screenshots are refreshed: all **51 existing PNG hashes** match the initial snapshot, and the production bundle is unchanged. The diagnostic specs are removed; no additional test cases are left in the normal suite, which remains **278 tests across 11 specs**.
+
+A new GitHub workflow on the reviewed/committed fix is still required to verify the Ubuntu runner. No local result is presented as a GitHub pass. The observed mechanism is confirmed under throttling; finite repeated runs cannot rule out every different runner failure. Commit, staging, push, PR changes, merge and Jira actions are left to the owner as requested.
+
+These are actual timestamps from one throttled local failure, not a latency guarantee. The compact original trace is retained in [ci263-account-menu-reproduction.json](ci263-account-menu-reproduction.json). Temporary diagnostic specs/tracing are removed before the normal suites; no React-internal instrumentation is added to product code.
+
+## Previous CI #262 follow-up: Tags Autocomplete (PR #98)
 
 Baseline for this follow-up: `61c95aff843d5dc20a4685de4cb0cb261c791f9c` on `JT-101-frontend-polish`. The working tree was clean at inspection. Repository-root `AGENTS.md` and the actual [Frontend checks log](https://github.com/jobtrack-cst/jobtrack/actions/runs/44628739496/job/135929423483) were read. CI #262 passed dependency installation, lint, typecheck and build, then passed 276/277 Cypress cases. Its only failure was `job-pages.cy.js`: “retries missing job options and enforces the tag count before saving”. Cypress correctly refused to click the Tags input because the Clear button covered it.
 
@@ -45,7 +101,7 @@ The six new AFTER images below are real element captures of the Tags control wit
 | 1024 px | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-1024.png) |
 | 1280 px | [Tags](screenshots/after/job-pages.cy.js/job-tags-20-1280.png) |
 
-Changed files in this follow-up: `frontend/src/theme.ts`, `tests/e2e/job-pages.cy.js`, this report and the six new PNGs under `screenshots/after/job-pages.cy.js/`. No `JobForm.tsx`, route, data-* selector, API, auth, service, dependency or workflow file changed. GitHub CI #262 remains failed until the owner pushes this fix and a new workflow verifies it. The optional native-zoom helper had one unexplained intermittent failure before successful repeats; it is separate from the passing Cypress GUI/stack commands and remains a verification limitation. Commit, push, PR changes, merge and Jira updates remain owner actions.
+Changed files in this follow-up: `frontend/src/theme.ts`, `tests/e2e/job-pages.cy.js`, this report and the six new PNGs under `screenshots/after/job-pages.cy.js/`. No `JobForm.tsx`, route, data-* selector, API, auth, service, dependency or workflow file changed. The subsequent CI #263 passed both Tags cases; its separate account-menu failures are investigated above. The optional native-zoom helper had one unexplained intermittent failure before successful repeats; it is separate from the passing Cypress GUI/stack commands and remains a verification limitation. Commit, push, PR changes, merge and Jira updates remain owner actions.
 
 Earlier header/account results later in this report are historical results for that pass, not substitutes for this CI follow-up.
 
