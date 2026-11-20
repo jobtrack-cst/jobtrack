@@ -17,6 +17,7 @@ import (
 
 	auditlogv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/audit_log/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/audit-log/internal/adapters/grpc"
@@ -103,7 +104,14 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerAuditLog(d.entries))
+					auditLog := app.NewAuditLog(d.entries)
+					consume := func(ctx context.Context) error {
+						return events.Consume(ctx, rabbitmq.EventsConsumerConfig(cfg.rabbitMQURL, logger, auditLog))
+					}
+					// The consumer stops with the servers, before the database pool closes (JT-72).
+					return runWithConsumer(ctx, consume, func(ctx context.Context) error {
+						return runServers(ctx, cfg, logger, d.checker, registerAuditLog(d.entries))
+					})
 				})
 		})
 }
