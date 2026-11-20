@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,8 +10,12 @@ import (
 	"github.com/jobtrack-cst/jobtrack/services/audit-log/internal/ports"
 )
 
-// AuditLog holds the audit-log use cases. Sprint 1 has only the admin list;
-// recording entries comes with the Sprint 2 event consumer.
+// ErrInvalidEntry marks an event that fails the JT-35 field limits. The
+// consumer dead-letters it, because a retry can never make it valid.
+var ErrInvalidEntry = errors.New("event cannot be recorded as an audit entry")
+
+// AuditLog holds the audit-log use cases: the admin list and recording
+// entries from the event consumer (JT-72).
 type AuditLog struct {
 	repo ports.EntryRepository
 }
@@ -59,4 +64,27 @@ func (s *AuditLog) ListEntries(ctx context.Context, caller domain.Caller, in Lis
 		NextPageToken: page.NextToken(len(entries), total),
 		TotalCount:    total,
 	}, nil
+}
+
+// RecordEntryInput is one consumed event envelope.
+type RecordEntryInput struct {
+	EventID    string
+	EventType  string
+	Producer   string
+	OccurredAt time.Time
+	DataJSON   string
+}
+
+// RecordEntry validates the event with the JT-35 rules and stores it once.
+// recorded is false, with no error, when the event_id was already processed.
+func (s *AuditLog) RecordEntry(ctx context.Context, in RecordEntryInput) (bool, error) {
+	entry, err := domain.NewEntry(in.EventID, in.EventType, in.Producer, in.OccurredAt, in.DataJSON)
+	if err != nil {
+		return false, fmt.Errorf("%w: %w", ErrInvalidEntry, err)
+	}
+	recorded, err := s.repo.RecordEntry(ctx, entry)
+	if err != nil {
+		return false, fmt.Errorf("record audit entry: %w", err)
+	}
+	return recorded, nil
 }
