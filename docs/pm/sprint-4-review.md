@@ -7,8 +7,8 @@
 | Sprint | Sprint 4 (Jira sprint 38), the last sprint |
 | Sprint dates | 17 Nov 09:00 to 20 Nov 23:59 (extended by one day on 19 Nov; planned end 19 Nov 23:59, AGENTS.md Section 15) |
 | Closed in Jira | After the JT-100 pull request merges, before 20 Nov 23:59 |
-| Review and retrospective | Not held as a separate meeting on the last day. Written by Jigden from Jira, UAT and the earlier retrospectives, and reviewed by Phuntsho as Product Owner in the JT-100 pull request |
-| Data source | Jira sprint 38 and issue history, checked on 20 Nov 2026 at 19:10 |
+| Review and retrospective | Not held as a separate meeting on the last day. Written by Jigden from Jira, UAT and the earlier retrospectives. Product Owner review: Phuntsho reviewed PR #101 on 20 Nov and requested corrections; approval pending |
+| Data dates | Jira sprint 38 and issue history read on 20 Nov 2026 at 19:10, when JT-100 was In Review. UAT on 19 Nov 2026, retests on 20 Nov 2026. Test results: end-to-end (JT-95) completed on 18 Nov, load test (JT-96) and test summary (JT-97) on 19 Nov |
 | Related documents | `docs/pm/sprint-3-review.md`, `docs/pm/sprint-4-planning.md`, `docs/pm/earned-value-report.md`, `docs/pm/risk-register.md` (version 1.6), `docs/pm/project-closure-report.md`, `docs/testing/uat-script.md`, `docs/testing/test-summary-report.md`, AGENTS.md (Sections 14 and 15) |
 
 ---
@@ -17,7 +17,7 @@
 
 Goal: End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze. Committed minimum: the Must tasks (39 points).
 
-Outcome: met. All 22 tasks and all 57 points are Done: the 14 Must tasks (39 points) and the 8 Should tasks (18 points). It is the only sprint that finished all of its planned work. JT-100 is counted as Done because this document is part of it; it is Done when its pull request merges. The goal was met only with the one-day extension agreed on 19 Nov.
+Outcome: met, pending the merge of JT-100. At the snapshot 21 of 22 tasks and 54 of 57 points were Done: 13 of the 14 Must tasks (36 of 39 points) and all 8 Should tasks (18 points). The open task is JT-100 (Must, 3 points), which includes this review; it is In Review in PR #101 and is Done when that merges. Projected at the merge: all 22 tasks and 57 points, the only sprint that finishes all of its planned work. The goal was met only with the one-day extension agreed on 19 Nov.
 
 What was delivered:
 
@@ -29,38 +29,39 @@ What was delivered:
 - Cypress end-to-end tests of the main workflow against the running Compose stack (JT-95), the JMeter run with 200 concurrent users (JT-96) and the final test summary report (JT-97).
 - UAT for applicant, employer and admin (JT-99), and fixes for all four bugs it found (JT-105 to JT-108).
 
-Not delivered: nothing. JT-72 (audit-log consumer), last in the slip order, was started on the evening of 20 Nov while JT-100 was in review and merged at 19:07 (PR #102).
+Not delivered: nothing is recorded as not delivered. JT-72 (audit-log consumer), last in the slip order, was started on the evening of 20 Nov while JT-100 was in review and merged at 19:07 (PR #102); it is the last task completed before this review. JT-100 itself is the final item and completes when PR #101 merges.
 
 ---
 
 ## 2. Results
 
-| Measure | Tasks | Story points |
-|---|---|---|
-| Planned | 22 | 57 |
-| Done in Sprint 4 | 22 | 57 |
-| Not delivered | 0 | 0 |
-| Must (High): planned / done | 14 / 14 | 39 / 39 |
-| Should (Medium): planned / done | 8 / 8 | 18 / 18 |
+| Measure | Tasks (snapshot) | Points (snapshot) | Tasks (projected, JT-100 merged) | Points (projected) |
+|---|---|---|---|---|
+| Planned | 22 | 57 | 22 | 57 |
+| Done | 21 | 54 | 22 | 57 |
+| In Review | 1 (JT-100) | 3 | 0 | 0 |
+| Not delivered | 0 | 0 | 0 | 0 |
+| Must (High): planned / done | 14 / 13 | 39 / 36 | 14 / 14 | 39 / 39 |
+| Should (Medium): planned / done | 8 / 8 | 18 / 18 | 8 / 8 | 18 / 18 |
 
-- Velocity (story points Done in the sprint): 57, compared with 43 in Sprint 3, 60 in Sprint 2 (over 5 days), 49 in Sprint 1 and 35 in Sprint 0.
-- Velocity per day: about 14 over 4 days (17 to 20 Nov), the same as Sprint 3.
-- Completion: 22 of 22 tasks and 57 of 57 points (100 percent).
+- Velocity (story points Done in the sprint): 54 at the snapshot (57 when JT-100 merges), compared with 43 in Sprint 3, 60 in Sprint 2 (over 5 days), 49 in Sprint 1 and 35 in Sprint 0.
+- Velocity per day: about 14 over 4 days (17 to 20 Nov), about the same as Sprint 3.
+- Completion: 21 of 22 tasks and 54 of 57 points at the snapshot; 22 of 22 and 57 of 57 projected when JT-100 merges.
 - Hours logged in the sprint: see `docs/pm/earned-value-report.md` Section 3. Sprint 4 had the highest hours per point of any sprint, because it was mostly testing, UAT and documentation and included bug fixes without points.
 - R1 day 2 check (18 Nov, 17:00): 2 of 57 points Done or In Review, below the trigger of 29, so the trigger fired. At midday on 19 Nov 22 of 39 Must points were Done, which led to the one-day extension agreed by Phuntsho and Jigden (JT-67).
 - Work without points in the sprint: JT-104 (SonarQube finding) and the UAT bugs JT-105 to JT-108. Their hours count as actual cost but they add no points.
 
 ### By member
 
-By Jira assignee on 20 Nov.
+By Jira assignee on 20 Nov at 19:10.
 
 | Member | Planned points | Done tasks | Done points | Not delivered | Bugs fixed (no points) |
 |---|---|---|---|---|---|
 | Phuntsho Namgyel | 14 | 5 of 5 (JT-66, JT-73, JT-93, JT-94, JT-101) | 14 | | JT-106, JT-107, JT-108 |
 | Kinley Tobgay Lhendrup | 15 | 5 of 5 (JT-84, JT-95, JT-96, JT-97, JT-103) | 15 | | JT-104 |
-| Jigden Shakya | 16 | 8 of 8 (JT-67, JT-70, JT-72, JT-90, JT-98, JT-99, JT-100, JT-102) | 16 | | |
+| Jigden Shakya | 16 | 7 of 8 (JT-67, JT-70, JT-72, JT-90, JT-98, JT-99, JT-102); JT-100 (3) In Review | 13 (16 when JT-100 merges) | | |
 | Sangay Tenzin | 12 | 4 of 4 (JT-69, JT-71, JT-91, JT-92) | 12 | | JT-105 |
-| Total | 57 | 22 of 22 | 57 | 0 | 5 bugs |
+| Total | 57 | 21 of 22 (JT-100 In Review) | 54 (57 projected) | 0 | 5 bugs |
 
 ---
 
@@ -88,7 +89,7 @@ Owner is the Jira assignee. Status as of 20 Nov 2026, 19:10.
 | JT-97 | Final test summary report: test counts, coverage, SonarQube and defects | Kinley | Must | 2 | Done |
 | JT-98 | Sprint 3 review, Sprint 4 planning record and AGENTS.md update | Jigden | Must | 2 | Done |
 | JT-99 | UAT: test script and sessions for applicant, employer and admin | Jigden | Must | 2 | Done |
-| JT-100 | Final sprint review and retrospective, earned value and project closure report | Jigden | Must | 3 | Done when this pull request merges |
+| JT-100 | Final sprint review and retrospective, earned value and project closure report | Jigden | Must | 3 | In Review (PR #101); Done when it merges |
 | JT-101 | Frontend polish: MUI theme, shared layout and consistent page styling | Phuntsho | Should | 3 | Done |
 | JT-102 | Employer: company logo upload and display | Jigden | Should | 3 | Done (PR #71 and PR #100, including logos on job cards) |
 | JT-103 | Applicant-profile: profile photo upload and display | Kinley | Should | 3 | Done |
@@ -105,7 +106,7 @@ Owner is the Jira assignee. Status as of 20 Nov 2026, 19:10.
 
 ### Not delivered
 
-None. The slip order (JT-66 first, then JT-102 and JT-103, then the other Should tasks; among Jigden's, JT-72 before JT-67 and JT-70) was prepared but in the end no task had to be dropped.
+None. The slip order (JT-66 first, then JT-102 and JT-103, then the other Should tasks; among Jigden's, JT-72 before JT-67 and JT-70) was prepared but in the end no task had to be dropped. JT-100 is not dropped: it is In Review and completes when PR #101 merges.
 
 ### Work outside the sprint
 
@@ -115,7 +116,7 @@ None. The slip order (JT-66 first, then JT-102 and JT-103, then the other Should
 
 ## 4. UAT and known issues
 
-UAT (JT-99, 19 Nov 2026, `docs/testing/uat-script.md`, PR #88): 34 scenarios, 29 Pass, 3 Fail, 2 Not run. The core workflow from employer registration to the accepted offer was verified end to end, and there were no Critical defects.
+UAT (JT-99, sessions on 19 Nov 2026, `docs/testing/uat-script.md`, PR #88): 34 scenarios, 29 Pass, 3 Fail, 2 Not run. The core workflow from employer registration to the accepted offer was verified end to end, and there were no Critical defects.
 
 Not run:
 
@@ -141,8 +142,8 @@ Future improvements (not part of this project):
 
 ## 5. What went well
 
-- Every Must task was finished, including all three Sprint 3 carryover Musts (JT-69, JT-71, JT-73). Sangay finished all four of his Must tasks, including the deployment path JT-71 then JT-92.
-- All 8 Should tasks were delivered as well, so no points were dropped. Sprint 4 is the only sprint that finished all of its planned work.
+- Every Must task except JT-100 (In Review) was finished, including all three Sprint 3 carryover Musts (JT-69, JT-71, JT-73). Sangay finished all four of his Must tasks, including the deployment path JT-71 then JT-92.
+- All 8 Should tasks were delivered as well, so no points were dropped. Once JT-100 merges, Sprint 4 is the only sprint that finished all of its planned work.
 - All 5 functions run on Knative in k3d with their triggers verified (JT-92), meeting the agreed WEB303 deployment scope.
 - The Sprint 3 testing gap was closed: Cypress runs the main workflow against the real Compose stack (JT-95), the 200-user JMeter run finished with 0 errors (JT-96), monitoring is in place (JT-93), and `application` and `application-status` meet the 80 percent coverage target (JT-97).
 - UAT with the Product Owner verified the core workflow, and all four bugs it found were fixed within about a day, including the two that were only expected to be documented.
@@ -180,8 +181,8 @@ These are the final retrospective points. Because there is no next sprint, they 
 
 ## 8. Risks
 
-- R1 (schedule overrun): occurred. The day 2 trigger fired on 18 Nov and Sprint 4 needed a one-day extension; with it, all planned work was finished.
-- R6 (uneven workload): the reassignment on 17 Nov worked; every member finished all their Must tasks.
+- R1 (schedule overrun): occurred. The day 2 trigger fired on 18 Nov and Sprint 4 needed a one-day extension; with it, all planned work except JT-100 (In Review) was finished.
+- R6 (uneven workload): the reassignment on 17 Nov worked; every Must task except JT-100 (In Review) was finished.
 - R2 (Knative and RabbitMQ): all 5 functions were deployed and their triggers verified in k3d (JT-92), and the Compose forwarder for notification-dispatcher was added in JT-105.
 - R8 (load test): the 200-user run finished with 0 errors without straining the host (JT-96).
 - All risks are closed out in `docs/pm/risk-register.md`, version 1.6.
@@ -190,5 +191,6 @@ These are the final retrospective points. Because there is no next sprint, they 
 
 ## 9. Open items at close
 
+- JT-100 (this review) is In Review; the Product Owner's approval of PR #101 is pending.
 - AGENTS.md Section 16 still says notification-dispatcher has no Compose forwarder; JT-105 (PR #90) added it, so that line should be removed in the next AGENTS.md update.
 - Sprint 4 is closed in Jira after this pull request merges.
