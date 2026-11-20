@@ -1,3 +1,4 @@
+import { openAccountMenu } from './account-menu';
 const gateway = 'http://localhost:8000';
 const user = (role = 'ROLE_APPLICANT') => ({ userId: '11111111-1111-4111-8111-111111111111', email: 'pema@example.test', fullName: 'Pema', role });
 // The applicant app bar reads its photo; keep stubbed auth independent of Compose.
@@ -38,6 +39,7 @@ describe('JT-63 authentication and routing', () => {
       cy.window().then((win) => win.history.pushState({}, '', other));
       cy.window().trigger('popstate');
       cy.location('pathname').should('eq', path);
+      openAccountMenu();
       cy.contains('button', 'Log out').click();
       cy.location('pathname').should('eq', '/login');
       cy.reload();

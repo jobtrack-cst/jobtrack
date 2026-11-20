@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { Pager, ResourceState } from '../application/shared';
@@ -61,7 +62,7 @@ export function AdminVerificationPage() {
     {notice && <Alert severity="success">{notice}</Alert>}
     {list.loading && <ResourceState loading error="" />}
     {!list.loading && list.error && <><Alert severity="error">{list.error}</Alert><Button onClick={list.refresh}>Try again</Button></>}
-    {list.data && !list.data.requests?.length && <Typography>No requests on this page.</Typography>}
+    {list.data && !list.data.requests?.length && <EmptyState>No requests on this page.</EmptyState>}
     {list.data?.requests?.map(r => <RequestCard key={r.requestId} request={r} admin>
       <Typography variant="body2">Employer ID: {r.employerId}</Typography>
       <CompanyDetails employerId={r.employerId} />
@@ -84,7 +85,7 @@ export function AdminVerificationPage() {
       </Stack></DialogContent>
       <DialogActions>
         <Button disabled={busy} onClick={() => setDecision(undefined)}>Cancel</Button>
-        <Button disabled={busy || !canConfirm} onClick={() => void decide()}>{decision?.approve ? 'Confirm approval' : 'Confirm rejection'}</Button>
+        <Button variant="contained" color={decision?.approve ? 'success' : 'error'} disabled={busy || !canConfirm} onClick={() => void decide()}>{decision?.approve ? 'Confirm approval' : 'Confirm rejection'}</Button>
       </DialogActions>
     </Dialog>
   </Stack>;

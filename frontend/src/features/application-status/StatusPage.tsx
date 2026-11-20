@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Button, Chip, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { useParams } from 'react-router';
@@ -27,13 +28,13 @@ function StatusView({ applicationId }: { applicationId: string }) {
     <Typography variant="body2">Application: {applicationId}</Typography>
     <Button disabled={status.loading || history.loading} onClick={() => { status.refresh(); history.refresh(); }}>Refresh status</Button>
     <ResourceState loading={status.loading} error={status.error} />
-    {record && <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+    {record && <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', p: 2.5, bgcolor: '#e9f0e3', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
       <Typography>Current status:</Typography><Chip label={statusLabel(record.status)} color="primary" />
       <Typography variant="body2">since {formatTime(record.timestamps?.updatedAt)}</Typography>
     </Stack>}
     <Typography variant="h6" component="h2">History</Typography>
     <ResourceState loading={history.loading} error={status.error ? '' : history.error} />
-    {history.data && !history.data.entries?.length && <Typography>No history on this page.</Typography>}
+    {history.data && !history.data.entries?.length && <EmptyState>No history on this page.</EmptyState>}
     {!!history.data?.entries?.length && <Table size="small" aria-label="Status history"><TableHead><TableRow>
       <TableCell>From</TableCell><TableCell>To</TableCell><TableCell>When</TableCell>
     </TableRow></TableHead><TableBody>

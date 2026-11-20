@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, CircularProgress, Stack } from '@mui/material';
+import { Alert, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import { ApiError } from '../../api/client';
 
 export const idPath = (id: string) => encodeURIComponent(id);
@@ -33,8 +33,8 @@ export function useResource<T>(load: () => Promise<T>, dependencies: unknown[]) 
   return { data, error, loading, refresh: () => setRevision(n => n + 1) };
 }
 export function ResourceState({ loading, error }: { loading: boolean; error: string }) {
-  return <>{loading && <CircularProgress aria-label="Loading" size={24} />}{error && <Alert severity="error">{error}</Alert>}</>;
+  return <>{loading && <Stack direction="row" spacing={1.5} alignItems="center" role="status" sx={{ py: 2 }}><CircularProgress aria-label="Loading" size={22} /><Typography variant="body2" color="text.secondary">Loading…</Typography></Stack>}{error && <Alert severity="error">{error}</Alert>}</>;
 }
 export function Pager({ next, token, busy, onPage }: { next?: string; token: string; busy: boolean; onPage: (token: string) => void }) {
-  return <Stack direction="row" spacing={2}><Button disabled={busy || !token} onClick={() => onPage('')}>First page</Button><Button disabled={busy || !next} onClick={() => onPage(next!)}>Next page</Button></Stack>;
+  return <Stack direction="row" spacing={1} sx={{ pt: 2, mt: 1, borderTop: '1px solid', borderColor: 'divider', flexWrap: 'wrap' }}><Button variant="outlined" disabled={busy || !token} onClick={() => onPage('')}>First page</Button><Button variant="outlined" disabled={busy || !next} onClick={() => onPage(next!)}>Next page</Button></Stack>;
 }

@@ -1,0 +1,343 @@
+{
+  "baseline": "6148595e380dee5e06844a2b5a0ca023a8c9f7c6",
+  "conditions": "CI=1; headless Electron 146; CDP CPU throttling rate 6; default 4000ms assertions; temporary tracing only",
+  "case": "JT-101 applicant account shows only authorized actions, fits five widths and logs out",
+  "trace": [
+    {
+      "event": "replaceState",
+      "url": "/applicant",
+      "key": "z6k6wdut",
+      "expanded": "false",
+      "menu": false,
+      "workspace": false,
+      "route": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "identity": false,
+      "at": 1598
+    },
+    {
+      "event": "mutation",
+      "url": "/applicant",
+      "key": "z6k6wdut",
+      "expanded": "false",
+      "menu": false,
+      "workspace": false,
+      "route": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "identity": false,
+      "at": 1601
+    },
+    {
+      "event": "click account-menu-button",
+      "url": "/applicant",
+      "key": "z6k6wdut",
+      "expanded": "false",
+      "menu": false,
+      "workspace": false,
+      "route": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "identity": false,
+      "at": 1755
+    },
+    {
+      "event": "mutation",
+      "url": "/applicant",
+      "key": "z6k6wdut",
+      "expanded": "true",
+      "menu": true,
+      "workspace": false,
+      "route": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "selected": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "identity": true,
+      "at": 1848
+    },
+    {
+      "event": "mutation",
+      "url": "/applicant",
+      "key": "z6k6wdut",
+      "expanded": "false",
+      "menu": true,
+      "workspace": true,
+      "route": {
+        "pathname": "/applicant",
+        "search": "",
+        "hash": "",
+        "key": "z6k6wdut"
+      },
+      "selected": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "identity": false,
+      "at": 2109
+    },
+    {
+      "event": "mutation",
+      "url": "/applicant",
+      "key": "z6k6wdut",
+      "expanded": "false",
+      "menu": true,
+      "workspace": true,
+      "route": {
+        "pathname": "/applicant",
+        "search": "",
+        "hash": "",
+        "key": "z6k6wdut"
+      },
+      "selected": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "identity": false,
+      "at": 2130
+    },
+    {
+      "event": "mutation",
+      "url": "/applicant",
+      "key": "z6k6wdut",
+      "expanded": "false",
+      "menu": false,
+      "workspace": true,
+      "route": {
+        "pathname": "/applicant",
+        "search": "",
+        "hash": "",
+        "key": "z6k6wdut"
+      },
+      "selected": {
+        "pathname": "/login",
+        "search": "",
+        "hash": "",
+        "key": "default"
+      },
+      "identity": false,
+      "at": 2261
+    }
+  ],
+  "jobRouteCase": {
+    "case": "restricts job routes and navigation to the correct role",
+    "trace": [
+      {
+        "event": "mutation",
+        "url": "/employer/jobs",
+        "expanded": "false",
+        "menu": false,
+        "workspace": true,
+        "route": {
+          "pathname": "/login",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "identity": false,
+        "at": 1219
+      },
+      {
+        "event": "mutation",
+        "url": "/employer/jobs",
+        "expanded": "false",
+        "menu": false,
+        "workspace": false,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "kq596871"
+        },
+        "identity": false,
+        "at": 1334
+      },
+      {
+        "event": "replaceState",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "false",
+        "menu": false,
+        "workspace": false,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "kq596871"
+        },
+        "identity": false,
+        "at": 1353
+      },
+      {
+        "event": "click account-menu-button",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "false",
+        "menu": false,
+        "workspace": false,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "1v79wqdy"
+        },
+        "identity": false,
+        "at": 1455
+      },
+      {
+        "event": "mutation",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "true",
+        "menu": true,
+        "workspace": false,
+        "route": {
+          "pathname": "/employer/jobs",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "selected": {
+          "pathname": "/employer/jobs",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "identity": true,
+        "at": 1532
+      },
+      {
+        "event": "mutation",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "false",
+        "menu": true,
+        "workspace": true,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "1v79wqdy"
+        },
+        "selected": {
+          "pathname": "/employer/jobs",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "identity": false,
+        "at": 1908
+      },
+      {
+        "event": "mutation",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "false",
+        "menu": true,
+        "workspace": true,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "1v79wqdy"
+        },
+        "selected": {
+          "pathname": "/employer/jobs",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "identity": false,
+        "at": 1928
+      },
+      {
+        "event": "mutation",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "false",
+        "menu": false,
+        "workspace": true,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "1v79wqdy"
+        },
+        "selected": {
+          "pathname": "/employer/jobs",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "identity": false,
+        "at": 2062
+      },
+      {
+        "event": "mutation",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "false",
+        "menu": false,
+        "workspace": true,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "1v79wqdy"
+        },
+        "selected": {
+          "pathname": "/employer/jobs",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "identity": false,
+        "at": 5627
+      },
+      {
+        "event": "mutation",
+        "url": "/applicant",
+        "key": "1v79wqdy",
+        "expanded": "false",
+        "menu": false,
+        "workspace": true,
+        "route": {
+          "pathname": "/applicant",
+          "search": "",
+          "hash": "",
+          "key": "1v79wqdy"
+        },
+        "selected": {
+          "pathname": "/employer/jobs",
+          "search": "",
+          "hash": "",
+          "key": "default"
+        },
+        "identity": false,
+        "at": 5823
+      }
+    ]
+  },
+  "traceNotes": "Temporary read-only fiber snapshots can sample alternate render fibers. Conclusions use actual DOM workspace/aria flags and the selected location captured by the opened menu, not every sampled context row in isolation."
+}
