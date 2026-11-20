@@ -9,6 +9,7 @@ import { alertReferences } from '../job-alert/api';
 import { SaveJobButton } from '../saved-jobs/SaveJobButton';
 import { emptyFilters, searchJobs } from './api';
 import { PageHeader } from '../../components/PageHeader';
+import { JobCompany } from '../employer/JobCompany';
 
 const messages = { 3: 'The search filters were not accepted. Check your filters and try again.' };
 export function SearchJobsPage() {
@@ -46,6 +47,7 @@ export function SearchJobsPage() {
           <Typography variant="overline" color="text.secondary">Opportunity</Typography>{job.location && <Chip label={job.location} variant="outlined" color="secondary" />}
         </Stack>
         <Typography variant="h6" component="h2">{job.title}</Typography>
+        <JobCompany employerId={job.employerId} />
         <Typography variant="body2" color="text.secondary">Deadline: {formatTime(job.deadline)}</Typography>
         <Stack className="record-actions"><Button variant="outlined" component={Link} to={`/applicant/jobs/${job.jobId}`}>View job</Button><SaveJobButton jobId={job.jobId} /></Stack>
       </Stack></CardContent></Card>)}

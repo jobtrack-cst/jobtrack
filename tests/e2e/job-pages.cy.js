@@ -3,6 +3,8 @@ import { openAccountMenu } from './account-menu';
 const gateway = 'http://localhost:8000';
 // Keep the applicant app-bar photo request independent of a running gateway.
 beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
+// JT-102 job cards read company profiles; keep them independent of a running gateway.
+beforeEach(() => cy.intercept('GET', `${gateway}/v1/companies/**`, { statusCode: 404, body: { code: 5 } }));
 const jobId = '22222222-2222-4222-8222-222222222222';
 const categoryId = '33333333-3333-4333-8333-333333333333';
 const tagId = '44444444-4444-4444-8444-444444444444';
