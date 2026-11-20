@@ -3,11 +3,14 @@ package grpc
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"os"
 	"strconv"
 
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
 	jobalertv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_alert/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
+	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/job-alert/internal/domain"
 	"google.golang.org/grpc/codes"
@@ -18,9 +21,16 @@ import (
 type AlertHandler struct {
 	jobalertv1.UnimplementedJobAlertServiceServer
 	alerts *app.Alerts
+	logger *slog.Logger
 }
 
-func NewAlertHandler(alerts *app.Alerts) *AlertHandler { return &AlertHandler{alerts: alerts} }
+func NewAlertHandler(alerts *app.Alerts, loggers ...*slog.Logger) *AlertHandler {
+	logger := logging.New("job-alert", os.Stdout)
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	return &AlertHandler{alerts: alerts, logger: logger}
+}
 func callerFrom(ctx context.Context) (domain.Caller, error) {
 	identity, ok := authctx.FromContext(ctx)
 	if !ok {
@@ -31,28 +41,28 @@ func callerFrom(ctx context.Context) (domain.Caller, error) {
 func (h *AlertHandler) CreateJobAlert(ctx context.Context, req *jobalertv1.CreateJobAlertRequest) (*jobalertv1.CreateJobAlertResponse, error) {
 	c, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobalertv1.JobAlertService_CreateJobAlert_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
 	a, err := h.alerts.Create(ctx, c, req.GetCategoryIds(), req.GetTagIds(), req.GetLocation())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobalertv1.JobAlertService_CreateJobAlert_FullMethodName, err, toStatus(err))
 	}
 	return &jobalertv1.CreateJobAlertResponse{JobAlert: alertToProto(a)}, nil
 }
 func (h *AlertHandler) ListMyJobAlerts(ctx context.Context, req *jobalertv1.ListMyJobAlertsRequest) (*jobalertv1.ListMyJobAlertsResponse, error) {
 	c, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobalertv1.JobAlertService_ListMyJobAlerts_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
 	alerts, total, page, err := h.alerts.List(ctx, c, req.GetPagination().GetPageSize(), req.GetPagination().GetPageToken())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobalertv1.JobAlertService_ListMyJobAlerts_FullMethodName, err, toStatus(err))
 	}
 	out := &jobalertv1.ListMyJobAlertsResponse{JobAlerts: make([]*jobalertv1.JobAlert, 0, len(alerts)), Pagination: &commonv1.PaginationResponse{TotalCount: total}}
 	for _, a := range alerts {
@@ -67,13 +77,13 @@ func (h *AlertHandler) ListMyJobAlerts(ctx context.Context, req *jobalertv1.List
 func (h *AlertHandler) DeleteJobAlert(ctx context.Context, req *jobalertv1.DeleteJobAlertRequest) (*jobalertv1.DeleteJobAlertResponse, error) {
 	c, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobalertv1.JobAlertService_DeleteJobAlert_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
 	if err = h.alerts.Delete(ctx, c, req.GetAlertId()); err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobalertv1.JobAlertService_DeleteJobAlert_FullMethodName, err, toStatus(err))
 	}
 	return &jobalertv1.DeleteJobAlertResponse{}, nil
 }

@@ -22,9 +22,13 @@ var (
 	ErrTooManySkills        = errors.New("skills must have at most 50 entries")
 	ErrInvalidSkill         = errors.New("each skill must be 1 to 50 characters on one line")
 	ErrDuplicateSkill       = errors.New("skills must not repeat (compared ignoring case and surrounding spaces)")
+	ErrInvalidPhotoSize     = errors.New("photo must be 1 to 1000000 bytes")
+	ErrInvalidPhotoType     = errors.New("photo content_type must be image/jpeg or image/png")
+	ErrInvalidPhotoContent  = errors.New("photo content does not match its content_type")
 
 	// NOT_FOUND
 	ErrProfileNotFound = errors.New("applicant profile not found")
+	ErrPhotoNotFound   = errors.New("profile photo not found")
 
 	// ALREADY_EXISTS
 	ErrProfileExists = errors.New("applicant profile already exists")

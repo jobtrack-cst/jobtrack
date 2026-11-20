@@ -51,6 +51,9 @@ type Profile struct {
 	ProfileContent
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// HasPhoto only says whether a photo is stored; the bytes are read
+	// separately through GetPhoto (JT-103).
+	HasPhoto bool
 }
 
 // NewProfileContent applies the JT-50 rules. now supplies the current year

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	employerv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/employer/v1"
+	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/job-posting/internal/ports"
 	"google.golang.org/grpc/codes"
@@ -34,7 +35,7 @@ func (c *EmployerClient) IsVerified(ctx context.Context, employerID string) (boo
 		return false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("%w: GetCompanyProfile returned %s", domain.ErrEmployerCheckFailed, status.Code(err))
+		return false, logging.InternalError("GetCompanyProfile failed", employerRPCError{code: status.Code(err)})
 	}
 	switch s := resp.GetProfile().GetVerificationStatus(); s {
 	case employerv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED:
@@ -43,6 +44,16 @@ func (c *EmployerClient) IsVerified(ctx context.Context, employerID string) (boo
 		employerv1.VerificationStatus_VERIFICATION_STATUS_REJECTED:
 		return false, nil
 	default:
-		return false, fmt.Errorf("%w: unexpected verification status %d", domain.ErrEmployerCheckFailed, s)
+		return false, logging.InternalError("GetCompanyProfile returned unexpected verification status", domain.ErrEmployerCheckFailed)
 	}
 }
+
+// Keep only the downstream code and the domain sentinel, never its message or
+// details. The logger can inspect this wrapped code without rendering Error().
+type employerRPCError struct{ code codes.Code }
+
+func (e employerRPCError) Error() string {
+	return fmt.Sprintf("%s: GetCompanyProfile returned %s", domain.ErrEmployerCheckFailed, e.code)
+}
+func (e employerRPCError) Unwrap() error              { return domain.ErrEmployerCheckFailed }
+func (e employerRPCError) GRPCStatus() *status.Status { return status.New(e.code, "") }

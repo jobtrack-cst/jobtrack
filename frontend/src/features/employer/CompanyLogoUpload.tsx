@@ -51,7 +51,7 @@ export function CompanyLogoUpload({ profile, onUploaded }: Props) {
     }
   }
 
-  return <Stack spacing={1}>
+  return <Stack spacing={1.5} sx={{ p: 2.5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '14px' }}>
     <Typography variant="h6" component="h2">Company logo</Typography>
     <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
       <CompanyLogo employerId={profile.employerId} name={profile.companyName} hasLogo={hasLogo} size={72} version={version} />

@@ -199,9 +199,9 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 	requestMetrics := requestmetrics.New("application")
 	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor()))
 	for _, service := range services {
-		applicationv1.RegisterApplicationServiceServer(grpcServer, grpcadapter.NewApplicationHandler(service))
+		applicationv1.RegisterApplicationServiceServer(grpcServer, grpcadapter.NewApplicationHandler(service, logger))
 	}
-	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker, logger))
 	requestMetrics.RegisterGRPC(grpcServer)
 	httpServer := &http.Server{Handler: healthHandler(checker, requestMetrics), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)

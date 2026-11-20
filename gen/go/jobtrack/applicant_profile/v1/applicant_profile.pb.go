@@ -26,11 +26,13 @@ const (
 type ApplicantProfile struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Applicant user ID represented as a UUID string.
-	ApplicantId   string                 `protobuf:"bytes,1,opt,name=applicant_id,json=applicantId,proto3" json:"applicant_id,omitempty"`
-	Summary       string                 `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
-	Education     []*Education           `protobuf:"bytes,3,rep,name=education,proto3" json:"education,omitempty"`
-	Skills        []string               `protobuf:"bytes,4,rep,name=skills,proto3" json:"skills,omitempty"`
-	Timestamps    *v1.ResourceTimestamps `protobuf:"bytes,5,opt,name=timestamps,proto3" json:"timestamps,omitempty"`
+	ApplicantId string                 `protobuf:"bytes,1,opt,name=applicant_id,json=applicantId,proto3" json:"applicant_id,omitempty"`
+	Summary     string                 `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
+	Education   []*Education           `protobuf:"bytes,3,rep,name=education,proto3" json:"education,omitempty"`
+	Skills      []string               `protobuf:"bytes,4,rep,name=skills,proto3" json:"skills,omitempty"`
+	Timestamps  *v1.ResourceTimestamps `protobuf:"bytes,5,opt,name=timestamps,proto3" json:"timestamps,omitempty"`
+	// True when a photo is stored. Profile reads never include the image bytes.
+	HasPhoto      bool `protobuf:"varint,6,opt,name=has_photo,json=hasPhoto,proto3" json:"has_photo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -98,6 +100,13 @@ func (x *ApplicantProfile) GetTimestamps() *v1.ResourceTimestamps {
 		return x.Timestamps
 	}
 	return nil
+}
+
+func (x *ApplicantProfile) GetHasPhoto() bool {
+	if x != nil {
+		return x.HasPhoto
+	}
+	return false
 }
 
 type Education struct {
@@ -456,11 +465,196 @@ func (x *UpdateMyProfileResponse) GetProfile() *ApplicantProfile {
 	return nil
 }
 
+type PutMyProfilePhotoRequest struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ContentType string                 `protobuf:"bytes,1,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	// Protobuf JSON uses base64; size, type and signature are runtime checks.
+	Content       []byte `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutMyProfilePhotoRequest) Reset() {
+	*x = PutMyProfilePhotoRequest{}
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutMyProfilePhotoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutMyProfilePhotoRequest) ProtoMessage() {}
+
+func (x *PutMyProfilePhotoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutMyProfilePhotoRequest.ProtoReflect.Descriptor instead.
+func (*PutMyProfilePhotoRequest) Descriptor() ([]byte, []int) {
+	return file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *PutMyProfilePhotoRequest) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *PutMyProfilePhotoRequest) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+type PutMyProfilePhotoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *ApplicantProfile      `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutMyProfilePhotoResponse) Reset() {
+	*x = PutMyProfilePhotoResponse{}
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutMyProfilePhotoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutMyProfilePhotoResponse) ProtoMessage() {}
+
+func (x *PutMyProfilePhotoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutMyProfilePhotoResponse.ProtoReflect.Descriptor instead.
+func (*PutMyProfilePhotoResponse) Descriptor() ([]byte, []int) {
+	return file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *PutMyProfilePhotoResponse) GetProfile() *ApplicantProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type GetMyProfilePhotoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyProfilePhotoRequest) Reset() {
+	*x = GetMyProfilePhotoRequest{}
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyProfilePhotoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyProfilePhotoRequest) ProtoMessage() {}
+
+func (x *GetMyProfilePhotoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyProfilePhotoRequest.ProtoReflect.Descriptor instead.
+func (*GetMyProfilePhotoRequest) Descriptor() ([]byte, []int) {
+	return file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDescGZIP(), []int{10}
+}
+
+type GetMyProfilePhotoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ContentType   string                 `protobuf:"bytes,1,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyProfilePhotoResponse) Reset() {
+	*x = GetMyProfilePhotoResponse{}
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyProfilePhotoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyProfilePhotoResponse) ProtoMessage() {}
+
+func (x *GetMyProfilePhotoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyProfilePhotoResponse.ProtoReflect.Descriptor instead.
+func (*GetMyProfilePhotoResponse) Descriptor() ([]byte, []int) {
+	return file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetMyProfilePhotoResponse) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *GetMyProfilePhotoResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 var File_jobtrack_applicant_profile_v1_applicant_profile_proto protoreflect.FileDescriptor
 
 const file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDesc = "" +
 	"\n" +
-	"5jobtrack/applicant_profile/v1/applicant_profile.proto\x12\x1djobtrack.applicant_profile.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fjobtrack/common/v1/common.proto\"\xf7\x01\n" +
+	"5jobtrack/applicant_profile/v1/applicant_profile.proto\x12\x1djobtrack.applicant_profile.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fjobtrack/common/v1/common.proto\"\x94\x02\n" +
 	"\x10ApplicantProfile\x12!\n" +
 	"\fapplicant_id\x18\x01 \x01(\tR\vapplicantId\x12\x18\n" +
 	"\asummary\x18\x02 \x01(\tR\asummary\x12F\n" +
@@ -468,7 +662,8 @@ const file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDesc = "" +
 	"\x06skills\x18\x04 \x03(\tR\x06skills\x12F\n" +
 	"\n" +
 	"timestamps\x18\x05 \x01(\v2&.jobtrack.common.v1.ResourceTimestampsR\n" +
-	"timestamps\"\x8d\x01\n" +
+	"timestamps\x12\x1b\n" +
+	"\thas_photo\x18\x06 \x01(\bR\bhasPhoto\"\x8d\x01\n" +
 	"\tEducation\x12 \n" +
 	"\vinstitution\x18\x01 \x01(\tR\vinstitution\x12$\n" +
 	"\rqualification\x18\x02 \x01(\tR\rqualification\x12\x1d\n" +
@@ -489,11 +684,22 @@ const file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDesc = "" +
 	"\teducation\x18\x02 \x03(\v2(.jobtrack.applicant_profile.v1.EducationR\teducation\x12\x16\n" +
 	"\x06skills\x18\x03 \x03(\tR\x06skills\"d\n" +
 	"\x17UpdateMyProfileResponse\x12I\n" +
-	"\aprofile\x18\x01 \x01(\v2/.jobtrack.applicant_profile.v1.ApplicantProfileR\aprofile2\xfc\x03\n" +
+	"\aprofile\x18\x01 \x01(\v2/.jobtrack.applicant_profile.v1.ApplicantProfileR\aprofile\"W\n" +
+	"\x18PutMyProfilePhotoRequest\x12!\n" +
+	"\fcontent_type\x18\x01 \x01(\tR\vcontentType\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\"f\n" +
+	"\x19PutMyProfilePhotoResponse\x12I\n" +
+	"\aprofile\x18\x01 \x01(\v2/.jobtrack.applicant_profile.v1.ApplicantProfileR\aprofile\"\x1a\n" +
+	"\x18GetMyProfilePhotoRequest\"X\n" +
+	"\x19GetMyProfilePhotoResponse\x12!\n" +
+	"\fcontent_type\x18\x01 \x01(\tR\vcontentType\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent2\xdb\x06\n" +
 	"\x17ApplicantProfileService\x12\xa2\x01\n" +
 	"\x0fCreateMyProfile\x125.jobtrack.applicant_profile.v1.CreateMyProfileRequest\x1a6.jobtrack.applicant_profile.v1.CreateMyProfileResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/v1/applicant/profile\x12\x96\x01\n" +
 	"\fGetMyProfile\x122.jobtrack.applicant_profile.v1.GetMyProfileRequest\x1a3.jobtrack.applicant_profile.v1.GetMyProfileResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/applicant/profile\x12\xa2\x01\n" +
-	"\x0fUpdateMyProfile\x125.jobtrack.applicant_profile.v1.UpdateMyProfileRequest\x1a6.jobtrack.applicant_profile.v1.UpdateMyProfileResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\x1a\x15/v1/applicant/profileBZZXgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/applicant_profile/v1;applicantprofilev1b\x06proto3"
+	"\x0fUpdateMyProfile\x125.jobtrack.applicant_profile.v1.UpdateMyProfileRequest\x1a6.jobtrack.applicant_profile.v1.UpdateMyProfileResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\x1a\x15/v1/applicant/profile\x12\xae\x01\n" +
+	"\x11PutMyProfilePhoto\x127.jobtrack.applicant_profile.v1.PutMyProfilePhotoRequest\x1a8.jobtrack.applicant_profile.v1.PutMyProfilePhotoResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\x1a\x1b/v1/applicant/profile/photo\x12\xab\x01\n" +
+	"\x11GetMyProfilePhoto\x127.jobtrack.applicant_profile.v1.GetMyProfilePhotoRequest\x1a8.jobtrack.applicant_profile.v1.GetMyProfilePhotoResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/v1/applicant/profile/photoBZZXgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/applicant_profile/v1;applicantprofilev1b\x06proto3"
 
 var (
 	file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDescOnce sync.Once
@@ -507,37 +713,46 @@ func file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDescGZIP() []
 	return file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDescData
 }
 
-var file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_jobtrack_applicant_profile_v1_applicant_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_jobtrack_applicant_profile_v1_applicant_profile_proto_goTypes = []any{
-	(*ApplicantProfile)(nil),        // 0: jobtrack.applicant_profile.v1.ApplicantProfile
-	(*Education)(nil),               // 1: jobtrack.applicant_profile.v1.Education
-	(*CreateMyProfileRequest)(nil),  // 2: jobtrack.applicant_profile.v1.CreateMyProfileRequest
-	(*CreateMyProfileResponse)(nil), // 3: jobtrack.applicant_profile.v1.CreateMyProfileResponse
-	(*GetMyProfileRequest)(nil),     // 4: jobtrack.applicant_profile.v1.GetMyProfileRequest
-	(*GetMyProfileResponse)(nil),    // 5: jobtrack.applicant_profile.v1.GetMyProfileResponse
-	(*UpdateMyProfileRequest)(nil),  // 6: jobtrack.applicant_profile.v1.UpdateMyProfileRequest
-	(*UpdateMyProfileResponse)(nil), // 7: jobtrack.applicant_profile.v1.UpdateMyProfileResponse
-	(*v1.ResourceTimestamps)(nil),   // 8: jobtrack.common.v1.ResourceTimestamps
+	(*ApplicantProfile)(nil),          // 0: jobtrack.applicant_profile.v1.ApplicantProfile
+	(*Education)(nil),                 // 1: jobtrack.applicant_profile.v1.Education
+	(*CreateMyProfileRequest)(nil),    // 2: jobtrack.applicant_profile.v1.CreateMyProfileRequest
+	(*CreateMyProfileResponse)(nil),   // 3: jobtrack.applicant_profile.v1.CreateMyProfileResponse
+	(*GetMyProfileRequest)(nil),       // 4: jobtrack.applicant_profile.v1.GetMyProfileRequest
+	(*GetMyProfileResponse)(nil),      // 5: jobtrack.applicant_profile.v1.GetMyProfileResponse
+	(*UpdateMyProfileRequest)(nil),    // 6: jobtrack.applicant_profile.v1.UpdateMyProfileRequest
+	(*UpdateMyProfileResponse)(nil),   // 7: jobtrack.applicant_profile.v1.UpdateMyProfileResponse
+	(*PutMyProfilePhotoRequest)(nil),  // 8: jobtrack.applicant_profile.v1.PutMyProfilePhotoRequest
+	(*PutMyProfilePhotoResponse)(nil), // 9: jobtrack.applicant_profile.v1.PutMyProfilePhotoResponse
+	(*GetMyProfilePhotoRequest)(nil),  // 10: jobtrack.applicant_profile.v1.GetMyProfilePhotoRequest
+	(*GetMyProfilePhotoResponse)(nil), // 11: jobtrack.applicant_profile.v1.GetMyProfilePhotoResponse
+	(*v1.ResourceTimestamps)(nil),     // 12: jobtrack.common.v1.ResourceTimestamps
 }
 var file_jobtrack_applicant_profile_v1_applicant_profile_proto_depIdxs = []int32{
 	1,  // 0: jobtrack.applicant_profile.v1.ApplicantProfile.education:type_name -> jobtrack.applicant_profile.v1.Education
-	8,  // 1: jobtrack.applicant_profile.v1.ApplicantProfile.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
+	12, // 1: jobtrack.applicant_profile.v1.ApplicantProfile.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
 	1,  // 2: jobtrack.applicant_profile.v1.CreateMyProfileRequest.education:type_name -> jobtrack.applicant_profile.v1.Education
 	0,  // 3: jobtrack.applicant_profile.v1.CreateMyProfileResponse.profile:type_name -> jobtrack.applicant_profile.v1.ApplicantProfile
 	0,  // 4: jobtrack.applicant_profile.v1.GetMyProfileResponse.profile:type_name -> jobtrack.applicant_profile.v1.ApplicantProfile
 	1,  // 5: jobtrack.applicant_profile.v1.UpdateMyProfileRequest.education:type_name -> jobtrack.applicant_profile.v1.Education
 	0,  // 6: jobtrack.applicant_profile.v1.UpdateMyProfileResponse.profile:type_name -> jobtrack.applicant_profile.v1.ApplicantProfile
-	2,  // 7: jobtrack.applicant_profile.v1.ApplicantProfileService.CreateMyProfile:input_type -> jobtrack.applicant_profile.v1.CreateMyProfileRequest
-	4,  // 8: jobtrack.applicant_profile.v1.ApplicantProfileService.GetMyProfile:input_type -> jobtrack.applicant_profile.v1.GetMyProfileRequest
-	6,  // 9: jobtrack.applicant_profile.v1.ApplicantProfileService.UpdateMyProfile:input_type -> jobtrack.applicant_profile.v1.UpdateMyProfileRequest
-	3,  // 10: jobtrack.applicant_profile.v1.ApplicantProfileService.CreateMyProfile:output_type -> jobtrack.applicant_profile.v1.CreateMyProfileResponse
-	5,  // 11: jobtrack.applicant_profile.v1.ApplicantProfileService.GetMyProfile:output_type -> jobtrack.applicant_profile.v1.GetMyProfileResponse
-	7,  // 12: jobtrack.applicant_profile.v1.ApplicantProfileService.UpdateMyProfile:output_type -> jobtrack.applicant_profile.v1.UpdateMyProfileResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	0,  // 7: jobtrack.applicant_profile.v1.PutMyProfilePhotoResponse.profile:type_name -> jobtrack.applicant_profile.v1.ApplicantProfile
+	2,  // 8: jobtrack.applicant_profile.v1.ApplicantProfileService.CreateMyProfile:input_type -> jobtrack.applicant_profile.v1.CreateMyProfileRequest
+	4,  // 9: jobtrack.applicant_profile.v1.ApplicantProfileService.GetMyProfile:input_type -> jobtrack.applicant_profile.v1.GetMyProfileRequest
+	6,  // 10: jobtrack.applicant_profile.v1.ApplicantProfileService.UpdateMyProfile:input_type -> jobtrack.applicant_profile.v1.UpdateMyProfileRequest
+	8,  // 11: jobtrack.applicant_profile.v1.ApplicantProfileService.PutMyProfilePhoto:input_type -> jobtrack.applicant_profile.v1.PutMyProfilePhotoRequest
+	10, // 12: jobtrack.applicant_profile.v1.ApplicantProfileService.GetMyProfilePhoto:input_type -> jobtrack.applicant_profile.v1.GetMyProfilePhotoRequest
+	3,  // 13: jobtrack.applicant_profile.v1.ApplicantProfileService.CreateMyProfile:output_type -> jobtrack.applicant_profile.v1.CreateMyProfileResponse
+	5,  // 14: jobtrack.applicant_profile.v1.ApplicantProfileService.GetMyProfile:output_type -> jobtrack.applicant_profile.v1.GetMyProfileResponse
+	7,  // 15: jobtrack.applicant_profile.v1.ApplicantProfileService.UpdateMyProfile:output_type -> jobtrack.applicant_profile.v1.UpdateMyProfileResponse
+	9,  // 16: jobtrack.applicant_profile.v1.ApplicantProfileService.PutMyProfilePhoto:output_type -> jobtrack.applicant_profile.v1.PutMyProfilePhotoResponse
+	11, // 17: jobtrack.applicant_profile.v1.ApplicantProfileService.GetMyProfilePhoto:output_type -> jobtrack.applicant_profile.v1.GetMyProfilePhotoResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_jobtrack_applicant_profile_v1_applicant_profile_proto_init() }
@@ -551,7 +766,7 @@ func file_jobtrack_applicant_profile_v1_applicant_profile_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDesc), len(file_jobtrack_applicant_profile_v1_applicant_profile_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

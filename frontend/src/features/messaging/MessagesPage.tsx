@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { useParams } from 'react-router';
@@ -24,16 +25,17 @@ export function MessagesPage() {
   return <Stack spacing={2}>
     <Typography variant="h4" component="h1">Application messages</Typography><Typography>Application: {applicationId}</Typography>
     <Button disabled={busy || resource.loading} onClick={resource.refresh}>Refresh messages</Button><ResourceState {...resource} />
-    {resource.data && !resource.data.messages?.length && <Typography>No messages on this page.</Typography>}
-    {resource.data?.messages?.map(m => <Card key={m.messageId}><CardContent>
-      <Typography>{m.senderId === session?.user.userId ? 'You' : 'Other participant'}{m.timestamps?.createdAt ? ` · ${new Date(m.timestamps.createdAt).toLocaleString()}` : ''}</Typography>
-      <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.content}</Typography>
+    {resource.data && !resource.data.messages?.length && <EmptyState>No messages on this page.</EmptyState>}
+    {resource.data?.messages?.map(m => <Card key={m.messageId} sx={{ ml: m.senderId === session?.user.userId ? { xs: 2, sm: 8 } : 0,
+      mr: m.senderId === session?.user.userId ? 0 : { xs: 2, sm: 8 }, bgcolor: m.senderId === session?.user.userId ? '#eaf1e5' : 'background.paper', boxShadow: 'none' }}><CardContent>
+      <Typography variant="body2" color="text.secondary" fontWeight={650}>{m.senderId === session?.user.userId ? 'You' : 'Other participant'}{m.timestamps?.createdAt ? ` · ${new Date(m.timestamps.createdAt).toLocaleString()}` : ''}</Typography>
+      <Typography sx={{ mt: 1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.content}</Typography>
     </CardContent></Card>)}
     <Pager token={token} next={resource.data?.pagination?.nextPageToken} busy={resource.loading || busy} onPage={setToken} />
     {error && <Alert severity="error">{error}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
     <Stack component="form" spacing={2} onSubmit={e => { e.preventDefault(); void send(); }}>
       <TextField label="Message" multiline minRows={3} required value={content} disabled={busy} onChange={e => setContent(e.target.value)} helperText={`${Array.from(content.trim()).length}/2000 characters`} />
-      <Button type="submit" disabled={busy || !resource.data || !content.trim() || Array.from(content.trim()).length > 2000}>Send message</Button>
+      <Button variant="contained" type="submit" disabled={busy || !resource.data || !content.trim() || Array.from(content.trim()).length > 2000}>Send message</Button>
     </Stack>
   </Stack>;
 }

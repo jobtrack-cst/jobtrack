@@ -1,0 +1,4 @@
+Native zoom browser: Chrome/157.0.8103.79
+PASS applicant: native 200% zoom, 1280px window / 640px CSS viewport, DPR 2; account menu/actions/Escape/focus, home, drawer and jobs route
+PASS employer: native 200% zoom, 1280px window / 640px CSS viewport, DPR 2; account menu/actions/Escape/focus, home, drawer and jobs route
+PASS admin: native 200% zoom, 1280px window / 640px CSS viewport, DPR 2; account menu/actions/Escape/focus, home, drawer and analytics route

@@ -28,7 +28,7 @@ export function ApplyPage() {
     <Typography variant="h4" component="h1">Apply for a job</Typography>
     <Stack component="form" spacing={2} onSubmit={e => { e.preventDefault(); setLoadedId(jobId.trim()); job.refresh(); setResult(undefined); setError(''); }}>
       <TextField label="Job ID" value={jobId} disabled={busy} onChange={e => { setJobId(e.target.value); setLoadedId(''); setResult(undefined); }} required />
-      <Button type="submit" disabled={busy || !validId(jobId.trim())}>Load job</Button>
+      <Button variant="contained" type="submit" disabled={busy || !validId(jobId.trim())}>Load job</Button>
     </Stack>
     <ResourceState {...job} />
     {job.data && <><Typography variant="h6">{job.data.job.title}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{job.data.job.description}</Typography>

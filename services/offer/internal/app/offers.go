@@ -59,6 +59,24 @@ func (s *Offers) GetOffer(ctx context.Context, caller domain.Caller, offerID str
 	return o, nil
 }
 
+func (s *Offers) GetOfferByApplication(ctx context.Context, caller domain.Caller, applicationID string) (domain.Offer, error) {
+	if _, err := domain.NewCaller(caller.UserID, caller.Role); err != nil {
+		return domain.Offer{}, err
+	}
+	id, err := domain.NormalizeID(applicationID, domain.ErrInvalidApplicationID)
+	if err != nil {
+		return domain.Offer{}, err
+	}
+	o, err := s.offers.GetByApplicationID(ctx, id)
+	if err != nil {
+		return domain.Offer{}, err
+	}
+	if err := o.CanView(caller); err != nil {
+		return domain.Offer{}, err
+	}
+	return o, nil
+}
+
 func (s *Offers) AcceptOffer(ctx context.Context, caller domain.Caller, id string) (domain.Offer, error) {
 	return s.decide(ctx, caller, id, true)
 }

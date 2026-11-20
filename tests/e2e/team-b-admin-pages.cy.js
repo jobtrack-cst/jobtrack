@@ -1,6 +1,9 @@
+import { openAccountMenu } from './account-menu';
 // JT-88 pages. Gateway responses are stubbed, so these tests check the UI and
 // the requests it sends, not live services (see docs/testing/jt-88-test-cases.md).
 const gateway = 'http://localhost:8000';
+// Keep the applicant app-bar photo request independent of a running gateway.
+beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
 const people = {
   ROLE_APPLICANT: { userId: '11111111-1111-4111-8111-111111111111', email: 'pema@example.test', fullName: 'Pema', landing: '/applicant' },
   ROLE_EMPLOYER: { userId: '66666666-6666-4666-8666-666666666666', email: 'dorji@example.test', fullName: 'Dorji', landing: '/employer' },
@@ -349,6 +352,7 @@ describe('JT-88 verification path', () => {
     cy.wait('@submit');
     cy.contains('Your latest request is pending').should('be.visible');
 
+    openAccountMenu();
     cy.contains('button', 'Log out').click();
     login('ROLE_ADMIN');
     open('Verification');
@@ -357,6 +361,7 @@ describe('JT-88 verification path', () => {
     cy.wait('@approve');
     cy.contains('No requests on this page.').should('be.visible');
 
+    openAccountMenu();
     cy.contains('button', 'Log out').click();
     login('ROLE_EMPLOYER');
     open('Company');

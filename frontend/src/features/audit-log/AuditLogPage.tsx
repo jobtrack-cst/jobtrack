@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { Pager, ResourceState } from '../application/shared';
@@ -42,7 +43,7 @@ export function AuditLogPage() {
   return <Stack spacing={2}>
     <Typography variant="h4" component="h1">Audit log</Typography>
     <Typography>Every domain event, newest first. The data is shown exactly as it was received.</Typography>
-    <Stack component="form" direction={{ xs: 'column', md: 'row' }} spacing={2} noValidate onSubmit={e => { e.preventDefault(); apply(); }}>
+    <Stack component="form" direction={{ xs: 'column', xl: 'row' }} spacing={2} noValidate onSubmit={e => { e.preventDefault(); apply(); }}>
       <TextField label="Event type" value={eventType} placeholder="application.submitted" helperText="Optional"
         onChange={e => setEventType(e.target.value)} />
       <TextField label="From" type="datetime-local" value={from} helperText="Optional, included" slotProps={{ inputLabel: { shrink: true } }}
@@ -57,13 +58,13 @@ export function AuditLogPage() {
     {list.loading && <ResourceState loading error="" />}
     {!list.loading && list.error && <><Alert severity="error">{list.error}</Alert><Button onClick={list.refresh}>Try again</Button></>}
     {list.data && total !== undefined && <Typography>Matching entries: {Number(total).toLocaleString()}</Typography>}
-    {list.data && !list.data.entries?.length && <Typography>No entries on this page.</Typography>}
+    {list.data && !list.data.entries?.length && <EmptyState>No entries on this page.</EmptyState>}
     {list.data?.entries?.map(e => <Card key={e.eventId}><CardContent><Stack spacing={1}>
       <Typography variant="h6" component="h2">{e.eventType || 'Unknown event'}</Typography>
       <Typography>Producer: {e.producer || 'Unknown'}</Typography>
       <Typography>Occurred: {formatTime(e.occurredAt)}</Typography>
-      <Typography variant="body2">Event ID: {e.eventId}</Typography>
-      <Box component="pre" sx={{ m: 0, p: 1, bgcolor: 'action.hover', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 13 }}>{e.dataJson || '{}'}</Box>
+      <Typography className="record-id">Event ID: {e.eventId}</Typography>
+      <Box component="pre" sx={{ m: 0, p: 1, bgcolor: '#edf1e6', borderRadius: '8px', border: '1px solid #dce3d4', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 13 }}>{e.dataJson || '{}'}</Box>
     </Stack></CardContent></Card>)}
     <Pager next={list.data?.pagination?.nextPageToken} token={token} busy={list.loading} onPage={setToken} />
   </Stack>;

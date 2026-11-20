@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { Pager, ResourceState } from '../application/shared';
@@ -65,14 +66,14 @@ export function AdminModerationPage() {
       onChange={e => { setFilter(e.target.value as Filter); setToken(''); setNotice(''); }}>
       {filters.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
     </TextField>
-    <Stack direction="row" spacing={1}>
+    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
       <Button disabled={busy || list.loading} onClick={list.refresh}>Refresh reports</Button>
       <Button color="error" disabled={busy} onClick={() => openRemove()}>Remove a job by ID</Button>
     </Stack>
     {notice && <Alert severity="success">{notice}</Alert>}
     {list.loading && <ResourceState loading error="" />}
     {!list.loading && list.error && <><Alert severity="error">{list.error}</Alert><Button onClick={list.refresh}>Try again</Button></>}
-    {list.data && !list.data.reports?.length && <Typography>No reports on this page.</Typography>}
+    {list.data && !list.data.reports?.length && <EmptyState>No reports on this page.</EmptyState>}
     {list.data?.reports?.map(r => {
       const view = views[r.status ?? 'REPORT_STATUS_UNSPECIFIED'] ?? views.REPORT_STATUS_UNSPECIFIED;
       return <Card key={r.reportId}><CardContent><Stack spacing={1}>
@@ -83,7 +84,7 @@ export function AdminModerationPage() {
         <Typography>Reported: {formatTime(r.timestamps?.createdAt)}</Typography>
         <Typography variant="body2">Reporter: {r.reporterId || 'Unknown'}</Typography>
         <Typography variant="body2">Report ID: {r.reportId}</Typography>
-        {r.status === 'REPORT_STATUS_OPEN' && <Stack direction="row" spacing={1}>
+        {r.status === 'REPORT_STATUS_OPEN' && <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           <Button disabled={busy} onClick={() => openDismiss(r)}>Dismiss</Button>
           <Button color="error" disabled={busy} onClick={() => openRemove(r.jobId)}>Remove job</Button>
         </Stack>}

@@ -1,4 +1,6 @@
 const gateway = 'http://localhost:8000';
+// Keep the applicant app-bar photo request independent of a running gateway.
+beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
 beforeEach(() => {
   cy.intercept('GET', `${gateway}/v1/locations?*`, { locations: [{ locationId: '30000000-0000-4000-8000-000000000001', name: 'Thimphu' }] });
 });
@@ -362,5 +364,90 @@ describe('JT-78 location reference selection', () => {
     cy.contains('button', 'Refresh subscriptions').click();
     selectLocation('Thimphu');
     cy.contains('button', 'Create subscription').should('be.enabled');
+  });
+});
+
+// JT-108: discover the lifetime offer through either participant's application.
+describe('JT-108 offer discovery', () => {
+  for (const role of ['ROLE_APPLICANT', 'ROLE_EMPLOYER']) {
+    const base = role === 'ROLE_EMPLOYER' ? '/employer' : '/applicant';
+    it(`opens, revisits and reloads the offer from application cards for ${role}`, () => {
+      cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { delay: 500, body: { offer } }).as('byApplication');
+      applications(role);
+      cy.contains('a', 'View Offer').should('have.attr', 'href', `${base}/offers?applicationId=${applicationId}`).click();
+      cy.contains('Loading offer').should('be.visible');
+      cy.wait('@byApplication');
+      cy.contains(offer.terms).should('be.visible');
+      cy.contains('button', 'Accept offer').should(role === 'ROLE_APPLICANT' ? 'exist' : 'not.exist');
+      cy.contains('a', 'Applications').click();
+      cy.contains('a', 'View Offer').click(); cy.wait('@byApplication');
+      cy.contains(offerId).should('be.visible');
+      // JT-106 revalidates the session and preserves the offer deep link.
+      cy.reload(); cy.location('pathname').should('eq', `${base}/offers`);
+      cy.location('search').should('eq', `?applicationId=${applicationId}`);
+      cy.wait('@byApplication');
+      cy.contains(offer.terms).should('be.visible');
+    });
+  }
+  it('shows no offer separately from server errors and allows retry', () => {
+    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { statusCode: 404, body: { code: 5 } }).as('missingOffer');
+    applications(); cy.contains('a', 'View Offer').click(); cy.wait('@missingOffer');
+    cy.contains('No offer has been made for this application.').should('be.visible');
+    cy.contains('button', 'Accept offer').should('not.exist');
+    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { statusCode: 503, body: { code: 14, message: 'private-details' } }).as('failedOffer');
+    cy.contains('button', 'Load offer').click(); cy.wait('@failedOffer');
+    cy.get('[role=alert]').should('contain', 'The request failed').and('not.contain', 'private-details');
+    cy.contains('No offer has been made').should('not.exist');
+    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { offer });
+    cy.contains('button', 'Load offer').click();
+    cy.contains(offer.terms).should('be.visible');
+  });
+  it('does not request a malformed application ID', () => {
+    login(); navigate('/applicant/offers?applicationId=bad');
+    cy.contains('Application ID must be a UUID.').should('be.visible');
+    cy.contains('button', 'Load offer').should('be.disabled');
+  });
+  it('switches from the existing offer-ID lookup to application lookup', () => {
+    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { offer }).as('byApplication');
+    login(); cy.contains('a', 'Offers').click();
+    cy.contains('button', 'Use application ID').click();
+    cy.get('input').type(applicationId);
+    cy.contains('button', 'Load offer').click(); cy.wait('@byApplication');
+    cy.contains(offer.terms).should('be.visible');
+  });
+  it('keeps a pending offer available after a failed decision for retry', () => {
+    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { offer });
+    applications(); cy.contains('a', 'View Offer').click();
+    cy.contains('button', 'Accept offer').click();
+    cy.intercept('POST', `${gateway}/v1/offers/${offerId}/accept`, { statusCode: 503, body: {} }).as('failedDecision');
+    cy.contains('button', 'Confirm decision').click(); cy.wait('@failedDecision');
+    cy.contains('button', 'Confirm decision').should('be.enabled');
+    cy.intercept('POST', `${gateway}/v1/offers/${offerId}/accept`, { offer: { ...offer, status: 'OFFER_STATUS_ACCEPTED' } });
+    cy.contains('button', 'Confirm decision').click();
+    cy.contains('Status: ACCEPTED').should('be.visible');
+  });
+  it('links a newly created offer to a reloadable application lookup', () => {
+    cy.intercept('POST', `${gateway}/v1/applications/${applicationId}/offers`, { offer });
+    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { offer }).as('createdOffer');
+    applications('ROLE_EMPLOYER'); cy.contains('a', 'Make offer').click();
+    cy.get('textarea').first().type('Synthetic offer terms');
+    cy.contains('button', 'Make offer').click();
+    cy.contains('a', 'View Offer').click(); cy.wait('@createdOffer');
+    cy.location('search').should('eq', `?applicationId=${applicationId}`);
+    cy.contains(offer.terms).should('be.visible');
+  });
+  it('ignores an old response when navigating to another application on the same offers page', () => {
+    const otherId = '77777777-7777-4777-8777-777777777777';
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, req => pending.then(() => req.reply({ offer }))).as('oldOffer');
+    cy.intercept('GET', `${gateway}/v1/applications/${otherId}/offer`, { offer: { ...offer, applicationId: otherId, terms: 'Another application offer' } }).as('newOffer');
+    applications(); cy.contains('a', 'View Offer').click();
+    cy.contains('Loading offer').should('be.visible');
+    navigate(`/applicant/offers?applicationId=${otherId}`); cy.wait('@newOffer');
+    cy.contains('Another application offer').should('be.visible');
+    cy.then(() => release()); cy.wait('@oldOffer');
+    cy.contains('Another application offer').should('be.visible');
+    cy.contains(offer.terms).should('not.exist');
   });
 });

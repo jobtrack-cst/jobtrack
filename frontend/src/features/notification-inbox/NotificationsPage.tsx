@@ -1,9 +1,11 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
 import { Alert, Button, Card, CardContent, Checkbox, FormControlLabel, Stack, Typography } from '@mui/material';
 import { Pager, ResourceState } from '../application/shared';
 import { formatTime, gatewayMessage } from '../application-status/shared';
 import { useLoad } from '../application-status/useLoad';
 import { listNotifications, markRead } from './api';
+import { PageHeader } from '../../components/PageHeader';
 
 const messages = { 7: 'You can only read your own notifications.' };
 export function NotificationsPage() {
@@ -21,16 +23,15 @@ export function NotificationsPage() {
     finally { setBusy(false); }
   }
   return <Stack spacing={2}>
-    <Typography variant="h4" component="h1">Notifications</Typography>
+    <PageHeader title="Notifications" actions={<Button disabled={busy || resource.loading} onClick={() => { setError(''); resource.refresh(); }}>Refresh notifications</Button>} />
     <FormControlLabel label="Unread only" control={<Checkbox checked={unread} disabled={busy} onChange={(_, value) => { setUnread(value); setToken(''); setError(''); setNotice(''); }} />} />
     <ResourceState {...resource} />{error && <Alert severity="error">{error}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
-    <Button disabled={busy || resource.loading} onClick={() => { setError(''); resource.refresh(); }}>Refresh notifications</Button>
-    {resource.data && <Typography>{unread ? 'Unread notifications' : 'Notifications'}: {resource.data.pagination?.totalCount ?? 0}</Typography>}
-    {resource.data && !resource.data.notifications?.length && <Typography>No notifications on this page.</Typography>}
-    {resource.data?.notifications?.map(n => <Card key={n.notificationId}><CardContent><Stack spacing={1}>
-      <Typography variant="h6">{n.title}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{n.body}</Typography>
-      <Typography>{formatTime(n.createdAt)} · {n.read ? 'Read' : 'Unread'}</Typography>
-      {!n.read && <Button disabled={busy} onClick={() => void read(n.notificationId)}>Mark as read</Button>}
+    {resource.data && <Typography variant="subtitle2" color="text.secondary">{unread ? 'Unread notifications' : 'Notifications'}: {resource.data.pagination?.totalCount ?? 0}</Typography>}
+    {resource.data && !resource.data.notifications?.length && <EmptyState>No notifications on this page.</EmptyState>}
+    {resource.data?.notifications?.map(n => <Card key={n.notificationId} sx={{ borderLeft: n.read ? undefined : '3px solid #70947c', bgcolor: n.read ? 'background.paper' : '#f7f9f0' }}><CardContent><Stack spacing={1}>
+      <Typography variant="h6" component="h2">{n.title}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{n.body}</Typography>
+      <Typography variant="body2" color="text.secondary">{formatTime(n.createdAt)} · {n.read ? 'Read' : 'Unread'}</Typography>
+      {!n.read && <Button variant="outlined" disabled={busy} onClick={() => void read(n.notificationId)}>Mark as read</Button>}
     </Stack></CardContent></Card>)}
     <Pager token={token} next={resource.data?.pagination?.nextPageToken} busy={busy || resource.loading} onPage={setToken} />
   </Stack>;

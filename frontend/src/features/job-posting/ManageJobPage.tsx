@@ -52,15 +52,15 @@ export function ManageJobPage({ create = false }: { create?: boolean }) {
     {error && <Alert severity="error">{error}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
     {job && <><Typography>Status: {jobStatus(job.status)}</Typography>
       <Typography>Deadline: {formatTime(job.deadline)}</Typography>
-      {job.status === 'JOB_STATUS_DRAFT' && <Button disabled={busy} onClick={() => { setTransitionError(''); setConfirm('publish'); }}>Publish job</Button>}
-      {job.status === 'JOB_STATUS_PUBLISHED' && <Button disabled={busy} onClick={() => { setTransitionError(''); setConfirm('close'); }}>Close job</Button>}
+      {job.status === 'JOB_STATUS_DRAFT' && <Button variant="contained" disabled={busy} onClick={() => { setTransitionError(''); setConfirm('publish'); }}>Publish job</Button>}
+      {job.status === 'JOB_STATUS_PUBLISHED' && <Button variant="outlined" color="error" disabled={busy} onClick={() => { setTransitionError(''); setConfirm('close'); }}>Close job</Button>}
       {!editable(job.status) && <><Typography variant="h6">{job.title}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{job.description}</Typography><Alert severity="info">Closed and removed jobs cannot be edited.</Alert></>}
     </>}
     {(create || (job && editable(job.status))) && <JobForm key={job ? `${job.jobId}:${job.title}:${job.deadline}` : 'new'} job={job} busy={busy} onSave={save} />}
     <Dialog open={!!confirm} onClose={() => { if (!busy) setConfirm(''); }}>
       <DialogTitle>{confirm === 'publish' ? 'Publish this job?' : 'Close this job? Closing cannot be undone.'}</DialogTitle>
       <DialogContent>{transitionError && <Alert severity="error">{transitionError}</Alert>}</DialogContent>
-      <DialogActions><Button disabled={busy} onClick={() => setConfirm('')}>Cancel</Button><Button disabled={busy} onClick={() => void transition()}>Confirm {confirm}</Button></DialogActions>
+      <DialogActions><Button disabled={busy} onClick={() => setConfirm('')}>Cancel</Button><Button variant="contained" color={confirm === 'close' ? 'error' : 'primary'} disabled={busy} onClick={() => void transition()}>Confirm {confirm}</Button></DialogActions>
     </Dialog>
   </Stack>;
 }

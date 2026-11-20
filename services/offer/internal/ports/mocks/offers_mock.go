@@ -72,6 +72,21 @@ func (mr *MockOfferRepositoryMockRecorder) Decide(arg0, arg1, arg2, arg3, arg4 a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Decide", reflect.TypeOf((*MockOfferRepository)(nil).Decide), arg0, arg1, arg2, arg3, arg4)
 }
 
+// GetByApplicationID mocks base method.
+func (m *MockOfferRepository) GetByApplicationID(arg0 context.Context, arg1 string) (domain.Offer, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByApplicationID", arg0, arg1)
+	ret0, _ := ret[0].(domain.Offer)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByApplicationID indicates an expected call of GetByApplicationID.
+func (mr *MockOfferRepositoryMockRecorder) GetByApplicationID(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByApplicationID", reflect.TypeOf((*MockOfferRepository)(nil).GetByApplicationID), arg0, arg1)
+}
+
 // GetByID mocks base method.
 func (m *MockOfferRepository) GetByID(arg0 context.Context, arg1 string) (domain.Offer, error) {
 	m.ctrl.T.Helper()

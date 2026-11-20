@@ -67,7 +67,7 @@ function ReviewView({ applicationId }: { applicationId: string }) {
     <Dialog open={confirming} onClose={() => { if (!busy) setConfirming(false); }}>
       <DialogTitle>{decision === 'REVIEW_DECISION_SHORTLISTED' ? 'Shortlist' : 'Reject'} this application?</DialogTitle>
       <DialogContent>A review cannot be changed afterwards. Score: {score} of 5.</DialogContent>
-      <DialogActions><Button disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button><Button disabled={busy} onClick={() => void submit()}>Confirm review</Button></DialogActions>
+      <DialogActions><Button disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button><Button variant="contained" color={decision === 'REVIEW_DECISION_REJECTED' ? 'error' : 'primary'} disabled={busy} onClick={() => void submit()}>Confirm review</Button></DialogActions>
     </Dialog>
   </Stack>;
 }

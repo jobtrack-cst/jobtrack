@@ -3,11 +3,14 @@ package grpc
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"os"
 	"time"
 
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
 	jobpostingv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
+	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,13 +23,18 @@ import (
 // and GetJob for application with the user's identity forwarded.
 type JobPostingHandler struct {
 	jobpostingv1.UnimplementedJobPostingServiceServer
-	jobs *app.Jobs
+	jobs   *app.Jobs
+	logger *slog.Logger
 }
 
 var _ jobpostingv1.JobPostingServiceServer = (*JobPostingHandler)(nil)
 
-func NewJobPostingHandler(jobs *app.Jobs) *JobPostingHandler {
-	return &JobPostingHandler{jobs: jobs}
+func NewJobPostingHandler(jobs *app.Jobs, loggers ...*slog.Logger) *JobPostingHandler {
+	logger := logging.New("job-posting", os.Stdout)
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	return &JobPostingHandler{jobs: jobs, logger: logger}
 }
 
 // CreateJob is employer only. The generated getters are nil-safe, so a nil
@@ -34,15 +42,15 @@ func NewJobPostingHandler(jobs *app.Jobs) *JobPostingHandler {
 func (h *JobPostingHandler) CreateJob(ctx context.Context, req *jobpostingv1.CreateJobRequest) (*jobpostingv1.CreateJobResponse, error) {
 	caller, err := employerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_CreateJob_FullMethodName, err, toStatus(err))
 	}
 	in, err := jobInput(req.GetTitle(), req.GetDescription(), req.GetCategoryId(), req.GetTagIds(), req.GetLocation(), req.GetDeadline())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_CreateJob_FullMethodName, err, toStatus(err))
 	}
 	job, err := h.jobs.Create(ctx, caller, in)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_CreateJob_FullMethodName, err, toStatus(err))
 	}
 	return &jobpostingv1.CreateJobResponse{Job: jobToProto(job)}, nil
 }
@@ -50,15 +58,15 @@ func (h *JobPostingHandler) CreateJob(ctx context.Context, req *jobpostingv1.Cre
 func (h *JobPostingHandler) UpdateJob(ctx context.Context, req *jobpostingv1.UpdateJobRequest) (*jobpostingv1.UpdateJobResponse, error) {
 	caller, err := employerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_UpdateJob_FullMethodName, err, toStatus(err))
 	}
 	in, err := jobInput(req.GetTitle(), req.GetDescription(), req.GetCategoryId(), req.GetTagIds(), req.GetLocation(), req.GetDeadline())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_UpdateJob_FullMethodName, err, toStatus(err))
 	}
 	job, err := h.jobs.Update(ctx, caller, req.GetJobId(), in)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_UpdateJob_FullMethodName, err, toStatus(err))
 	}
 	return &jobpostingv1.UpdateJobResponse{Job: jobToProto(job)}, nil
 }
@@ -66,11 +74,11 @@ func (h *JobPostingHandler) UpdateJob(ctx context.Context, req *jobpostingv1.Upd
 func (h *JobPostingHandler) PublishJob(ctx context.Context, req *jobpostingv1.PublishJobRequest) (*jobpostingv1.PublishJobResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_PublishJob_FullMethodName, err, toStatus(err))
 	}
 	job, err := h.jobs.Publish(ctx, caller, req.GetJobId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_PublishJob_FullMethodName, err, toStatus(err))
 	}
 	return &jobpostingv1.PublishJobResponse{Job: jobToProto(job)}, nil
 }
@@ -78,11 +86,11 @@ func (h *JobPostingHandler) PublishJob(ctx context.Context, req *jobpostingv1.Pu
 func (h *JobPostingHandler) CloseJob(ctx context.Context, req *jobpostingv1.CloseJobRequest) (*jobpostingv1.CloseJobResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_CloseJob_FullMethodName, err, toStatus(err))
 	}
 	job, err := h.jobs.Close(ctx, caller, req.GetJobId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_CloseJob_FullMethodName, err, toStatus(err))
 	}
 	return &jobpostingv1.CloseJobResponse{Job: jobToProto(job)}, nil
 }
@@ -90,11 +98,11 @@ func (h *JobPostingHandler) CloseJob(ctx context.Context, req *jobpostingv1.Clos
 func (h *JobPostingHandler) GetJob(ctx context.Context, req *jobpostingv1.GetJobRequest) (*jobpostingv1.GetJobResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_GetJob_FullMethodName, err, toStatus(err))
 	}
 	job, err := h.jobs.Get(ctx, caller, req.GetJobId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_GetJob_FullMethodName, err, toStatus(err))
 	}
 	return &jobpostingv1.GetJobResponse{Job: jobToProto(job)}, nil
 }
@@ -102,15 +110,15 @@ func (h *JobPostingHandler) GetJob(ctx context.Context, req *jobpostingv1.GetJob
 func (h *JobPostingHandler) ListMyJobs(ctx context.Context, req *jobpostingv1.ListMyJobsRequest) (*jobpostingv1.ListMyJobsResponse, error) {
 	caller, err := employerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_ListMyJobs_FullMethodName, err, toStatus(err))
 	}
 	filter, err := statusFilter(req.GetStatus())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_ListMyJobs_FullMethodName, err, toStatus(err))
 	}
 	page, err := h.jobs.ListMine(ctx, caller, filter, req.GetPagination().GetPageSize(), req.GetPagination().GetPageToken())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_ListMyJobs_FullMethodName, err, toStatus(err))
 	}
 	return &jobpostingv1.ListMyJobsResponse{Jobs: jobsToProto(page.Jobs), Pagination: pageToProto(page)}, nil
 }
@@ -121,27 +129,32 @@ func (h *JobPostingHandler) ListMyJobs(ctx context.Context, req *jobpostingv1.Li
 // there is no user role to check here.
 type JobPostingInternalHandler struct {
 	jobpostingv1.UnimplementedJobPostingInternalServiceServer
-	jobs *app.Jobs
+	jobs   *app.Jobs
+	logger *slog.Logger
 }
 
 var _ jobpostingv1.JobPostingInternalServiceServer = (*JobPostingInternalHandler)(nil)
 
-func NewJobPostingInternalHandler(jobs *app.Jobs) *JobPostingInternalHandler {
-	return &JobPostingInternalHandler{jobs: jobs}
+func NewJobPostingInternalHandler(jobs *app.Jobs, loggers ...*slog.Logger) *JobPostingInternalHandler {
+	logger := logging.New("job-posting", os.Stdout)
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	return &JobPostingInternalHandler{jobs: jobs, logger: logger}
 }
 
 func (h *JobPostingInternalHandler) ListJobsClosingBetween(ctx context.Context, req *jobpostingv1.ListJobsClosingBetweenRequest) (*jobpostingv1.ListJobsClosingBetweenResponse, error) {
 	start, err := optionalTime(req.GetStartTime(), domain.ErrInvalidTimeRange)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingInternalService_ListJobsClosingBetween_FullMethodName, err, toStatus(err))
 	}
 	end, err := optionalTime(req.GetEndTime(), domain.ErrInvalidTimeRange)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingInternalService_ListJobsClosingBetween_FullMethodName, err, toStatus(err))
 	}
 	page, err := h.jobs.ListClosingBetween(ctx, start, end, req.GetPagination().GetPageSize(), req.GetPagination().GetPageToken())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingInternalService_ListJobsClosingBetween_FullMethodName, err, toStatus(err))
 	}
 	return &jobpostingv1.ListJobsClosingBetweenResponse{Jobs: jobsToProto(page.Jobs), Pagination: pageToProto(page)}, nil
 }

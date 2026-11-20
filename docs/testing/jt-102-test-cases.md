@@ -62,8 +62,8 @@ Unit and integration paths are under `services/employer/internal/`.
 | JT102-25 | AC3, AC6 | Replace with another image | State transition | "Logo replaced." and the new image; verification still "Not verified" | Manual, browser | Pass |
 | JT102-26 | AC2, AC6 | Choose `test.gif` (106 bytes), `fake.png` (PDF bytes, 108 bytes) and `big.png` (PNG signature, 1,000,008 bytes) | Equivalence partitioning, boundary value analysis | Matching fixed warning for each; no `logo` request in the Network tab; current logo unchanged | Manual, browser | Pass |
 | JT102-27 | AC6 | Type in Description without saving, then upload | Error guessing | "Logo replaced."; one `PUT` (200) after the CORS preflight (204); typed text kept | Manual, browser | Pass |
-| JT102-28 | AC6 | Logo on job cards with initials fallback | Not run | Job cards do not exist on `main` (JT-73 not merged). `CompanyLogo` takes `employer_id` and the company name and is ready to use | Not run | Blocked by JT-73 |
-| JT102-29 | AC6 | Logo section uses the JT-101 theme | Not run | JT-101 not merged. The new components use plain MUI with no custom styling, so the theme applies once merged | Not run | Blocked by JT-101 |
+| JT102-28 | AC6 | Logo on job cards with initials fallback | E2E (stubbed) and manual | Search cards and job details show the company logo and name; initials when there is no logo; one profile request and at most one logo request per employer | `company-logo.cy.js`, local and CI; browser | Pass |
+| JT102-29 | AC6 | Logo section uses the JT-101 theme | Manual | The logo avatar uses the theme palette (light secondary background, divider border) on job cards, job details and the company page | Browser | Pass |
 
 ## Verification
 
@@ -89,8 +89,8 @@ All commands ran on 18 November 2026 on Jigden's laptop (WSL Ubuntu, Docker Desk
 | Compose | employer and gateway rebuilt from the branch; `00004_create_company_logos.sql` applied, database at version 4; consumer ready on `employer.verification` |
 | End to end (JT102-22) | Pass, 20 of 20 checks through the gateway on port 8000 (employer `300ff3ef-d6b9-441f-87dc-2b31ff431d01`): upload before a profile 404; new profile without `has_logo`; logo before upload 404; real 1x1 PNG uploaded (200) with `has_logo` true and verification unchanged; applicant sees `has_logo` on the profile with no image bytes in the response; applicant reads the same PNG back; replaced with a JPEG; 1,000,000 bytes accepted; 1,000,001 bytes, 0 bytes, 1 byte, GIF and PNG with JPEG bytes each HTTP 400 with code 3; applicant upload 403; no token 401; unknown employer 404; ID not a UUID 400 |
 | Frontend | `npm run lint` and `npm run build` pass; browser checks JT102-23 to JT102-27 pass (8 of 8). A page refresh logs the user out because the token is kept only in memory; this is existing frontend shell behaviour, so JT102-24 logs in again instead |
-| CI on the pull request | Green on PR #71 |
+| CI on the pull request | Green on PR #71 and PR #100 |
 
 ## Not delivered in JT-102
 
-JT102-28 and JT102-29 depend on JT-73 and JT-101. If either is not merged before the sprint ends, the job card logo and theme parts of AC6 are recorded as not delivered in the closure report (JT-100), following Section 14.
+JT102-28 and JT102-29 depended on JT-73 and JT-101. Both were merged before PR #100, and both cases were run on PR #100. The remaining local failures in `application-workflows.cy.js` and `frontend-polish.cy.js` occur on WSL only; the resume test also fails on `main`, and CI is green.

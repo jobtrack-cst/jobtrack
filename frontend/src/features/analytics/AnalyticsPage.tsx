@@ -1,5 +1,6 @@
+import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
-import { Alert, Button, CircularProgress, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { formatTime, gatewayMessage, grpcCode } from '../application-status/shared';
 import { getSummary, type Summary } from './api';
 import { dayInput, dayStart } from './dates';
@@ -52,8 +53,17 @@ export function AnalyticsPage() {
     {busy && <CircularProgress aria-label="Loading" size={24} />}
     {error && <Alert severity="error">{error}</Alert>}
     {summary && <Stack spacing={2}>
-      <Typography>Period: {formatTime(summary.startTime)} to {formatTime(summary.endTime)} (end not included)</Typography>
-      <Table size="small" aria-label="Outcome counts"><TableBody>
+      <Typography variant="body2" color="text.secondary">Period: {formatTime(summary.startTime)} to {formatTime(summary.endTime)} (end not included)</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>
+        {([['jobsPublished', 'Jobs published'], ['applicationsSubmitted', 'Applications submitted'], ['offersAccepted', 'Offers accepted']] as [CountKey, string][]).map(([key, label], index) => <Paper variant="outlined" key={key}
+          sx={{ p: 2.5, borderRadius: '12px', position: 'relative', overflow: 'hidden', borderTop: `3px solid ${index === 1 ? '#bc9655' : '#70947c'}` }}>
+          <Typography variant="body2" color="text.secondary">{label}</Typography>
+          <Typography sx={{ mt: 1, fontSize: '2.25rem', letterSpacing: '-0.05em', lineHeight: 1.2, fontWeight: 750, fontVariantNumeric: 'tabular-nums' }}>{count(summary[key])}</Typography>
+          <Box aria-hidden="true" sx={{ position: 'absolute', width: 65, height: 65, border: '1px solid #e2e7d8', transform: 'rotate(45deg)', right: -25, bottom: -25 }} />
+        </Paper>)}
+      </Box>
+      <Typography variant="h6" component="h2">Outcome counts</Typography>
+      <Table size="small" aria-label="Outcome counts"><TableHead><TableRow><TableCell>Event</TableCell><TableCell align="right">Count</TableCell></TableRow></TableHead><TableBody>
         {rows.map(([key, label]) => <TableRow key={key}>
           <TableCell component="th" scope="row">{label}</TableCell><TableCell align="right">{count(summary[key])}</TableCell>
         </TableRow>)}
@@ -66,7 +76,7 @@ export function AnalyticsPage() {
             <TableCell>{statusName(s.status)}</TableCell><TableCell align="right">{count(s.count)}</TableCell>
           </TableRow>)}</TableBody>
         </Table>
-        : <Typography>No status changes in this period.</Typography>}
+        : <EmptyState>No status changes in this period.</EmptyState>}
     </Stack>}
   </Stack>;
 }

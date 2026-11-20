@@ -41,6 +41,21 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 	return m.recorder
 }
 
+// CloseJob mocks base method.
+func (m *MockRepository) CloseJob(ctx context.Context, closure domain.JobClosure) (domain.ClosureOutcome, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CloseJob", ctx, closure)
+	ret0, _ := ret[0].(domain.ClosureOutcome)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CloseJob indicates an expected call of CloseJob.
+func (mr *MockRepositoryMockRecorder) CloseJob(ctx, closure any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseJob", reflect.TypeOf((*MockRepository)(nil).CloseJob), ctx, closure)
+}
+
 // ListJobSavers mocks base method.
 func (m *MockRepository) ListJobSavers(ctx context.Context, jobID string, limit, offset int) ([]string, int, error) {
 	m.ctrl.T.Helper()
