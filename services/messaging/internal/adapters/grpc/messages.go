@@ -3,48 +3,59 @@ package grpc
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"os"
+	"strconv"
+
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
 	messagingv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/messaging/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
+	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/services/messaging/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/messaging/internal/domain"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"strconv"
 )
 
 type MessageHandler struct {
 	messagingv1.UnimplementedMessagingServiceServer
 	messages *app.Messages
+	logger   *slog.Logger
 }
 
-func NewMessageHandler(m *app.Messages) *MessageHandler { return &MessageHandler{messages: m} }
+func NewMessageHandler(messages *app.Messages, loggers ...*slog.Logger) *MessageHandler {
+	logger := logging.New("messaging", os.Stdout)
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	return &MessageHandler{messages: messages, logger: logger}
+}
 func (h *MessageHandler) SendMessage(ctx context.Context, r *messagingv1.SendMessageRequest) (*messagingv1.SendMessageResponse, error) {
 	c, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, messagingv1.MessagingService_SendMessage_FullMethodName, err, toStatus(err))
 	}
 	if r == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 	m, err := h.messages.Send(ctx, c, r.GetApplicationId(), r.GetContent())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, messagingv1.MessagingService_SendMessage_FullMethodName, err, toStatus(err))
 	}
 	return &messagingv1.SendMessageResponse{Message: messageProto(m)}, nil
 }
 func (h *MessageHandler) ListMessages(ctx context.Context, r *messagingv1.ListMessagesRequest) (*messagingv1.ListMessagesResponse, error) {
 	c, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, messagingv1.MessagingService_ListMessages_FullMethodName, err, toStatus(err))
 	}
 	if r == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 	items, total, page, err := h.messages.List(ctx, c, r.GetApplicationId(), r.GetPagination().GetPageSize(), r.GetPagination().GetPageToken())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, messagingv1.MessagingService_ListMessages_FullMethodName, err, toStatus(err))
 	}
 	out := &messagingv1.ListMessagesResponse{Pagination: &commonv1.PaginationResponse{TotalCount: total}}
 	for _, m := range items {
