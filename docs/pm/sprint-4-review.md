@@ -6,9 +6,9 @@
 | Owner | Jigden Shakya (Scrum Master). Backup: Kinley Tobgay Lhendrup |
 | Sprint | Sprint 4 (Jira sprint 38), the last sprint |
 | Sprint dates | 17 Nov 09:00 to 20 Nov 23:59 (extended by one day on 19 Nov; planned end 19 Nov 23:59, AGENTS.md Section 15) |
-| Closed in Jira | After the JT-100 pull request merges, before 20 Nov 23:59; JT-72 then moves to the backlog |
+| Closed in Jira | After the JT-100 pull request merges, before 20 Nov 23:59 |
 | Review and retrospective | Not held as a separate meeting on the last day. Written by Jigden from Jira, UAT and the earlier retrospectives, and reviewed by Phuntsho as Product Owner in the JT-100 pull request |
-| Data source | Jira sprint 38 and issue history, checked on 20 Nov 2026 at 17:15 |
+| Data source | Jira sprint 38 and issue history, checked on 20 Nov 2026 at 19:10 |
 | Related documents | `docs/pm/sprint-3-review.md`, `docs/pm/sprint-4-planning.md`, `docs/pm/earned-value-report.md`, `docs/pm/risk-register.md` (version 1.6), `docs/pm/project-closure-report.md`, `docs/testing/uat-script.md`, `docs/testing/test-summary-report.md`, AGENTS.md (Sections 14 and 15) |
 
 ---
@@ -17,19 +17,19 @@
 
 Goal: End-to-end and load tests, UAT, bug fixes, monitoring, all documentation, feature freeze. Committed minimum: the Must tasks (39 points).
 
-Outcome: met. All 14 Must tasks (39 points) are Done, and 7 of the 8 Should tasks (16 of 18 points). In total 21 of 22 tasks and 55 of 57 points, the highest completion of any sprint. JT-100 is counted as Done because this document is part of it; it is Done when its pull request merges. The goal was met only with the one-day extension agreed on 19 Nov.
+Outcome: met. All 22 tasks and all 57 points are Done: the 14 Must tasks (39 points) and the 8 Should tasks (18 points). It is the only sprint that finished all of its planned work. JT-100 is counted as Done because this document is part of it; it is Done when its pull request merges. The goal was met only with the one-day extension agreed on 19 Nov.
 
 What was delivered:
 
 - The last function, notification-dispatcher (JT-71), and all 5 functions deployed to Knative in k3d with their triggers verified (JT-92). Its Compose forwarder and queue were added by the JT-105 fix.
-- The job-search read model (JT-69), the saved-jobs `job.closed` consumer (JT-70), `ListJobSavers` pagination and the internal interceptor (JT-91), and `job.closed` on moderation removal (JT-90).
+- The audit-log consumer for all domain events (JT-72), the job-search read model (JT-69), the saved-jobs `job.closed` consumer (JT-70), `ListJobSavers` pagination and the internal interceptor (JT-91), and `job.closed` on moderation removal (JT-90).
 - The frontend job pages, job search, saved jobs and notifications (JT-73), the frontend polish with an MUI theme and shared layout (JT-101), the company logo on the company page and job cards (JT-102) and the applicant profile photo (JT-103).
 - Logging of unexpected gRPC errors through `pkg/logging.GRPCError` (JT-66).
 - Prometheus and Grafana in Docker Compose (JT-93), and the architecture and deployment documentation (JT-94).
 - Cypress end-to-end tests of the main workflow against the running Compose stack (JT-95), the JMeter run with 200 concurrent users (JT-96) and the final test summary report (JT-97).
 - UAT for applicant, employer and admin (JT-99), and fixes for all four bugs it found (JT-105 to JT-108).
 
-Not delivered: JT-72 (audit-log consumer, Should, 2 points). Following the slip order (AGENTS.md Section 14), it is recorded as not delivered instead of moving, because there is no Sprint 5. See Section 3.
+Not delivered: nothing. JT-72 (audit-log consumer), last in the slip order, was started on the evening of 20 Nov while JT-100 was in review and merged at 19:07 (PR #102).
 
 ---
 
@@ -38,14 +38,14 @@ Not delivered: JT-72 (audit-log consumer, Should, 2 points). Following the slip 
 | Measure | Tasks | Story points |
 |---|---|---|
 | Planned | 22 | 57 |
-| Done in Sprint 4 | 21 | 55 |
-| Not delivered | 1 (JT-72) | 2 |
+| Done in Sprint 4 | 22 | 57 |
+| Not delivered | 0 | 0 |
 | Must (High): planned / done | 14 / 14 | 39 / 39 |
-| Should (Medium): planned / done | 8 / 7 | 18 / 16 |
+| Should (Medium): planned / done | 8 / 8 | 18 / 18 |
 
-- Velocity (story points Done in the sprint): 55, compared with 43 in Sprint 3, 60 in Sprint 2 (over 5 days), 49 in Sprint 1 and 35 in Sprint 0.
+- Velocity (story points Done in the sprint): 57, compared with 43 in Sprint 3, 60 in Sprint 2 (over 5 days), 49 in Sprint 1 and 35 in Sprint 0.
 - Velocity per day: about 14 over 4 days (17 to 20 Nov), the same as Sprint 3.
-- Completion: 21 of 22 tasks (95 percent) and 55 of 57 points (96 percent).
+- Completion: 22 of 22 tasks and 57 of 57 points (100 percent).
 - Hours logged in the sprint: see `docs/pm/earned-value-report.md` Section 3. Sprint 4 had the highest hours per point of any sprint, because it was mostly testing, UAT and documentation and included bug fixes without points.
 - R1 day 2 check (18 Nov, 17:00): 2 of 57 points Done or In Review, below the trigger of 29, so the trigger fired. At midday on 19 Nov 22 of 39 Must points were Done, which led to the one-day extension agreed by Phuntsho and Jigden (JT-67).
 - Work without points in the sprint: JT-104 (SonarQube finding) and the UAT bugs JT-105 to JT-108. Their hours count as actual cost but they add no points.
@@ -58,15 +58,15 @@ By Jira assignee on 20 Nov.
 |---|---|---|---|---|---|
 | Phuntsho Namgyel | 14 | 5 of 5 (JT-66, JT-73, JT-93, JT-94, JT-101) | 14 | | JT-106, JT-107, JT-108 |
 | Kinley Tobgay Lhendrup | 15 | 5 of 5 (JT-84, JT-95, JT-96, JT-97, JT-103) | 15 | | JT-104 |
-| Jigden Shakya | 16 | 7 of 8 (JT-67, JT-70, JT-90, JT-98, JT-99, JT-100, JT-102) | 14 | JT-72 (2) | |
+| Jigden Shakya | 16 | 8 of 8 (JT-67, JT-70, JT-72, JT-90, JT-98, JT-99, JT-100, JT-102) | 16 | | |
 | Sangay Tenzin | 12 | 4 of 4 (JT-69, JT-71, JT-91, JT-92) | 12 | | JT-105 |
-| Total | 57 | 21 of 22 | 55 | 2 | 5 bugs |
+| Total | 57 | 22 of 22 | 57 | 0 | 5 bugs |
 
 ---
 
 ## 3. Task outcomes
 
-Owner is the Jira assignee. Status as of 20 Nov 2026, 17:15.
+Owner is the Jira assignee. Status as of 20 Nov 2026, 19:10.
 
 | Key | Summary | Owner | Priority | Points | Result |
 |---|---|---|---|---|---|
@@ -75,7 +75,7 @@ Owner is the Jira assignee. Status as of 20 Nov 2026, 17:15.
 | JT-69 | Job-search: build the read model from job events (carried over) | Sangay | Must | 2 | Done |
 | JT-70 | Saved-jobs: consume job.closed (carried over) | Jigden | Should | 1 | Done |
 | JT-71 | Implement notification-dispatcher Knative function (carried over) | Sangay | Must | 5 | Done (Compose event delivery fixed in JT-105) |
-| JT-72 | Audit-log: consume all domain events (carried over) | Jigden | Should | 2 | Not delivered |
+| JT-72 | Audit-log: consume all domain events (carried over) | Jigden | Should | 2 | Done (PR #102, 20 Nov) |
 | JT-73 | Frontend: employer job pages, job search, saved jobs and notifications (carried over) | Phuntsho | Must | 3 | Done |
 | JT-84 | Sprint 3 SonarQube run and JMeter deadline-rush scenario preparation (carried over) | Kinley | Should | 2 | Done |
 | JT-90 | job-posting: removing a job through moderation does not publish job.closed (bug) | Jigden | Must | 2 | Done |
@@ -105,9 +105,7 @@ Owner is the Jira assignee. Status as of 20 Nov 2026, 17:15.
 
 ### Not delivered
 
-| Key | Summary | Owner | Points | Reason |
-|---|---|---|---|---|
-| JT-72 | Audit-log: consume all domain events | Jigden | 2 | Last in the agreed slip order (among Jigden's tasks it slips before JT-67 and JT-70); not started, so that the Must work, JT-102 and the closure documents were finished first. Audit-log has no consumer (`services/audit-log` has only the template publisher, checked on 20 Nov), so the admin audit log page stays empty and UAT-AD-07 could not be run. Jira links three merged pull requests to JT-72, but no commit on `main` carries its key and none of them adds the consumer |
+None. The slip order (JT-66 first, then JT-102 and JT-103, then the other Should tasks; among Jigden's, JT-72 before JT-67 and JT-70) was prepared but in the end no task had to be dropped.
 
 ### Work outside the sprint
 
@@ -122,7 +120,7 @@ UAT (JT-99, 19 Nov 2026, `docs/testing/uat-script.md`, PR #88): 34 scenarios, 29
 Not run:
 
 - UAT-AP-05: no job alert existed before the job was published, so the alert match could not be observed.
-- UAT-AD-07: the audit log stays empty without the audit-log consumer (JT-72, not delivered).
+- UAT-AD-07: the audit log was empty because the audit-log consumer did not exist yet. JT-72 added it on 20 Nov and verified in Docker Compose that an admin sees a new event in the audit log; the UAT scenario itself was not rerun.
 
 Product Owner sign-off (Phuntsho, 19 Nov 2026): Accepted with conditions. All conditions were met by 20 Nov 23:59.
 
@@ -138,18 +136,17 @@ Known issues at closure: none from UAT. The remaining limitations are listed in 
 Future improvements (not part of this project):
 
 - Employer access to applicant resumes during review (AGENTS.md Section 16 open question). Approved for backlog consideration only; no Jira issue yet. Needs Phuntsho's authorisation and a contract review.
-- The audit-log consumer (JT-72), in the backlog.
 
 ---
 
 ## 5. What went well
 
 - Every Must task was finished, including all three Sprint 3 carryover Musts (JT-69, JT-71, JT-73). Sangay finished all four of his Must tasks, including the deployment path JT-71 then JT-92.
-- 7 of 8 Should tasks were delivered as well, so only 2 of 57 points were dropped. Sprint 4 had the highest completion rate of the project.
+- All 8 Should tasks were delivered as well, so no points were dropped. Sprint 4 is the only sprint that finished all of its planned work.
 - All 5 functions run on Knative in k3d with their triggers verified (JT-92), meeting the agreed WEB303 deployment scope.
 - The Sprint 3 testing gap was closed: Cypress runs the main workflow against the real Compose stack (JT-95), the 200-user JMeter run finished with 0 errors (JT-96), monitoring is in place (JT-93), and `application` and `application-status` meet the 80 percent coverage target (JT-97).
 - UAT with the Product Owner verified the core workflow, and all four bugs it found were fixed within about a day, including the two that were only expected to be documented.
-- The slip order agreed on 18 Nov was clear, so the one task that did not fit was dropped without discussion.
+- The slip order agreed on 18 Nov made clear which task would go first, so the team could finish the Must work and the closure documents before starting JT-72, the last Should task.
 
 ---
 
@@ -170,20 +167,20 @@ These are the final retrospective points. Because there is no next sprint, they 
 
 | Sprint 3 action | Result |
 |---|---|
-| Reassign the carryovers: JT-73 to Phuntsho, JT-72 and JT-70 to Jigden, with Sangay reviewing | Done at Sprint 4 planning on 17 Nov. JT-73 and JT-70 were Done; JT-72 was not delivered |
+| Reassign the carryovers: JT-73 to Phuntsho, JT-72 and JT-70 to Jigden, with Sangay reviewing | Done at Sprint 4 planning on 17 Nov. JT-73, JT-70 and JT-72 were all Done |
 | Check every Must task at each stand-up and reassign through the handover rule the same day | All Must tasks were finished, so no further reassignment was needed; the remaining Musts were covered by the one-day extension |
-| Follow the slip order: JT-66, then JT-102 and JT-103, then other Should tasks; never cut a Must | Followed: no Must was cut. JT-66, JT-102 and JT-103 were finished in the end, and only JT-72, last among Jigden's Should tasks, slipped |
+| Follow the slip order: JT-66, then JT-102 and JT-103, then other Should tasks; never cut a Must | Followed: no Must was cut. JT-72, last among Jigden's Should tasks, was left until the Must work and JT-100 were in review, and was then finished on 20 Nov |
 | Replace the stubbed Cypress tests with real end-to-end tests against Docker Compose (JT-95) | Done |
 | Add Prometheus and Grafana to Docker Compose (JT-93) | Done |
-| Record unfinished Should tasks as not delivered in the closure report (JT-100) | Done in Section 3 and in the closure report |
+| Record unfinished Should tasks as not delivered in the closure report (JT-100) | Not needed: every Should task was finished (Section 3) |
 | Estimate every task before it is added to the sprint, including bugs | Not met: JT-104 to JT-108 have no points |
-| Verify each new event end to end in Docker Compose before moving its task to Done | Not met for JT-71 (found in UAT as JT-105); met for JT-70 and JT-90 |
+| Verify each new event end to end in Docker Compose before moving its task to Done | Not met for JT-71 (found in UAT as JT-105); met for JT-70, JT-72 and JT-90 |
 
 ---
 
 ## 8. Risks
 
-- R1 (schedule overrun): occurred. The day 2 trigger fired on 18 Nov and Sprint 4 needed a one-day extension; with it, all Must work and all but one Should task were finished.
+- R1 (schedule overrun): occurred. The day 2 trigger fired on 18 Nov and Sprint 4 needed a one-day extension; with it, all planned work was finished.
 - R6 (uneven workload): the reassignment on 17 Nov worked; every member finished all their Must tasks.
 - R2 (Knative and RabbitMQ): all 5 functions were deployed and their triggers verified in k3d (JT-92), and the Compose forwarder for notification-dispatcher was added in JT-105.
 - R8 (load test): the 200-user run finished with 0 errors without straining the host (JT-96).
@@ -193,6 +190,5 @@ These are the final retrospective points. Because there is no next sprint, they 
 
 ## 9. Open items at close
 
-- JT-72 (audit-log consumer) is in the backlog; until it is built, the admin audit log page stays empty.
 - AGENTS.md Section 16 still says notification-dispatcher has no Compose forwarder; JT-105 (PR #90) added it, so that line should be removed in the next AGENTS.md update.
 - Sprint 4 is closed in Jira after this pull request merges.
