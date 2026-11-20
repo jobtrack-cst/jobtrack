@@ -2,7 +2,7 @@
 
 This file is the single source of truth for the JobTrack project. It is written for both team members and AI assistants (Claude, ChatGPT, GitHub Copilot).
 
-- Last updated: 19 Nov 2026 (JT-70 saved-jobs job.closed consumer; JT-103 applicant_profile.proto change approved)
+- Last updated: 20 Nov 2026 (JT-66 unexpected gRPC error logging approved and job-posting adoption authorized; JT-70 saved-jobs job.closed consumer; JT-103 applicant_profile.proto change approved)
 - Lives in the repo root as `AGENTS.md`. Changes go through a pull request like code.
 - If something here conflicts with a chat message, an old copy or an AI suggestion, this file wins. If this file is wrong, fix it through a PR.
 
@@ -440,6 +440,27 @@ services/<service>/
 ### General
 
 - Logging: Go `log/slog` with JSON output through `pkg/logging`. Always include `service` and, where available, `event_id` or `request_id`.
+
+Unexpected gRPC failures are logged once per failed RPC, at the gRPC adapter's
+error return, through `pkg/logging.GRPCError` and the service's existing JSON
+logger. Pass the original cause before status conversion, the generated full
+method constant, and the mapped status. Only `INTERNAL` emits an error entry,
+with `service`, `grpc_method`, `code`, safe `cause`, and `request_id` when a single
+canonical nonzero UUID is available in incoming `x-request-id` metadata. Other
+metadata is never copied. Do not also log that failure in the app, client,
+repository or a server interceptor. Separate downstream RPC invocations may
+each log their own failure; this is not global deduplication across services.
+
+Preserve discarded unexpected causes with `logging.InternalError` where needed;
+its diagnostic message must be a fixed code-owned literal. The adapter logs
+only those controlled labels and wrapped error types/status codes, never
+arbitrary error text, status messages/details, credentials, tokens, passwords,
+request/response bodies, private user data, or unrestricted metadata. Inject
+loggers without private attributes. The returned `INTERNAL` status uses a fixed
+sanitized message, with no original cause or status details attached. Unknown
+error text is deliberately withheld; add a controlled operation label rather
+than trusting or attempting to redact arbitrary strings.
+
 - Every outgoing gRPC call uses `pkg/grpcclient` (default timeout 2 s, up to 3 retries on `UNAVAILABLE`, circuit breaker).
 - Health endpoint `GET /healthz` and metrics `GET /metrics` on the HTTP port.
 - Keep comments short and useful: explain why, not what.
@@ -709,6 +730,7 @@ Add new decisions at the bottom with the date and a one-line reason.
 | 19 Nov 2026 | Saved-jobs consumes `job.closed` from the quorum queue `saved-jobs.jobs` (dead queue `saved-jobs.jobs.dead`) through `events.Consume`. The event must come from `job-posting` with a UUID `event_id`, a valid `occurred_at`, a `JobClosed` payload and a UUID `job_id` (stored lowercase); any other event goes to the dead queue at once, and database errors are retried under the JT-61 policy. As the contract says, one transaction claims the `event_id` in `processed_events`, records the job in `closed_jobs` (`closed_at` = `occurred_at`; the first close is kept) and deletes every bookmark for it; a repeated `event_id` changes nothing. `SaveJob` and the consumer take the same per-job transaction advisory lock, so a bookmark saved during a close is either deleted or refused with `FAILED_PRECONDITION`. Saved-jobs now requires `RABBITMQ_URL` (Compose already sets it) and stops the consumer before its database pool closes (JT-70, implemented and approved by Jigden as saved-jobs backup; reviewed by Sangay as saved-jobs owner in the PR) | Moderation removal also publishes `job.closed` (JT-90), so bookmarks never point at closed or removed jobs; without the lock, `SaveJob`'s separate check and insert could leave a bookmark on a closed job |
 | 19 Nov 2026 | JT-103 `applicant_profile.proto` change approved by Phuntsho as Product Owner and contracts lead at 22:12: new RPCs `PutMyProfilePhoto` (`PUT /v1/applicant/profile/photo`, body `"*"`, with `content_type` and `content` bytes, returns the profile) and `GetMyProfilePhoto` (`GET /v1/applicant/profile/photo`, returns `content_type` and `content`), and `bool has_photo = 6` on `ApplicantProfile`. Additive only, following JT-102, with no delete RPC. Applicant role only and own profile only, as in JT-50: employers and admins get `PERMISSION_DENIED`, a caller without a profile or a `GetMyProfilePhoto` without a photo gets `NOT_FOUND`. JPEG or PNG only, 1 to 1,000,000 bytes, the file signature must match the type, every failure `INVALID_ARGUMENT`; the database enforces the same limits. The photo is stored apart from the profile, so profile reads never load the image bytes. Only the applicant sees their own photo. Jigden or Sangay confirms the exact diff for Team B in the PR, and `buf lint`, `buf breaking`, tests and CI must pass before merging. JT-103 stays a Should task and must not delay any Must task (JT-103) | Adds the applicant profile photo with the same rules as the company logo (JT-102), meeting the 18 Nov profile image conditions |
 | 19 Nov 2026 | JT-106: Phuntsho as User/Product Owner approved storing only the frontend JWT and its absolute expiry in `sessionStorage`. Reload restores the token to the shared API client and confirms identity and role through authenticated `/v1/auth/me` before showing a session. Logout, expiry and protected HTTP 401 clear storage and memory; no refresh tokens, cookies or localStorage | Keeps applicant, employer and admin sessions across reloads within the tab and the existing one-hour lifetime. JavaScript can read the stored JWT, so XSS could steal it; this security trade-off is explicitly accepted |
+| 20 Nov 2026 | JT-66: the team agreed to log unexpected `INTERNAL` failures once at the gRPC adapter using `pkg/logging.GRPCError`, preserving original causes until mapping and recording only controlled operation labels, wrapped types and status codes. Include service, full gRPC method, code and a validated request ID when available; return only fixed sanitized statuses. Service owners adopt the helper in their own services. Team agreement and approval for Sangay-owned job-posting adoption were explicitly confirmed by the user on 20 Nov 2026. | Logging before status conversion retains safe diagnostics that a server interceptor would otherwise lose, without exposing arbitrary error text or private request data. |
 
 
 ---

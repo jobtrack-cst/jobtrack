@@ -3,9 +3,13 @@ package grpc
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"os"
+
 	commonv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/common/v1"
 	offerv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/offer/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
+	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/services/offer/internal/app"
 	"github.com/jobtrack-cst/jobtrack/services/offer/internal/domain"
 	"google.golang.org/grpc/codes"
@@ -16,23 +20,30 @@ import (
 type OfferHandler struct {
 	offerv1.UnimplementedOfferServiceServer
 	offers *app.Offers
+	logger *slog.Logger
 }
 
 var _ offerv1.OfferServiceServer = (*OfferHandler)(nil)
 
-func NewOfferHandler(offers *app.Offers) *OfferHandler { return &OfferHandler{offers: offers} }
+func NewOfferHandler(offers *app.Offers, loggers ...*slog.Logger) *OfferHandler {
+	logger := logging.New("offer", os.Stdout)
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	return &OfferHandler{offers: offers, logger: logger}
+}
 
 func (h *OfferHandler) MakeOffer(ctx context.Context, req *offerv1.MakeOfferRequest) (*offerv1.MakeOfferResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_MakeOffer_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 	o, err := h.offers.MakeOffer(ctx, caller, req.GetApplicationId(), req.GetTerms())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_MakeOffer_FullMethodName, err, toStatus(err))
 	}
 	return &offerv1.MakeOfferResponse{Offer: offerToProto(o)}, nil
 }
@@ -40,14 +51,14 @@ func (h *OfferHandler) MakeOffer(ctx context.Context, req *offerv1.MakeOfferRequ
 func (h *OfferHandler) GetOffer(ctx context.Context, req *offerv1.GetOfferRequest) (*offerv1.GetOfferResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_GetOffer_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 	o, err := h.offers.GetOffer(ctx, caller, req.GetOfferId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_GetOffer_FullMethodName, err, toStatus(err))
 	}
 	return &offerv1.GetOfferResponse{Offer: offerToProto(o)}, nil
 }
@@ -55,14 +66,14 @@ func (h *OfferHandler) GetOffer(ctx context.Context, req *offerv1.GetOfferReques
 func (h *OfferHandler) GetOfferByApplication(ctx context.Context, req *offerv1.GetOfferByApplicationRequest) (*offerv1.GetOfferByApplicationResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_GetOfferByApplication_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 	o, err := h.offers.GetOfferByApplication(ctx, caller, req.GetApplicationId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_GetOfferByApplication_FullMethodName, err, toStatus(err))
 	}
 	return &offerv1.GetOfferByApplicationResponse{Offer: offerToProto(o)}, nil
 }
@@ -70,14 +81,14 @@ func (h *OfferHandler) GetOfferByApplication(ctx context.Context, req *offerv1.G
 func (h *OfferHandler) AcceptOffer(ctx context.Context, req *offerv1.AcceptOfferRequest) (*offerv1.AcceptOfferResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_AcceptOffer_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 	o, err := h.offers.AcceptOffer(ctx, caller, req.GetOfferId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_AcceptOffer_FullMethodName, err, toStatus(err))
 	}
 	return &offerv1.AcceptOfferResponse{Offer: offerToProto(o)}, nil
 }
@@ -85,14 +96,14 @@ func (h *OfferHandler) AcceptOffer(ctx context.Context, req *offerv1.AcceptOffer
 func (h *OfferHandler) DeclineOffer(ctx context.Context, req *offerv1.DeclineOfferRequest) (*offerv1.DeclineOfferResponse, error) {
 	caller, err := callerFrom(ctx)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_DeclineOffer_FullMethodName, err, toStatus(err))
 	}
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 	o, err := h.offers.DeclineOffer(ctx, caller, req.GetOfferId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, logging.GRPCError(ctx, h.logger, offerv1.OfferService_DeclineOffer_FullMethodName, err, toStatus(err))
 	}
 	return &offerv1.DeclineOfferResponse{Offer: offerToProto(o)}, nil
 }

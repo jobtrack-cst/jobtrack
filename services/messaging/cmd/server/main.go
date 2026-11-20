@@ -102,7 +102,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		return errors.New("apply database migrations failed")
 	}
 	participants := postgres.NewParticipants(pool)
-	register := registerMessages(postgres.NewMessages(pool), participants)
+	register := registerMessages(postgres.NewMessages(pool), participants, logger)
 	return runWithPublisher(ctx, cfg, logger, app.NewHealthWithReadiness(postgres.NewReadiness(pool)),
 		func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 		func(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker) error {
@@ -111,8 +111,8 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 }
 
 // registerMessages exposes only the approved public service.
-func registerMessages(messages ports.MessageRepository, participants ports.ParticipantRepository) func(grpc.ServiceRegistrar) {
-	handler := grpcadapter.NewMessageHandler(app.NewMessages(messages, participants, systemClock{}))
+func registerMessages(messages ports.MessageRepository, participants ports.ParticipantRepository, loggers ...*slog.Logger) func(grpc.ServiceRegistrar) {
+	handler := grpcadapter.NewMessageHandler(app.NewMessages(messages, participants, systemClock{}), loggers...)
 	return func(s grpc.ServiceRegistrar) { messagingv1.RegisterMessagingServiceServer(s, handler) }
 }
 
@@ -239,7 +239,7 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 	for _, r := range register {
 		r(grpcServer)
 	}
-	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker, logger))
 	requestMetrics.RegisterGRPC(grpcServer)
 	httpServer := &http.Server{Handler: healthHandler(checker, requestMetrics), ReadHeaderTimeout: 5 * time.Second}
 	results := make(chan error, 2)

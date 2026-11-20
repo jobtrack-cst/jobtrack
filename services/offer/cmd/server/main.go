@@ -108,7 +108,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerOffer(d.offers, d.participants))
+					return runServers(ctx, cfg, logger, d.checker, registerOffer(d.offers, d.participants, logger))
 				})
 		})
 }
@@ -118,8 +118,8 @@ type systemClock struct{}
 func (systemClock) Now() time.Time { return time.Now().UTC() }
 
 // registerOffer registers public operations backed by the local projection.
-func registerOffer(offers ports.OfferRepository, participants ports.ParticipantRepository) func(grpc.ServiceRegistrar) {
-	handler := grpcadapter.NewOfferHandler(app.NewOffers(offers, participants, systemClock{}))
+func registerOffer(offers ports.OfferRepository, participants ports.ParticipantRepository, loggers ...*slog.Logger) func(grpc.ServiceRegistrar) {
+	handler := grpcadapter.NewOfferHandler(app.NewOffers(offers, participants, systemClock{}), loggers...)
 	return func(s grpc.ServiceRegistrar) { offerv1.RegisterOfferServiceServer(s, handler) }
 }
 
@@ -240,7 +240,7 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 	defer httpListener.Close()
 	requestMetrics := requestmetrics.New("offer")
 	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor()))
-	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker, logger))
 	if register != nil {
 		register(grpcServer)
 	}

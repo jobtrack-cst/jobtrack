@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
+	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/domain"
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/ports"
 	"google.golang.org/grpc/codes"
@@ -55,7 +56,7 @@ func mapped(err error) error {
 	case errors.Is(err, context.DeadlineExceeded):
 		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
 	default:
-		return status.Error(codes.Internal, "application storage failed")
+		return logging.InternalError("application storage failed", err)
 	}
 }
 func dependencyError(err error) error {
@@ -66,7 +67,7 @@ func dependencyError(err error) error {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return mapped(err)
 		}
-		return status.Error(codes.Internal, "eligibility dependency failed")
+		return logging.InternalError("eligibility dependency failed", err)
 	}
 }
 func (s *Service) Submit(ctx context.Context, jobID, resumeID string) (domain.Application, error) {
@@ -96,7 +97,7 @@ func (s *Service) Submit(ctx context.Context, jobID, resumeID string) (domain.Ap
 		return zero, dependencyError(err)
 	}
 	if job.ID != jobID || !domain.ValidID(job.EmployerID) || job.Deadline.IsZero() {
-		return zero, status.Error(codes.Internal, "invalid job dependency response")
+		return zero, logging.InternalError("invalid job dependency response", nil)
 	}
 	if !job.Eligible(s.now()) {
 		return zero, status.Error(codes.FailedPrecondition, "job must be published and before deadline")
@@ -106,7 +107,7 @@ func (s *Service) Submit(ctx context.Context, jobID, resumeID string) (domain.Ap
 		return zero, dependencyError(err)
 	}
 	if resume.ID != resumeID {
-		return zero, status.Error(codes.Internal, "invalid resume dependency response")
+		return zero, logging.InternalError("invalid resume dependency response", nil)
 	}
 	if resume.ApplicantID != i.UserID {
 		return zero, status.Error(codes.PermissionDenied, "resume belongs to another applicant")

@@ -148,7 +148,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 				}()
 
 				// 3. Run the gRPC servers
-				return runServers(ctx, cfg, logger, d.checker, registerJobPosting(d.jobs, verifier), serverOpts...)
+				return runServers(ctx, cfg, logger, d.checker, registerJobPosting(d.jobs, verifier, logger), serverOpts...)
 			})
 		})
 }
@@ -248,7 +248,7 @@ func serve(ctx context.Context, logger *slog.Logger, checker ports.HealthChecker
 	requestMetrics := requestmetrics.New("job-posting")
 	opts = append([]grpc.ServerOption{grpc.ChainUnaryInterceptor(requestMetrics.UnaryServerInterceptor())}, opts...)
 	grpcServer := grpc.NewServer(opts...)
-	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker))
+	healthpb.RegisterHealthServer(grpcServer, grpcadapter.NewHealthHandler(checker, logger))
 	register(grpcServer)
 
 	requestMetrics.RegisterGRPC(grpcServer)
@@ -303,11 +303,11 @@ func shutdown(ctx context.Context, grpcServer *grpc.Server, httpServer *http.Ser
 	return errors.Join(errs...)
 }
 
-func registerJobPosting(repo ports.JobRepository, verifier ports.EmployerVerifier) func(*grpc.Server) {
+func registerJobPosting(repo ports.JobRepository, verifier ports.EmployerVerifier, loggers ...*slog.Logger) func(*grpc.Server) {
 	return func(s *grpc.Server) {
 		svc := app.NewJobs(repo, verifier, wallClock{})
-		public := grpcadapter.NewJobPostingHandler(svc)
-		internal := grpcadapter.NewJobPostingInternalHandler(svc)
+		public := grpcadapter.NewJobPostingHandler(svc, loggers...)
+		internal := grpcadapter.NewJobPostingInternalHandler(svc, loggers...)
 		jobpostingv1.RegisterJobPostingServiceServer(s, public)
 		jobpostingv1.RegisterJobPostingInternalServiceServer(s, internal)
 	}
