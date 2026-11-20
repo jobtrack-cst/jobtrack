@@ -56,6 +56,10 @@ type ConsumerConfig struct {
 	reconnectMax   time.Duration
 }
 
+// AllEventsBinding is the topic wildcard for every event (JT-72, audit-log).
+// It is the only wildcard allowed, so other queues always name their events.
+const AllEventsBinding = "#"
+
 var (
 	queueNamePattern  = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*\.[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 	routingKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
@@ -72,7 +76,7 @@ func (c *ConsumerConfig) validate() error {
 		return errors.New("at least one routing key binding is required")
 	}
 	for _, b := range c.Bindings {
-		if !routingKeyPattern.MatchString(b) {
+		if b != AllEventsBinding && !routingKeyPattern.MatchString(b) {
 			return fmt.Errorf("binding %q is not an event routing key", b)
 		}
 	}
