@@ -7,7 +7,7 @@
 | Sprint | Sprint 4 (Jira sprint 38), the last sprint |
 | Sprint dates | 17 Nov 09:00 to 20 Nov 23:59 (extended by one day on 19 Nov; planned end 19 Nov 23:59, AGENTS.md Section 15) |
 | Closed in Jira | After the JT-100 pull request merges, before 20 Nov 23:59 |
-| Review and retrospective | Not held as a separate meeting on the last day. Written by Jigden from Jira, UAT and the earlier retrospectives. Product Owner review: Phuntsho reviewed PR #101 on 20 Nov and requested corrections; approval pending |
+| Review and retrospective | Not held as a separate meeting on the last day. Written by Jigden from Jira, UAT and the earlier retrospectives. Product Owner review: Phuntsho reviewed PR #101 on 20 Nov, requested corrections and approved the corrected version at 20:37 |
 | Data dates | Jira sprint 38 and issue history read on 20 Nov 2026 at 19:10, when JT-100 was In Review. UAT on 19 Nov 2026, retests on 20 Nov 2026. Test results: end-to-end (JT-95) completed on 18 Nov, load test (JT-96) and test summary (JT-97) on 19 Nov |
 | Related documents | `docs/pm/sprint-3-review.md`, `docs/pm/sprint-4-planning.md`, `docs/pm/earned-value-report.md`, `docs/pm/risk-register.md` (version 1.6), `docs/pm/project-closure-report.md`, `docs/testing/uat-script.md`, `docs/testing/test-summary-report.md`, AGENTS.md (Sections 14 and 15) |
 
@@ -191,6 +191,6 @@ These are the final retrospective points. Because there is no next sprint, they 
 
 ## 9. Open items at close
 
-- JT-100 (this review) is In Review; the Product Owner's approval of PR #101 is pending.
+- JT-100 (this review) was approved by the Product Owner in PR #101 on 20 Nov at 20:37 and is Done when it merges.
 - AGENTS.md Section 16 still says notification-dispatcher has no Compose forwarder; JT-105 (PR #90) added it, so that line should be removed in the next AGENTS.md update.
 - Sprint 4 is closed in Jira after this pull request merges.

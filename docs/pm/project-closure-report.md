@@ -8,7 +8,7 @@
 | Version | 1.0 |
 | Date | 20 Nov 2026 |
 | Project dates | 2 Nov 2026 (Sprint 0 start) to 20 Nov 2026 (Sprint 4 end, 23:59 Asia/Thimphu) |
-| Product Owner review | Pending: Phuntsho Namgyel reviewed PR #101 on 20 Nov 2026 and requested corrections; approval pending |
+| Product Owner review | Approved: Phuntsho Namgyel reviewed PR #101 on 20 Nov 2026, requested corrections and approved the corrected version on 20 Nov 2026 at 20:37 |
 | Data dates | Jira data read on 20 Nov 2026 at 19:10 (JT-100 In Review at that time). Test results as reported on 18 and 19 Nov 2026 (Section 8). UAT on 19 Nov 2026, retests on 20 Nov 2026 |
 | Related documents | `docs/pm/project-charter.md` (version 1.2), `docs/pm/sprint-4-review.md`, `docs/pm/earned-value-report.md`, `docs/pm/risk-register.md` (version 1.6), `docs/testing/test-summary-report.md`, `docs/testing/uat-script.md`, `docs/testing/jt-96-load-test-report.md`, AGENTS.md (Sections 14 to 16) |
 | Format | Closure report following PMI PMBOK practice, adapted for Scrum |
@@ -57,7 +57,7 @@ The project is the combined final project for WEB303 (Microservices and Serverle
 | 2 | Objectives O1 to O4 are met, or any gap is documented in the closure report | Gaps documented in Sections 3 and 5 |
 | 3 | All deliverables in charter Section 5 are in the repo and reviewed by the team | Not fully met: four planning documents were not produced (Section 5.3) |
 | 4 | The final presentation is given and assessed by the module tutors | Not yet: dates not announced (milestone M7, risk R10) |
-| 5 | The lessons-learned and closure report is completed | This report; Product Owner approval pending in PR #101 |
+| 5 | The lessons-learned and closure report is completed | Met: this report, approved by the Product Owner in PR #101 on 20 Nov 2026 |
 
 ---
 
@@ -211,7 +211,7 @@ What to do differently:
 
 | Name | Role | Reviewed or accepted | Date |
 |---|---|---|---|
-| Phuntsho Namgyel | Product Owner | Pending: corrections requested in PR #101 on 20 Nov 2026; approval pending | |
+| Phuntsho Namgyel | Product Owner | Approved in PR #101 | 20 Nov 2026 |
 | Jigden Shakya | Scrum Master and project manager | Prepared | 20 Nov 2026 |
 | Kinley Tobgay Lhendrup | Developer | | |
 | Sangay Tenzin | Developer | | |
