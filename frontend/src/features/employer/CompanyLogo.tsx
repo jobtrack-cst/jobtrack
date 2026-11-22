@@ -15,7 +15,7 @@ interface Props {
 // The themed square used everywhere a company logo appears. MUI shows the
 // initials when there is no src or the image fails to load.
 export function LogoAvatar({ src, name, size = 40 }: { src?: string | null; name?: string; size?: number }) {
-  return <Avatar variant="rounded" src={src ?? undefined} alt={name ? `${name} logo` : 'Company logo'}
+  return <Avatar variant="circular" src={src ?? undefined} alt={name ? `${name} logo` : 'Company logo'}
     sx={{ width: size, height: size, fontSize: size * 0.4, fontWeight: 700, flexShrink: 0,
       bgcolor: 'secondary.light', color: 'secondary.dark', border: '1px solid', borderColor: 'divider' }}>
     {initialsOf(name)}

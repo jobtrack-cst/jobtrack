@@ -69,7 +69,11 @@ function chooseOption(label, option) {
   cy.contains('[role=option]', option).click();
 }
 function nav(label) {
-  cy.get('nav[aria-label=Workspace]').contains('a', new RegExp(`^${label}$`)).click();
+  cy.get('nav[aria-label=Main]').contains('a', new RegExp(`^${label}$`)).click();
+}
+// Pages that left the JT-110 menus keep their routes until their own phase.
+function go(path) {
+  cy.window().then(win => { win.history.pushState({}, '', path); win.dispatchEvent(new PopStateEvent('popstate')); });
 }
 function login(email, secret, landing) {
   cy.visit('/login');
@@ -83,6 +87,7 @@ function register(account, role) {
   cy.get('input[name=fullName]').type(account.name);
   cy.get('input[name=email]').type(account.email);
   cy.get('input[name=password]').type(password, { log: false });
+  cy.get('input[name=confirmPassword]').type(password, { log: false });
   if (role === 'Employer') chooseOption('Account type', 'Employer');
   cy.get('button[type=submit]').click();
   cy.contains('Account created. Log in to continue.', { timeout: 15000 }).should('be.visible');
@@ -90,7 +95,8 @@ function register(account, role) {
 // Opens one of the application card buttons for this run's application. The ID is
 // read when the command runs, not when it is queued, because step 06 sets it.
 function openApplication(button) {
-  nav('Applications');
+  // Employers reach applications through Applicants (JT-110).
+  cy.location('pathname').then(path => nav(path.startsWith('/employer') ? 'Applicants' : 'Applications'));
   cy.then(() => {
     until('the application in the list', () => cy.contains('button', 'Refresh applications').click(),
       body => body.text().includes(state.applicationId));
@@ -119,7 +125,7 @@ describe('JT-95 main workflow against the running stack', () => {
 
   it('02 employer requests verification', () => {
     login(employer.email, password, '/employer');
-    nav('Verification');
+    go('/employer/verification');
     field('Registration number').type(registration);
     cy.contains('button', 'Send request').click();
     cy.contains('Request sent.', { timeout: 15000 }).should('be.visible');
@@ -138,13 +144,13 @@ describe('JT-95 main workflow against the running stack', () => {
     nav('Verification');
     const findRequest = (tries = 20) => cy.get('body').then(body => {
       if (body.text().includes(`Registration number: ${registration}`)) return;
-      if (tries <= 1 || !body.find('button:contains("Next page"):enabled').length) throw new Error('verification request not listed');
-      cy.contains('button', 'Next page').click();
+      if (tries <= 1 || !body.find('nav[aria-label=Pages] button:contains("Next"):enabled').length) throw new Error('verification request not listed');
+      cy.contains('nav[aria-label=Pages] button', /^Next$/).click();
       cy.wait(500);
       findRequest(tries - 1);
     });
     findRequest();
-    cy.contains('h3', `Registration number: ${registration}`).parents('.MuiCard-root').within(() => {
+    cy.contains('h2', `Registration number: ${registration}`).parents('li').first().within(() => {
       cy.contains('button', 'Approve').click();
     });
     cy.contains('button', 'Confirm approval').click();
@@ -155,7 +161,7 @@ describe('JT-95 main workflow against the running stack', () => {
   it('04 employer sees Verified, creates and publishes a job', () => {
     login(employer.email, password, '/employer');
     until('company Verified', () => nav('Company'), body => hasExact(body, '.MuiChip-label', 'Verified'));
-    nav('My jobs');
+    nav('Jobs');
     cy.contains('a', 'Create job').click();
     field('Title').type(`JT-95 Developer ${run}`);
     field('Deadline').type(localInput(3, 17));
@@ -176,7 +182,7 @@ describe('JT-95 main workflow against the running stack', () => {
   it('05 applicant registers and uploads a resume that is validated', () => {
     register(applicant, 'Applicant');
     login(applicant.email, password, '/applicant');
-    nav('Resumes');
+    go('/applicant/resumes');
     cy.get('input[type=file][name=resume]').selectFile({ contents: Cypress.Buffer.from(resumePdf, 'base64'), fileName: resumeName, mimeType: 'application/pdf' }, { force: true });
     cy.contains(`${resumeName} uploaded`, { timeout: 15000 }).should('be.visible');
     until('resume Validated', () => cy.contains('button', 'Refresh resumes').click(),
@@ -186,7 +192,7 @@ describe('JT-95 main workflow against the running stack', () => {
 
   it('06 applicant applies for the job', () => {
     login(applicant.email, password, '/applicant');
-    nav('Apply');
+    go('/applicant/apply');
     field('Job ID').type(state.jobId);
     cy.contains('button', 'Load job').click();
     cy.contains(`JT-95 Developer ${run}`, { timeout: 15000 }).should('be.visible');
@@ -236,7 +242,7 @@ describe('JT-95 main workflow against the running stack', () => {
 
   it('10 applicant accepts the offer', () => {
     login(applicant.email, password, '/applicant');
-    nav('Offers');
+    go('/applicant/offers');
     field('Offer ID').type(state.offerId);
     cy.contains('button', 'Load offer').click();
     cy.contains('button', 'Accept offer', { timeout: 15000 }).click();

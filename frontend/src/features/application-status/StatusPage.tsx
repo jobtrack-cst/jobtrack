@@ -28,7 +28,7 @@ function StatusView({ applicationId }: { applicationId: string }) {
     <Typography variant="body2">Application: {applicationId}</Typography>
     <Button disabled={status.loading || history.loading} onClick={() => { status.refresh(); history.refresh(); }}>Refresh status</Button>
     <ResourceState loading={status.loading} error={status.error} />
-    {record && <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', p: 2.5, bgcolor: '#e9f0e3', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
+    {record && <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', p: 2.5, bgcolor: 'action.selected', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
       <Typography>Current status:</Typography><Chip label={statusLabel(record.status)} color="primary" />
       <Typography variant="body2">since {formatTime(record.timestamps?.updatedAt)}</Typography>
     </Stack>}

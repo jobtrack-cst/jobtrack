@@ -79,6 +79,7 @@ describe('JT-63 authentication and routing', () => {
     cy.get('input[name=fullName]').type('Pema');
     cy.get('input[name=email]').type('pema@example.test');
     cy.get('input[name=password]').type('password123', { log: false });
+    cy.get('input[name=confirmPassword]').type('password123', { log: false });
     cy.get('[role=combobox]').click();
     cy.get('[role=option]').should('have.length', 2);
     cy.get('[role=option]').contains('Employer').click();
@@ -86,6 +87,35 @@ describe('JT-63 authentication and routing', () => {
     cy.wait('@register');
     cy.location('pathname').should('eq', '/login');
     cy.contains('Account created').should('be.visible');
+  });
+  it('JT-110 does not send the form when the passwords differ', () => {
+    cy.intercept('POST', `${gateway}/v1/auth/register`, cy.spy().as('register'));
+    cy.visit('/register');
+    cy.get('input[name=fullName]').type('Pema');
+    cy.get('input[name=email]').type('pema@example.test');
+    cy.get('input[name=password]').type('password123', { log: false });
+    cy.get('input[name=confirmPassword]').type('password124', { log: false });
+    cy.get('button[type=submit]').click();
+    cy.get('[role=alert]').should('have.text', 'Passwords do not match.');
+    cy.get('input[name=confirmPassword]').should('have.attr', 'aria-invalid', 'true');
+    cy.get('@register').should('not.have.been.called');
+    cy.location('pathname').should('eq', '/register');
+  });
+  it('JT-110 keeps the password length rule before checking the confirmation', () => {
+    cy.intercept('POST', `${gateway}/v1/auth/register`, cy.spy().as('register'));
+    cy.visit('/register');
+    cy.get('input[name=fullName]').type('Pema');
+    cy.get('input[name=email]').type('pema@example.test');
+    cy.get('input[name=password]').type('1234567', { log: false });
+    cy.get('input[name=confirmPassword]').type('1234567', { log: false });
+    cy.get('button[type=submit]').click();
+    cy.get('[role=alert]').should('contain', 'at least 8 characters and at most 72 bytes');
+    cy.get('@register').should('not.have.been.called');
+  });
+  for (const path of ['/login', '/register']) it(`JT-110 ${path} shows no college text`, () => {
+    cy.visit(path);
+    cy.get('main h1').should('be.visible');
+    cy.contains(/CST|College of Science/).should('not.exist');
   });
   it('expires the session without attempting refresh', () => {
     signIn('ROLE_APPLICANT', 2);

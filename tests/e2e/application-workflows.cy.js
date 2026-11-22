@@ -1,3 +1,4 @@
+import { openApplications, settleHome } from './home';
 const gateway = 'http://localhost:8000';
 // Keep the applicant app-bar photo request independent of a running gateway.
 beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { statusCode: 404, body: {} }));
@@ -35,6 +36,7 @@ function login(role = 'ROLE_APPLICANT') {
   cy.get('input[name=password]').type('password123', { log: false });
   cy.get('button[type=submit]').click();
   cy.location('pathname').should('eq', role === 'ROLE_APPLICANT' ? '/applicant' : role === 'ROLE_EMPLOYER' ? '/employer' : '/admin');
+  settleHome();
 }
 function navigate(path) {
   cy.window().then(win => { win.history.pushState({}, '', path); win.dispatchEvent(new PopStateEvent('popstate')); });
@@ -47,7 +49,7 @@ function setupApply(status = 'JOB_STATUS_PUBLISHED') {
   ] }).as('resumes');
   cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: { jobId, title: 'Synthetic internship', description: 'Job description', status, deadline: new Date(Date.now() + 86400000).toISOString() } }).as('job');
   login();
-  cy.contains('a', 'Apply').click();
+  navigate('/applicant/apply');
   cy.get('input').first().type(jobId);
   cy.contains('button', 'Load job').click();
   cy.wait(['@resumes', '@job']);
@@ -55,9 +57,9 @@ function setupApply(status = 'JOB_STATUS_PUBLISHED') {
   cy.get('[role=option]').should('have.length', 1).and('contain', 'validated.pdf').click();
 }
 function applications(role = 'ROLE_APPLICANT') {
-  cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
   login(role);
-  cy.contains('a', 'Applications').click();
+  cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
+  openApplications(role);
   cy.wait('@applications');
 }
 describe('JT-78 apply and applications', () => {
@@ -117,7 +119,7 @@ describe('JT-78 apply and applications', () => {
         ? { applications: [], pagination: {} }
         : { applications: [application], pagination: { nextPageToken: '20' } });
     });
-    login(); cy.contains('a', 'Applications').click();
+    login(); openApplications();
     cy.contains(applicationId).should('be.visible');
     cy.contains('button', 'Next page').click();
     cy.contains('No applications').should('be.visible');
@@ -146,7 +148,7 @@ describe('JT-78 offers', () => {
         expect(req.body).to.deep.eq({});
         req.reply({ offer: { ...offer, status: decision === 'accept' ? 'OFFER_STATUS_ACCEPTED' : 'OFFER_STATUS_DECLINED' } });
       }).as('decision');
-      login(); cy.contains('a', 'Offers').click();
+      login(); navigate('/applicant/offers');
       cy.get('input').type(offerId); cy.contains('button', 'Load offer').click();
       cy.contains('Synthetic offer terms').should('be.visible');
       cy.contains('button', decision === 'accept' ? 'Accept offer' : 'Decline offer').click();
@@ -161,7 +163,7 @@ describe('JT-78 messages and alerts', () => {
   for (const role of ['ROLE_APPLICANT', 'ROLE_EMPLOYER']) {
     it(`reads and sends application messages for ${role}`, () => {
       cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/messages?*`, { messages: [{ messageId: 'm1', senderId: 'other', content: 'Existing message' }] });
-      applications(role); cy.contains('a', 'Messages').click();
+      applications(role); cy.contains('.workspace-content a', 'Messages').click();
       cy.contains('Existing message').should('be.visible');
       cy.get('textarea').first().type('  Reply  ');
       cy.intercept('POST', `${gateway}/v1/applications/${applicationId}/messages`, req => {
@@ -199,8 +201,9 @@ describe('JT-78 messages and alerts', () => {
     navigate('/applicant/apply'); cy.location('pathname').should('eq', '/employer');
   });
   it('redirects expired workflow sessions to login on protected 401', () => {
+    login();
     cy.intercept('GET', `${gateway}/v1/applications?*`, { statusCode: 401, body: { code: 16 } });
-    login(); cy.contains('a', 'Applications').click();
+    openApplications();
     cy.location('pathname').should('eq', '/login');
   });
 });
@@ -215,7 +218,8 @@ describe('JT-78 boundaries and recovery', () => {
     login(); navigate('/applicant/apply');
     cy.contains('No validated resume').should('be.visible');
     cy.contains('button', 'Next page').click();
-    cy.get('[role=combobox]').click(); cy.get('[role=option]').contains('later.pdf').click();
+    // The select is disabled while the next page loads; a click before then is ignored.
+    cy.get('[role=combobox]').should('not.have.attr', 'aria-disabled', 'true').click(); cy.get('[role=option]').contains('later.pdf').click();
   });
   it('blocks a passed deadline even when the job is published', () => {
     setupApply();
@@ -248,7 +252,7 @@ describe('JT-78 boundaries and recovery', () => {
   });
   it('keeps the thread draft on failure and permits retry', () => {
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/messages?*`, { messages: [] });
-    applications(); cy.contains('a', 'Messages').click();
+    applications(); cy.contains('.workspace-content a', 'Messages').click();
     cy.contains('No messages').should('be.visible');
     cy.contains('button', 'Send message').should('be.disabled');
     cy.get('textarea').first().type('Retry this draft');
@@ -260,7 +264,7 @@ describe('JT-78 boundaries and recovery', () => {
   });
   it('shows permission errors for a non-participant thread and blocks sending', () => {
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/messages?*`, { statusCode: 403, body: { code: 7 } });
-    applications(); cy.contains('a', 'Messages').click();
+    applications(); cy.contains('.workspace-content a', 'Messages').click();
     cy.contains('You do not have permission').should('be.visible');
     cy.get('textarea').first().type('Cannot send');
     cy.contains('button', 'Send message').should('be.disabled');
@@ -379,7 +383,7 @@ describe('JT-108 offer discovery', () => {
       cy.wait('@byApplication');
       cy.contains(offer.terms).should('be.visible');
       cy.contains('button', 'Accept offer').should(role === 'ROLE_APPLICANT' ? 'exist' : 'not.exist');
-      cy.contains('a', 'Applications').click();
+      openApplications(role);
       cy.contains('a', 'View Offer').click(); cy.wait('@byApplication');
       cy.contains(offerId).should('be.visible');
       // JT-106 revalidates the session and preserves the offer deep link.
@@ -409,7 +413,7 @@ describe('JT-108 offer discovery', () => {
   });
   it('switches from the existing offer-ID lookup to application lookup', () => {
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { offer }).as('byApplication');
-    login(); cy.contains('a', 'Offers').click();
+    login(); navigate('/applicant/offers');
     cy.contains('button', 'Use application ID').click();
     cy.get('input').type(applicationId);
     cy.contains('button', 'Load offer').click(); cy.wait('@byApplication');

@@ -1,10 +1,17 @@
+import { useId, useState } from 'react';
+import { Alert, Box, Button, Collapse, Stack, Typography } from '@mui/material';
 import { EmptyState } from '../../components/EmptyState';
-import { useState } from 'react';
-import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
-import { Pager, ResourceState } from '../application/shared';
+import { ErrorState } from '../../components/ErrorState';
+import { Icon } from '../../components/Icon';
+import { ListPanel, ListRow, ResultsHeader } from '../../components/Lists';
+import { LoadingRows } from '../../components/LoadingRows';
+import { PageHeader } from '../../components/PageHeader';
+import { SearchBar, SearchField } from '../../components/SearchBar';
+import { Pager } from '../../components/Pager';
+import { tokens } from '../../theme';
 import { formatTime, grpcCode, length } from '../application-status/shared';
 import { useLoad } from '../application-status/useLoad';
-import { listAuditEntries, type AuditFilters } from './api';
+import { listAuditEntries, type AuditEntry, type AuditFilters } from './api';
 
 const messages = {
   [grpcCode.invalidArgument]: 'The filters were not accepted. Use a lowercase event type with dots, for example application.submitted, and a From time before the To time.',
@@ -17,6 +24,33 @@ function localTime(value: string) {
   if (!value) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+// The payload is shown exactly as received (JT-35). This admin-only page is the
+// one place IDs appear (redesign doc Section 4), and only after the admin expands it.
+function EntryCard({ entry }: { entry: AuditEntry }) {
+  const [open, setOpen] = useState(false);
+  const regionId = useId();
+  return <ListRow>
+    <Stack spacing={1}>
+      <Typography variant="h3" component="h2" sx={{ fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace', fontSize: '1rem' }}>{entry.eventType || 'Unknown event'}</Typography>
+      <Typography variant="body2" color="text.secondary">From {entry.producer || 'an unknown producer'} · {formatTime(entry.occurredAt)}</Typography>
+      <Box>
+        <Button aria-expanded={open} aria-controls={regionId} onClick={() => setOpen(o => !o)}
+          endIcon={<Icon name="chevronDown" size={16} sx={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }} />}>
+          {open ? 'Hide event data' : 'Show event data'}
+        </Button>
+      </Box>
+      <Collapse in={open} timeout={180} unmountOnExit>
+        <Box id={regionId} role="region" aria-label="Event data">
+          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace', mb: 1 }}>Event ID: {entry.eventId}</Typography>
+          <Box component="pre" tabIndex={0} sx={{ m: 0, p: 2, bgcolor: tokens.canvas, color: tokens.chipText, borderRadius: '12px', border: `1px solid ${tokens.border}`,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.8125rem', lineHeight: 1.6, fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace',
+            maxHeight: 360, overflow: 'auto' }}>{entry.dataJson || '{}'}</Box>
+        </Box>
+      </Collapse>
+    </Stack>
+  </ListRow>;
 }
 
 export function AuditLogPage() {
@@ -39,33 +73,29 @@ export function AuditLogPage() {
     setToken('');
   }
   function clear() { setEventType(''); setFrom(''); setTo(''); setApplied({ eventType: '' }); setToken(''); }
-  const total = list.data?.pagination?.totalCount;
-  return <Stack spacing={2}>
-    <Typography variant="h4" component="h1">Audit log</Typography>
-    <Typography>Every domain event, newest first. The data is shown exactly as it was received.</Typography>
-    <Stack component="form" direction={{ xs: 'column', xl: 'row' }} spacing={2} noValidate onSubmit={e => { e.preventDefault(); apply(); }}>
-      <TextField label="Event type" value={eventType} placeholder="application.submitted" helperText="Optional"
-        onChange={e => setEventType(e.target.value)} />
-      <TextField label="From" type="datetime-local" value={from} helperText="Optional, included" slotProps={{ inputLabel: { shrink: true } }}
-        onChange={e => setFrom(e.target.value)} />
-      <TextField label="To" type="datetime-local" value={to} helperText="Optional, not included" slotProps={{ inputLabel: { shrink: true } }}
-        onChange={e => setTo(e.target.value)} />
-      <Button type="submit" variant="contained" disabled={list.loading || problems.length > 0}>Apply filters</Button>
-      <Button disabled={list.loading} onClick={clear}>Clear filters</Button>
+  const entries = list.data?.entries ?? [];
+  const total = Number(list.data?.pagination?.totalCount ?? entries.length);
+  const filtered = !!(applied.eventType || applied.startTime || applied.endTime);
+  return <Stack spacing={4}>
+    <PageHeader title="Audit log" description="Every domain event, newest first. Event data is shown exactly as it was received."
+      action={<Button variant="outlined" disabled={list.loading} onClick={list.refresh}>Refresh entries</Button>} />
+    <Stack spacing={1.5}>
+      <SearchBar label="Audit log filters" submitLabel="Apply filters" submitDisabled={list.loading || problems.length > 0} onSubmit={apply}>
+        <SearchField label="Event type" value={eventType} placeholder="Any, for example application.submitted" onChange={setEventType} grow={1.4} />
+        <SearchField label="From (included)" type="datetime-local" value={from} onChange={setFrom} />
+        <SearchField label="To (not included)" type="datetime-local" value={to} onChange={setTo} />
+      </SearchBar>
+      {(filtered || eventType || from || to) && <Box><Button disabled={list.loading} onClick={clear}>Clear filters</Button></Box>}
     </Stack>
     {problems.map(p => <Alert key={p} severity="warning">{p}</Alert>)}
-    <Button disabled={list.loading} onClick={list.refresh}>Refresh entries</Button>
-    {list.loading && <ResourceState loading error="" />}
-    {!list.loading && list.error && <><Alert severity="error">{list.error}</Alert><Button onClick={list.refresh}>Try again</Button></>}
-    {list.data && total !== undefined && <Typography>Matching entries: {Number(total).toLocaleString()}</Typography>}
-    {list.data && !list.data.entries?.length && <EmptyState>No entries on this page.</EmptyState>}
-    {list.data?.entries?.map(e => <Card key={e.eventId}><CardContent><Stack spacing={1}>
-      <Typography variant="h6" component="h2">{e.eventType || 'Unknown event'}</Typography>
-      <Typography>Producer: {e.producer || 'Unknown'}</Typography>
-      <Typography>Occurred: {formatTime(e.occurredAt)}</Typography>
-      <Typography className="record-id">Event ID: {e.eventId}</Typography>
-      <Box component="pre" sx={{ m: 0, p: 1, bgcolor: '#edf1e6', borderRadius: '8px', border: '1px solid #dce3d4', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 13 }}>{e.dataJson || '{}'}</Box>
-    </Stack></CardContent></Card>)}
-    <Pager next={list.data?.pagination?.nextPageToken} token={token} busy={list.loading} onPage={setToken} />
+    {list.loading && <LoadingRows rows={3} label="Loading entries" />}
+    {!list.loading && list.error && <ErrorState message={list.error} onRetry={list.refresh} />}
+    {list.data && !entries.length && <EmptyState title="No entries" description="No events match these filters on this page." />}
+    {!!entries.length && <Stack spacing={2}>
+      <ResultsHeader title={`${total.toLocaleString()} ${total === 1 ? 'entry' : 'entries'}`} note="Newest first" />
+      <ListPanel label="Audit entries">{entries.map(e => <EntryCard key={e.eventId} entry={e} />)}</ListPanel>
+    </Stack>}
+    <Pager token={token} nextToken={list.data?.pagination?.nextPageToken} totalCount={list.data?.pagination?.totalCount}
+      count={entries.length} busy={list.loading} onPage={setToken} />
   </Stack>;
 }

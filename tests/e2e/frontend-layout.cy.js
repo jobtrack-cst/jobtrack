@@ -1,11 +1,7 @@
 // JT-101: presentation regressions beyond the representative report captures.
 import { openNavigation, closeNavigation } from './navigation';
+import { homeHeading, navigationLinks as links } from './home';
 const gateway = 'http://localhost:8000';
-const links = {
-  applicant: ['Search jobs', 'Saved jobs', 'Notifications', 'Applications', 'Apply', 'Offers', 'Job alerts', 'Profile', 'Resumes', 'Report a job'],
-  employer: ['My jobs', 'Notifications', 'Applications', 'Offers', 'Company', 'Verification', 'Report a job'],
-  admin: ['Notifications', 'Verification', 'Moderation', 'Analytics', 'Audit log', 'Report a job'],
-};
 
 for (const role of Object.keys(links)) {
   it(`JT-101 ${role}: all navigation pages fit mobile and tablet, with keyboard access to main content`, () => {
@@ -40,7 +36,7 @@ for (const role of Object.keys(links)) {
     cy.get('main').should('be.focused');
     cy.get('header a[aria-label="JobTrack home"]').click();
     cy.location('pathname').should('eq', `/${role}`);
-    cy.get('main h1').should('contain', `${role[0].toUpperCase()}${role.slice(1)} workspace`);
+    cy.get('main h1').should('have.text', homeHeading(role, user.fullName));
   });
 }
 
@@ -58,10 +54,11 @@ it('JT-101 honors the browser reduced-motion preference', () => {
   }));
 });
 
-it('JT-101 public brand uses the existing public route and keeps its fallback accessible', () => {
+it('JT-110 brand keeps its wordmark and accessible name when the mark fails to load', () => {
   cy.intercept('GET', '/branding/jobtrack-mark.svg', { statusCode: 404, body: '' });
   cy.visit('/register');
-  cy.get('header a[aria-label="JobTrack home"]').should('contain', 'JobTrack').and('contain', 'JT');
+  cy.get('header a[aria-label="JobTrack home"]').should('contain', 'JobTrack');
+  cy.get('header a[aria-label="JobTrack home"] img').should('have.attr', 'alt', '');
   cy.get('header a[aria-label="JobTrack home"]').focus().should('be.focused');
   cy.press(Cypress.Keyboard.Keys.ENTER);
   cy.location('pathname').should('eq', '/login');
@@ -79,7 +76,7 @@ it('JT-101 long job data reflows at all five widths and at 200% text size', () =
   cy.get('input[name=password]').type('synthetic-password', { log: false });
   cy.get('button[type=submit]').click();
   openNavigation();
-  cy.contains('nav a', /^Search jobs$/).click();
+  cy.contains('nav a', /^Find jobs$/).click();
   cy.get('.MuiCard-root h2').should('contain', '界'.repeat(150));
   for (const width of [320, 390, 768, 1024, 1280]) {
     cy.viewport(width, 900);

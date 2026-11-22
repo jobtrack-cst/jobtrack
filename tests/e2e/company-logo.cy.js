@@ -38,7 +38,7 @@ beforeEach(() => {
 
 describe('JT-102 company logo on jobs', () => {
   it('shows the logo on search cards and loads it once per employer', () => {
-    cy.contains('nav a', /^Search jobs$/).click();
+    cy.contains('nav a', /^Find jobs$/).click();
     for (const title of ['Frontend intern', 'Backend intern']) {
       card(title).should('contain', 'Druk Tech').find('img[alt="Druk Tech logo"]')
         .should('have.attr', 'src').and('match', /^data:image\/png;base64,/);
@@ -48,14 +48,14 @@ describe('JT-102 company logo on jobs', () => {
   });
 
   it('shows initials and skips the logo request when the company has no logo', () => {
-    cy.contains('nav a', /^Search jobs$/).click();
+    cy.contains('nav a', /^Find jobs$/).click();
     card('Data intern').should('contain', 'Paro Works').find('.MuiAvatar-root').should('have.text', 'PW').find('img').should('not.exist');
     cy.get('@noLogo.all').should('have.length', 0);
   });
 
   it('shows the logo on job details', () => {
     cy.intercept('GET', `${gateway}/v1/jobs/${jobs[0].jobId}`, { job: { ...jobs[0], description: 'Build pages', status: 'JOB_STATUS_PUBLISHED' } });
-    cy.contains('nav a', /^Search jobs$/).click();
+    cy.contains('nav a', /^Find jobs$/).click();
     card('Frontend intern').contains('a', 'View job').click();
     cy.contains('Build pages').should('be.visible');
     card('Build pages').should('contain', 'Druk Tech').find('img[alt="Druk Tech logo"]')

@@ -110,7 +110,7 @@ describe('JT-106 session persistence', () => {
   it('clears storage and client auth on automatic one-hour expiry', () => {
     cy.intercept('GET', `${gateway}/v1/auth/me`, { user: user('ROLE_EMPLOYER') });
     visitStored(credentials(), '/employer');
-    cy.contains('h1', 'Employer workspace').should('be.visible');
+    cy.contains('h1', /^Home$/).should('be.visible');
     cy.clock(Date.now(), ['Date', 'setTimeout', 'clearTimeout']);
     // The existing expiry timer predates cy.clock; focus also checks wall-clock expiry.
     cy.tick(3600001);

@@ -42,7 +42,7 @@ export function SearchJobsPage() {
     {resource.data && <Typography variant="subtitle2" color="text.secondary">Matching jobs: {resource.data.pagination?.totalCount ?? 0}</Typography>}
     {resource.data && !resource.data.jobs?.length && <EmptyState>No open jobs match these filters.</EmptyState>}
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
-      {resource.data?.jobs?.map(job => <Card key={job.jobId} sx={{ borderTop: '3px solid #c9a76b' }}><CardContent><Stack spacing={1.5}>
+      {resource.data?.jobs?.map(job => <Card key={job.jobId} sx={{ borderTop: '3px solid', borderTopColor: 'primary.main' }}><CardContent><Stack spacing={1.5}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
           <Typography variant="overline" color="text.secondary">Opportunity</Typography>{job.location && <Chip label={job.location} variant="outlined" color="secondary" />}
         </Stack>

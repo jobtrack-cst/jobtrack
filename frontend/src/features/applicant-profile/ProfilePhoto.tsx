@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Avatar } from '@mui/material';
+import { tokens } from '../../theme';
 import { initialsOf } from '../employer/logo';
 import { loadPhoto, onPhotoChange } from './photo';
 
@@ -25,5 +26,6 @@ export function ProfilePhoto({ userId, name, hasPhoto, size = 40 }: Props) {
     return () => { current = false; };
   }, [userId, hasPhoto, version]);
   return <Avatar src={src ?? undefined} alt={name ? `${name} profile photo` : 'Profile photo'}
-    sx={{ width: size, height: size, fontSize: size * 0.4 }}>{initialsOf(name)}</Avatar>;
+    // Initials use the Night accent circle, as the account button does (JT-110).
+    sx={{ width: size, height: size, fontSize: size * 0.36, fontWeight: 800, bgcolor: tokens.accent, color: tokens.onAccent }}>{initialsOf(name)}</Avatar>;
 }

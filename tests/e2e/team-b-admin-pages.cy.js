@@ -30,6 +30,13 @@ function login(role) {
   cy.get('input[name=password]').type('password123', { log: false });
   cy.get('button[type=submit]').click();
   cy.location('pathname').should('eq', landing);
+  settleHome(role);
+}
+// JT-110 home pages load lists of their own; wait for them before stubbing the page under test.
+function settleHome(role) {
+  cy.get('.workspace-content h1').should('be.visible');
+  cy.get('.workspace-content [role=status][aria-label^="Loading"]').should('not.exist');
+  if (role === 'ROLE_ADMIN') for (const tile of ['Pending verification', 'Open reports']) cy.contains('.workspace-content a', tile).should('not.contain', '…');
 }
 const exact = text => new RegExp(`^${Cypress._.escapeRegExp(text)}$`);
 function open(link) { cy.contains('nav a', exact(link)).click(); }
@@ -48,21 +55,19 @@ function fill(label, text) {
     el.dispatchEvent(new view.Event('input', { bubbles: true }));
   });
 }
-function choose(label, option) {
-  cy.contains('label', new RegExp(`^${label}`)).parent().find('[role=combobox]').click();
-  cy.contains('[role=option]', exact(option)).click();
-}
+// JT-110 status filters are tabs.
+function tab(label) { cy.contains('[role=tab]', exact(label)).click(); }
 function visit(path) {
   cy.window().then(win => { win.history.pushState({}, '', path); win.dispatchEvent(new PopStateEvent('popstate')); });
 }
-const card = text => cy.contains('.MuiCard-root', text);
+const card = text => cy.contains('.MuiCard-root, .workspace-content li', text);
 
 describe('JT-88 company profile', () => {
   const fields = { companyName: 'Druk Tech', description: 'Synthetic company', website: 'https://druktech.example', location: 'Thimphu' };
   const profile = { employerId, ...fields, verificationStatus: 'VERIFICATION_STATUS_UNVERIFIED', timestamps };
   function openCompany(response) {
-    cy.intercept('GET', `${gateway}/v1/employer/profile`, response).as('load');
     login('ROLE_EMPLOYER');
+    cy.intercept('GET', `${gateway}/v1/employer/profile`, response).as('load');
     open('Company');
     cy.wait('@load');
   }
@@ -160,9 +165,9 @@ describe('JT-88 employer verification request', () => {
   const pending = { requestId, employerId, registrationNumber: 'REG-123', notes: 'Trade licence', status: 'REQUEST_STATUS_PENDING', timestamps };
   const listUrl = `${gateway}/v1/verification/my-requests?*`;
   function openVerification(requests) {
-    cy.intercept('GET', listUrl, { requests, pagination: {} }).as('list');
     login('ROLE_EMPLOYER');
-    open('Verification');
+    cy.intercept('GET', listUrl, { requests, pagination: {} }).as('list');
+    visit('/employer/verification');
     cy.wait('@list');
   }
 
@@ -236,8 +241,8 @@ describe('JT-88 admin verification', () => {
   const approveUrl = `${gateway}/v1/verification/requests/${requestId}/approve`;
   const rejectUrl = `${gateway}/v1/verification/requests/${requestId}/reject`;
   function openQueue(response = { requests: [pending], pagination: {} }) {
-    cy.intercept('GET', listUrl, response).as('list');
     login('ROLE_ADMIN');
+    cy.intercept('GET', listUrl, response).as('list');
     open('Verification');
     cy.wait('@list');
   }
@@ -249,9 +254,9 @@ describe('JT-88 admin verification', () => {
       req.reply({ requests: [pending], pagination: {} });
     });
     cy.intercept('GET', `${gateway}/v1/companies/${employerId}`, { profile: company }).as('company');
-    card('REG-123').contains('button', 'View company').click();
+    card('REG-123').contains('button', 'Show company details').click();
     cy.wait('@company');
-    card('REG-123').should('contain', 'Company: Druk Tech').and('contain', 'Location: Thimphu');
+    card('REG-123').should('contain', 'Druk Tech').and('contain', 'Location: Thimphu').and('not.contain', employerId);
     cy.intercept('POST', approveUrl, req => {
       expect(req.body).to.deep.eq({});
       req.reply({ request: { ...pending, status: 'REQUEST_STATUS_APPROVED', reviewedBy: adminId } });
@@ -265,7 +270,7 @@ describe('JT-88 admin verification', () => {
     cy.contains('button', 'Confirm approval').click();
     cy.wait(['@approve', '@relist']);
     cy.contains('Request approved').should('be.visible');
-    cy.contains('No requests on this page.').should('be.visible');
+    cy.contains('No employer is waiting for a decision.').should('be.visible');
   });
 
   it('rejects with a trimmed reason of 1 to 500 characters', () => {
@@ -297,10 +302,13 @@ describe('JT-88 admin verification', () => {
         ? { requests: [approved], pagination: {} }
         : { requests: [pending], pagination: { nextPageToken: '20' } });
     }).as('all');
-    choose('Status', 'All');
+    tab('All');
     cy.wait('@all');
-    cy.contains('button', 'Next page').click();
-    card('REG-456').should('contain', 'Approved').and('contain', `by admin ${adminId}`);
+    cy.contains('Showing 1 to 1').should('be.visible');
+    cy.contains('button', exact('Next')).click();
+    cy.contains('Showing 21 to 21').should('be.visible');
+    card('REG-456').should('contain', 'Approved').and('contain', 'by an admin').and('not.contain', adminId);
+    cy.contains('button', exact('Previous')).should('be.enabled');
     card('REG-456').contains('button', 'Approve').should('not.exist');
   });
 
@@ -318,7 +326,7 @@ describe('JT-88 admin verification', () => {
   it('says when the employer has no company profile', () => {
     openQueue();
     cy.intercept('GET', `${gateway}/v1/companies/${employerId}`, { statusCode: 404, body: { code: 5, message: 'private-input' } });
-    card('REG-123').contains('button', 'View company').click();
+    card('REG-123').contains('button', 'Show company details').click();
     card('REG-123').should('contain', 'has not created a company profile').and('not.contain', 'private-input');
   });
 });
@@ -359,7 +367,7 @@ describe('JT-88 verification path', () => {
     card('REG-123').contains('button', 'Approve').click();
     cy.contains('button', 'Confirm approval').click();
     cy.wait('@approve');
-    cy.contains('No requests on this page.').should('be.visible');
+    cy.contains('No employer is waiting for a decision.').should('be.visible');
 
     openAccountMenu();
     cy.contains('button', 'Log out').click();
@@ -367,7 +375,7 @@ describe('JT-88 verification path', () => {
     open('Company');
     cy.contains('.MuiChip-root', exact('Verified')).should('be.visible');
     cy.contains('a', 'Request verification').should('not.exist');
-    open('Verification');
+    visit('/employer/verification');
     cy.contains('Your company is verified').should('be.visible');
   });
 });
@@ -378,8 +386,8 @@ describe('JT-88 report a job', () => {
   const report = { reportId, jobId, reason: 'Asks applicants for a fee', status: 'REPORT_STATUS_OPEN', timestamps };
 
   it('reports a job from the application card with the job ID filled in', () => {
-    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
     login('ROLE_APPLICANT');
+    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
     open('Applications');
     cy.wait('@applications');
     cy.contains('a', exact('Report job')).click();
@@ -399,7 +407,7 @@ describe('JT-88 report a job', () => {
 
   it('lets an employer report by ID, blocking a bad ID and a reason over 1000 characters', () => {
     login('ROLE_EMPLOYER');
-    open('Report a job');
+    visit('/employer/report-job');
     field('Job ID').type('not-a-uuid');
     field('Reason').type('Fake job');
     cy.get('[role=alert]').should('contain', 'must be a UUID');
@@ -430,7 +438,7 @@ describe('JT-88 report a job', () => {
     it(`explains a ${statusCode} answer with code ${code} to Send report`, () => {
       cy.intercept('POST', reportUrl, { statusCode, body: { code, message: 'private-input' } });
       login('ROLE_APPLICANT');
-      open('Report a job');
+      visit('/applicant/report-job');
       field('Job ID').type(jobId);
       field('Reason').type('Fake job');
       cy.contains('button', 'Send report').click();
@@ -444,9 +452,12 @@ describe('JT-88 admin moderation', () => {
   const report = { reportId, jobId, reporterId: people.ROLE_APPLICANT.userId, reason: 'Asks applicants for a fee', status: 'REPORT_STATUS_OPEN', timestamps };
   const listUrl = `${gateway}/v1/moderation/reports?*`;
   const removeUrl = `${gateway}/v1/moderation/jobs/${jobId}/remove`;
+  const job = { jobId, employerId, title: 'Frontend developer intern', status: 'JOB_STATUS_PUBLISHED', deadline: '2030-12-20T12:00:00Z' };
   function openReports(response = { reports: [report], pagination: {} }) {
-    cy.intercept('GET', listUrl, response).as('list');
     login('ROLE_ADMIN');
+    cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job });
+    cy.intercept('GET', `${gateway}/v1/companies/${employerId}`, { profile: { employerId, companyName: 'Druk Tech' } });
+    cy.intercept('GET', listUrl, response).as('list');
     open('Moderation');
     cy.wait('@list');
   }
@@ -456,7 +467,8 @@ describe('JT-88 admin moderation', () => {
       expect(req.query.status).to.eq('REPORT_STATUS_OPEN');
       req.reply({ reports: [report], pagination: {} });
     });
-    card('Asks applicants').should('contain', 'Open').and('contain', jobId);
+    card('Asks applicants').should('contain', 'Open').and('contain', job.title).and('contain', 'Druk Tech')
+      .and('not.contain', jobId).and('not.contain', reportId).and('not.contain', people.ROLE_APPLICANT.userId);
     cy.intercept('POST', `${gateway}/v1/moderation/reports/${reportId}/dismiss`, req => {
       expect(req.body).to.deep.eq({});
       req.reply({ report: { ...report, status: 'REPORT_STATUS_DISMISSED' } });
@@ -475,7 +487,9 @@ describe('JT-88 admin moderation', () => {
   it('removes a reported job with a trimmed reason of 1 to 500 characters', () => {
     openReports();
     card('Asks applicants').contains('button', 'Remove job').click();
-    field('Job ID').should('have.value', jobId).and('be.disabled');
+    // The job comes from the report, so the admin sees its title and types no ID.
+    cy.get('[role=dialog]').should('contain', `Job: ${job.title}`).and('not.contain', jobId);
+    cy.get('[role=dialog]').contains('label', 'Job ID').should('not.exist');
     cy.contains('button', 'Confirm removal').should('be.disabled');
     fill('Reason', 'x'.repeat(501));
     cy.get('[role=alert]').should('contain', 'at most 500 characters');
@@ -513,9 +527,9 @@ describe('JT-88 admin moderation', () => {
       expect(req.query.status).to.eq('REPORT_STATUS_ACTIONED');
       req.reply({ reports: [{ ...report, status: 'REPORT_STATUS_ACTIONED' }], pagination: {} });
     }).as('actioned');
-    choose('Status', 'Actioned');
+    tab('Job removed');
     cy.wait('@actioned');
-    card('Asks applicants').should('contain', 'Actioned');
+    card('Asks applicants').should('contain', 'Job removed');
     card('Asks applicants').contains('button', 'Dismiss').should('not.exist');
   });
 
@@ -604,8 +618,8 @@ describe('JT-88 audit log', () => {
   const entry = { eventId: '88888888-8888-4888-8888-888888888888', eventType: 'employer.verified', producer: 'company-verification', occurredAt: '2026-11-16T04:00:00Z', dataJson: '{"employerId":"66666666-6666-4666-8666-666666666666"}' };
   const listUrl = `${gateway}/v1/audit/entries?*`;
   function openAudit(response = { entries: [entry], pagination: {} }) {
-    cy.intercept('GET', listUrl, response).as('list');
     login('ROLE_ADMIN');
+    cy.intercept('GET', listUrl, response).as('list');
     open('Audit log');
     cy.wait('@list');
   }
@@ -619,9 +633,14 @@ describe('JT-88 audit log', () => {
         ? { entries: [next], pagination: { totalCount: 2 } }
         : { entries: [entry], pagination: { nextPageToken: '20', totalCount: 2 } });
     });
-    cy.contains('Matching entries: 2').should('be.visible');
-    card('employer.verified').should('contain', 'company-verification').find('pre').should('have.text', entry.dataJson);
-    cy.contains('button', 'Next page').click();
+    cy.contains('Showing 1 to 1 of 2').should('be.visible');
+    card('employer.verified').should('contain', 'company-verification').and('not.contain', entry.eventId);
+    card('employer.verified').find('pre').should('not.exist');
+    card('employer.verified').contains('button', 'Show event data').should('have.attr', 'aria-expanded', 'false').click();
+    card('employer.verified').contains('button', 'Hide event data').should('have.attr', 'aria-expanded', 'true');
+    card('employer.verified').find('pre').should('have.text', entry.dataJson);
+    card('employer.verified').should('contain', `Event ID: ${entry.eventId}`);
+    cy.contains('button', exact('Next')).click();
     card('job.published').should('contain', 'job-posting');
   });
 
@@ -639,7 +658,7 @@ describe('JT-88 audit log', () => {
     }).as('filtered');
     cy.contains('button', 'Apply filters').click();
     cy.wait('@filtered');
-    cy.contains('No entries on this page.').should('be.visible');
+    cy.contains('No events match these filters').should('be.visible');
     cy.intercept('GET', listUrl, req => {
       expect(req.query).not.to.have.property('event_type');
       expect(req.query).not.to.have.property('start_time');
@@ -676,8 +695,8 @@ describe('JT-88 role-limited routes', () => {
 
   it('gives applicants no employer or admin links or routes', () => {
     login('ROLE_APPLICANT');
-    cy.contains('nav a', exact('Report a job')).should('be.visible');
-    for (const link of ['Company', 'Verification', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
+    for (const link of ['Find jobs', 'Saved', 'Applications']) cy.contains('nav a', exact(link)).should('be.visible');
+    for (const link of ['Report a job', 'Messages', 'Company', 'Verification', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
     visit('/admin/moderation');
     cy.location('pathname').should('eq', '/applicant');
     visit('/employer/company');
@@ -686,20 +705,20 @@ describe('JT-88 role-limited routes', () => {
 
   it('gives employers Company and Verification but no admin pages', () => {
     login('ROLE_EMPLOYER');
-    for (const link of ['Company', 'Verification', 'Report a job']) cy.contains('nav a', exact(link)).should('be.visible');
-    for (const link of adminLinks) cy.contains('nav a', exact(link)).should('not.exist');
+    for (const link of ['Jobs', 'Applicants', 'Company']) cy.contains('nav a', exact(link)).should('be.visible');
+    for (const link of ['Verification', 'Report a job', 'Messages', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
     visit('/admin/audit-log');
     cy.location('pathname').should('eq', '/employer');
   });
 
   it('gives admins the admin pages but no applicant or employer pages', () => {
     login('ROLE_ADMIN');
-    for (const link of ['Verification', ...adminLinks, 'Report a job']) cy.contains('nav a', exact(link)).should('be.visible');
-    for (const link of ['Applications', 'Company']) cy.contains('nav a', exact(link)).should('not.exist');
+    for (const link of ['Verification', ...adminLinks]) cy.contains('nav a', exact(link)).should('be.visible');
+    for (const link of ['Report a job', 'Notifications', 'Applications', 'Company']) cy.contains('nav a', exact(link)).should('not.exist');
     visit('/employer/verification');
     cy.location('pathname').should('eq', '/admin');
     visit('/admin/unknown');
     cy.location('pathname').should('eq', '/admin');
-    cy.contains('h1', 'Admin workspace').should('be.visible');
+    cy.contains('h1', exact('Home')).should('be.visible');
   });
 });
