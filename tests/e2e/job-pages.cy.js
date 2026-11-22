@@ -1,3 +1,4 @@
+import { settleHome } from './home';
 import { openAccountMenu } from './account-menu';
 // JT-73 gateway-stubbed UI workflows; live steps are in docs/testing/jt-73-frontend.md.
 const gateway = 'http://localhost:8000';
@@ -45,6 +46,7 @@ function login(role = 'ROLE_EMPLOYER') {
   cy.get('input[name=password]').type('password123', { log: false });
   cy.get('button[type=submit]').click();
   cy.location('pathname').should('eq', `/${role.slice(5).toLowerCase()}`);
+  settleHome();
 }
 function references() {
   cy.intercept('GET', `${gateway}/v1/categories?*`, { categories: [{ categoryId, name: 'Technology' }], pagination: {} });
@@ -84,7 +86,7 @@ describe('JT-73 employer jobs', () => {
         expect(req.body).to.deep.eq({}); current = { ...current, status }; req.reply({ job: current });
       }).as(action);
     }
-    login(); open('My jobs');
+    login(); open('Jobs');
     card(job.title).should('contain', 'Draft');
     cy.contains('button', 'Next page').click(); cy.contains('No jobs on this page.').should('be.visible');
     cy.contains('button', 'First page').click();
@@ -225,7 +227,7 @@ describe('JT-73 applicant jobs', () => {
       req.reply({ jobs: [job], pagination: { nextPageToken: '20', totalCount: 21 } });
     }).as('search');
     cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: { ...job, status: 'JOB_STATUS_PUBLISHED' } });
-    login('ROLE_APPLICANT'); open('Search jobs'); cy.wait('@search');
+    login('ROLE_APPLICANT'); open('Find jobs'); cy.wait('@search');
     cy.contains('button', 'Next page').click(); cy.wait('@search').its('request.query').should('include', { 'pagination.page_token': '20' });
     field('Search title').type(' intern '); choose('Category', 'Technology'); choose('Tags', 'React'); field('Tags').type('{esc}'); field('Location').type('Thimphu{esc}');
     cy.contains('button', exact('Search')).click();
@@ -244,10 +246,10 @@ describe('JT-73 applicant jobs', () => {
     }).as('save');
     cy.intercept('GET', `${gateway}/v1/saved-jobs?*`, req => req.reply({ savedJobs: saved, pagination: { totalCount: saved.length } }));
     cy.intercept('DELETE', `${gateway}/v1/saved-jobs/${jobId}`, req => { saved = []; req.reply({ statusCode: 200, body: {} }); }).as('unsave');
-    login('ROLE_APPLICANT'); open('Search jobs'); card(job.title).contains('button', exact('Save job')).click(); cy.wait('@save');
+    login('ROLE_APPLICANT'); open('Find jobs'); card(job.title).contains('button', exact('Save job')).click(); cy.wait('@save');
     card(job.title).should('contain', 'Job saved.');
-    open('Saved jobs'); card(jobId).contains('a', 'View job').click(); cy.contains(job.description).should('be.visible');
-    open('Saved jobs'); card(jobId).contains('button', 'Unsave job').click(); cy.wait('@unsave');
+    open('Saved'); card(jobId).contains('a', 'View job').click(); cy.contains(job.description).should('be.visible');
+    open('Saved'); card(jobId).contains('button', 'Unsave job').click(); cy.wait('@unsave');
     cy.contains('No saved jobs on this page.').should('be.visible');
   });
 
@@ -264,7 +266,7 @@ describe('JT-73 applicant jobs', () => {
     it(`shows a safe save failure ${code}`, () => {
       cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs: [job], pagination: {} });
       cy.intercept('POST', `${gateway}/v1/saved-jobs`, { statusCode, body: { code, message: 'private-input' } });
-      login('ROLE_APPLICANT'); open('Search jobs'); cy.contains('button', exact('Save job')).click();
+      login('ROLE_APPLICANT'); open('Find jobs'); cy.contains('button', exact('Save job')).click();
       cy.get('[role=alert]').should('contain', message).and('not.contain', 'private-input');
     });
   }
@@ -287,7 +289,7 @@ describe('JT-73 applicant jobs', () => {
 
   it('clears search filters and shows an empty result', () => {
     cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs: [], pagination: {} }).as('search');
-    login('ROLE_APPLICANT'); open('Search jobs'); cy.wait('@search');
+    login('ROLE_APPLICANT'); open('Find jobs'); cy.wait('@search');
     field('Search title').type('Nothing'); cy.contains('button', exact('Search')).click(); cy.wait('@search');
     cy.contains('No open jobs match these filters.').should('be.visible');
     cy.contains('button', 'Clear filters').click(); cy.wait('@search').its('request.query').should('include', { query: '', category_id: '', location: '', 'pagination.page_token': '' });
@@ -305,7 +307,7 @@ describe('JT-73 notifications and routing', () => {
       cy.intercept('POST', `${gateway}/v1/notifications/${notificationId}/read`, req => {
         expect(req.body).to.deep.eq({}); read = true; req.reply({ notification: { ...notice, read } });
       }).as('read');
-      login(role); open('Notifications'); cy.wait('@notifications');
+      login(role); visit(`/${role.slice(5).toLowerCase()}/notifications`); cy.wait('@notifications');
       card(notice.title).should('contain.text', notice.body).find('script').should('not.exist');
       cy.contains('label', 'Unread only').click(); cy.wait('@notifications').its('request.query.unread_only').should('eq', 'true');
       card(notice.title).contains('button', 'Mark as read').click(); cy.wait('@read');
@@ -317,7 +319,7 @@ describe('JT-73 notifications and routing', () => {
 
   it('paginates notifications and handles mark-read failures safely', () => {
     cy.intercept('GET', `${gateway}/v1/notifications?*`, req => req.reply({ notifications: [notice], pagination: req.query['pagination.page_token'] ? {} : { nextPageToken: '20' } })).as('list');
-    login('ROLE_APPLICANT'); open('Notifications'); cy.wait('@list');
+    login('ROLE_APPLICANT'); visit('/applicant/notifications'); cy.wait('@list');
     cy.contains('button', 'Next page').click(); cy.wait('@list').its('request.query').should('include', { 'pagination.page_token': '20' });
     cy.intercept('POST', `${gateway}/v1/notifications/${notificationId}/read`, { statusCode: 403, body: { code: 7, message: 'private-input' } });
     cy.contains('button', 'Mark as read').click(); cy.get('[role=alert]').should('contain', 'own notifications').and('not.contain', 'private-input');
@@ -326,15 +328,15 @@ describe('JT-73 notifications and routing', () => {
 
   it('clears an expired session on a protected notification request', () => {
     cy.intercept('GET', `${gateway}/v1/notifications?*`, { statusCode: 401, body: { code: 16 } });
-    login('ROLE_APPLICANT'); open('Notifications'); cy.location('pathname').should('eq', '/login');
+    login('ROLE_APPLICANT'); visit('/applicant/notifications'); cy.location('pathname').should('eq', '/login');
   });
 
   it('restricts job routes and navigation to the correct role', () => {
-    login('ROLE_APPLICANT'); cy.contains('nav a', exact('My jobs')).should('not.exist');
+    login('ROLE_APPLICANT'); cy.contains('nav a', exact('Jobs')).should('not.exist');
     visit('/employer/jobs'); cy.location('pathname').should('eq', '/applicant');
     openAccountMenu();
     cy.contains('button', 'Log out').click(); login();
-    cy.contains('nav a', exact('Search jobs')).should('not.exist'); cy.contains('nav a', exact('Saved jobs')).should('not.exist');
+    cy.contains('nav a', exact('Find jobs')).should('not.exist'); cy.contains('nav a', exact('Saved')).should('not.exist');
     visit('/applicant/saved-jobs'); cy.location('pathname').should('eq', '/employer');
     openAccountMenu();
     cy.contains('button', 'Log out').click(); login('ROLE_ADMIN');
@@ -413,7 +415,7 @@ describe('JT-73 recovery and boundaries', () => {
 
   it('validates search text limits and recovers from a network failure', () => {
     cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { forceNetworkError: true });
-    login('ROLE_APPLICANT'); open('Search jobs');
+    login('ROLE_APPLICANT'); open('Find jobs');
     cy.contains('Cannot reach JobTrack.').should('be.visible');
     fill('Search title', 'x'.repeat(151)); cy.contains('button', exact('Search')).should('be.disabled');
     fill('Search title', 'x'.repeat(150)); cy.contains('button', exact('Search')).should('be.enabled');
@@ -424,8 +426,9 @@ describe('JT-73 recovery and boundaries', () => {
   });
 
   it('paginates saved jobs and refreshes after a bookmark disappears', () => {
+    login('ROLE_APPLICANT');
     cy.intercept('GET', `${gateway}/v1/saved-jobs?*`, req => req.reply({ savedJobs: [{ jobId, applicantId: userId, savedAt: deadline }], pagination: req.query['pagination.page_token'] ? {} : { nextPageToken: '20' } })).as('saved');
-    login('ROLE_APPLICANT'); open('Saved jobs'); cy.wait('@saved');
+    open('Saved'); cy.wait('@saved');
     cy.contains('button', 'Next page').click(); cy.wait('@saved').its('request.query').should('include', { 'pagination.page_token': '20' });
     cy.intercept('DELETE', `${gateway}/v1/saved-jobs/${jobId}`, { statusCode: 404, body: { code: 5, message: 'private-input' } });
     cy.contains('button', 'Unsave job').click(); cy.get('[role=alert]').should('contain', 'no longer available').and('not.contain', 'private-input');

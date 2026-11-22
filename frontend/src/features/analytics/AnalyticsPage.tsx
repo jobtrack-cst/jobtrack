@@ -1,6 +1,10 @@
-import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Alert, Box, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { Card } from '../../components/Card';
+import { EmptyState } from '../../components/EmptyState';
+import { LoadingRows } from '../../components/LoadingRows';
+import { PageHeader } from '../../components/PageHeader';
+import { SearchBar, SearchField } from '../../components/SearchBar';
 import { formatTime, gatewayMessage, grpcCode } from '../application-status/shared';
 import { getSummary, type Summary } from './api';
 import { dayInput, dayStart } from './dates';
@@ -15,6 +19,7 @@ const rows: [CountKey, string][] = [
   ['applicationsSubmitted', 'Applications submitted'], ['applicationsWithdrawn', 'Applications withdrawn'],
   ['offersMade', 'Offers made'], ['offersAccepted', 'Offers accepted'], ['offersDeclined', 'Offers declined'],
 ];
+const highlights: [CountKey, string][] = [['jobsPublished', 'Jobs published'], ['applicationsSubmitted', 'Applications submitted'], ['offersAccepted', 'Offers accepted']];
 const count = (value?: string | number) => Number(value ?? 0).toLocaleString();
 // Events carry names such as "UNDER_REVIEW"; show them as "Under review".
 function statusName(status?: string) {
@@ -39,36 +44,30 @@ export function AnalyticsPage() {
     catch (failure) { setError(gatewayMessage(failure, messages)); }
     finally { setBusy(false); }
   }
-  return <Stack spacing={2}>
-    <Typography variant="h4" component="h1">Analytics</Typography>
-    <Typography>Counts events from the start of the From day to the end of the To day, in your time zone.</Typography>
-    <Stack component="form" direction={{ xs: 'column', sm: 'row' }} spacing={2} noValidate onSubmit={e => { e.preventDefault(); void load(); }}>
-      <TextField label="From" type="date" required value={from} disabled={busy} slotProps={{ inputLabel: { shrink: true } }}
-        onChange={e => setFrom(e.target.value)} />
-      <TextField label="To" type="date" required value={to} disabled={busy} slotProps={{ inputLabel: { shrink: true } }}
-        onChange={e => setTo(e.target.value)} />
-      <Button type="submit" variant="contained" disabled={busy || !!problem}>Show summary</Button>
-    </Stack>
+  return <Stack spacing={4}>
+    <PageHeader title="Analytics" description="Counts events from the start of the From day to the end of the To day, in your time zone." />
+    <SearchBar label="Analytics period" submitLabel="Show summary" submitDisabled={busy || !!problem} onSubmit={() => void load()}>
+      <SearchField label="From" type="date" value={from} disabled={busy} onChange={setFrom} />
+      <SearchField label="To" type="date" value={to} disabled={busy} onChange={setTo} />
+    </SearchBar>
     {problem && <Alert severity="warning">{problem}</Alert>}
-    {busy && <CircularProgress aria-label="Loading" size={24} />}
+    {busy && <LoadingRows rows={1} label="Loading summary" />}
     {error && <Alert severity="error">{error}</Alert>}
-    {summary && <Stack spacing={2}>
+    {summary && <Stack spacing={4}>
       <Typography variant="body2" color="text.secondary">Period: {formatTime(summary.startTime)} to {formatTime(summary.endTime)} (end not included)</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>
-        {([['jobsPublished', 'Jobs published'], ['applicationsSubmitted', 'Applications submitted'], ['offersAccepted', 'Offers accepted']] as [CountKey, string][]).map(([key, label], index) => <Paper variant="outlined" key={key}
-          sx={{ p: 2.5, borderRadius: '12px', position: 'relative', overflow: 'hidden', borderTop: `3px solid ${index === 1 ? '#bc9655' : '#70947c'}` }}>
-          <Typography variant="body2" color="text.secondary">{label}</Typography>
-          <Typography sx={{ mt: 1, fontSize: '2.25rem', letterSpacing: '-0.05em', lineHeight: 1.2, fontWeight: 750, fontVariantNumeric: 'tabular-nums' }}>{count(summary[key])}</Typography>
-          <Box aria-hidden="true" sx={{ position: 'absolute', width: 65, height: 65, border: '1px solid #e2e7d8', transform: 'rotate(45deg)', right: -25, bottom: -25 }} />
-        </Paper>)}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>
+        {highlights.map(([key, label]) => <Card key={key}>
+          <Typography color="text.secondary" sx={{ fontWeight: 600 }}>{label}</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: '2.5rem', letterSpacing: '-0.04em', lineHeight: 1.2, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{count(summary[key])}</Typography>
+        </Card>)}
       </Box>
-      <Typography variant="h6" component="h2">Outcome counts</Typography>
+      <Typography variant="h2">Outcome counts</Typography>
       <Table size="small" aria-label="Outcome counts"><TableHead><TableRow><TableCell>Event</TableCell><TableCell align="right">Count</TableCell></TableRow></TableHead><TableBody>
         {rows.map(([key, label]) => <TableRow key={key}>
           <TableCell component="th" scope="row">{label}</TableCell><TableCell align="right">{count(summary[key])}</TableCell>
         </TableRow>)}
       </TableBody></Table>
-      <Typography variant="h6" component="h2">Application status changes</Typography>
+      <Typography variant="h2">Application status changes</Typography>
       {summary.statusChanges?.length
         ? <Table size="small" aria-label="Status changes">
           <TableHead><TableRow><TableCell>New status</TableCell><TableCell align="right">Count</TableCell></TableRow></TableHead>
@@ -76,7 +75,7 @@ export function AnalyticsPage() {
             <TableCell>{statusName(s.status)}</TableCell><TableCell align="right">{count(s.count)}</TableCell>
           </TableRow>)}</TableBody>
         </Table>
-        : <EmptyState>No status changes in this period.</EmptyState>}
+        : <EmptyState description="No status changes in this period." />}
     </Stack>}
   </Stack>;
 }

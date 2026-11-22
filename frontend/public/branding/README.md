@@ -1,25 +1,19 @@
-# JobTrack branding asset
+# JobTrack branding and static assets
 
-The shared header uses `frontend/src/components/Brand.tsx`. Its logo mark is
-`frontend/public/branding/jobtrack-mark.svg`, served by Vite at
-`/branding/jobtrack-mark.svg`. The wordmark stays accessible HTML text.
+All files are local and served by Vite from `frontend/public/`. Nothing is
+requested from a third party at runtime (redesign doc Section 2).
 
-To use the team's logo, replace `jobtrack-mark.svg` with the local SVG, retaining
-that filename. Keep a `viewBox` and use a square or approximately square logo
-mark; it is displayed at 38 × 38 CSS pixels with `object-fit: contain`. Include
-enough internal contrast for light and dark surroundings. No package change or
-backend setup is needed; rebuild the frontend with `npm run build`.
+| File | Use |
+|---|---|
+| `branding/jobtrack-mark.svg` | Logo mark (rounded `accent` square, `#0E1A3B` "J", white dot) and the favicon (`index.html`). `Brand.tsx` shows it next to the HTML wordmark "JobTrack". |
+| `branding/background-night.svg` | Fixed full-page background (indigo and teal glow over `canvas` `#151B2C`), drawn by the theme on `body::before`. Decorative only. The glows are radial gradients; do not use an SVG blur filter here: without a GPU (Cypress in WSL) it is the most expensive repaint on the page and the likely cause of slow screenshots. |
+| `fonts/plus-jakarta-sans-latin-wght-normal.woff2` | Plus Jakarta Sans, variable weight 200 to 800, latin subset, loaded with `@font-face` in `src/theme.ts` (`font-display: swap`). |
+| `fonts/OFL.txt` | SIL Open Font License 1.1 for Plus Jakarta Sans. Keep it next to the font. |
 
-For PNG, add `frontend/public/branding/jobtrack-mark.png` and change `markAsset`
-in `Brand.tsx` to `/branding/jobtrack-mark.png`. A transparent PNG at least
-76 × 76 pixels works well for high-density screens. Keep the HTML wordmark and
-`aria-label="JobTrack home"`; the decorative image deliberately has empty alt
-text to avoid repeating the link's accessible name. If loading fails, the
-component shows a styled JT monogram and the wordmark.
+The font file is the latin variable build published by Fontsource
+(`@fontsource-variable/plus-jakarta-sans` 5.2.5), copied in as a static file;
+it is not an npm dependency.
 
-`weave.svg` is a separate, lightweight decorative repeat. The original valley,
-terraces, river, bridge and stepped architectural scene are authored in
-`frontend/public/branding/valley.svg` (4.4 kB) and rendered by `Landscape.tsx`.
-The artwork is decorative, uses no third-party imagery, and is cropped within
-its own figure on small screens. The auth footer and textile strip have separate
-flow regions. These are local build-time assets, not upload features.
+To replace the logo, keep the filename and a square `viewBox`. The mark is
+decorative next to the wordmark, so `Brand.tsx` gives the image empty alt text
+and the link carries `aria-label="JobTrack home"`.

@@ -1,4 +1,5 @@
 import { openAccountMenu } from './account-menu';
+import { homeHeading } from './home';
 
 const gateway = 'http://localhost:8000';
 const fullName = 'Pema Wangchuk Choden '.repeat(8).trim();
@@ -17,7 +18,7 @@ function login(role = 'applicant') {
   cy.get('input[name=password]').type('synthetic-password', { log: false });
   cy.get('button[type=submit]').click();
   cy.location('pathname').should('eq', `/${role}`);
-  cy.contains('.workspace-content h1', `${role[0].toUpperCase()}${role.slice(1)} workspace`).should('be.visible');
+  cy.contains('.workspace-content h1', homeHeading(role, fullName)).should('be.visible');
 }
 
 function closed() {
@@ -60,7 +61,9 @@ for (const role of ['applicant', 'employer', 'admin']) {
     login(role);
     for (const width of [320, 390, 768, 1024, 1280]) {
       cy.viewport(width, 900);
-      cy.get('#account-menu-button').should('have.attr', 'aria-haspopup', 'menu').and('contain.text', role === 'admin' ? 'Admin' : role === 'employer' ? 'Employer' : 'Applicant');
+      // JT-110: a 44px initials circle; name and role are in its accessible name.
+      cy.get('#account-menu-button').should('have.attr', 'aria-haspopup', 'menu');
+      cy.get('#account-menu-button').should('have.attr', 'aria-label').and('contain', role === 'admin' ? 'Admin' : role === 'employer' ? 'Employer' : 'Applicant');
       openAccountMenu();
       cy.get('#account-menu [role=menu]').should('have.attr', 'aria-labelledby', 'account-menu-button');
       cy.get('#account-menu [role=menuitem]').should('have.length', role === 'admin' ? 1 : 2);
@@ -158,7 +161,8 @@ it('JT-101 account has native hover, pressed and keyboard focus states with 200%
   }).then($button => inputAt($button, 'Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1 }));
   cy.get('#account-menu-button').should($button => expect($button[0].matches(':active')).to.eq(true));
   cy.then(() => Cypress.automation('remote:debugger:protocol', { command: 'Input.dispatchMouseEvent', params: { type: 'mouseReleased', x: 0, y: 0, button: 'left', clickCount: 1 } }));
-  cy.get('header a[aria-label="JobTrack home"]').focus();
+  // The nav pills sit between the logo and the account button on desktop.
+  cy.get('header nav a').last().focus();
   cy.press(Cypress.Keyboard.Keys.TAB);
   cy.get('#account-menu-button').should('be.focused').should($button => {
     const style = $button[0].ownerDocument.defaultView.getComputedStyle($button[0]);

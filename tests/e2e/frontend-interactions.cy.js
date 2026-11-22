@@ -53,8 +53,8 @@ it('JT-101 native pointer hover, pressed and keyboard focus states are visible',
     expect($button[0].ownerDocument.defaultView.getComputedStyle($button[0]).backgroundColor).not.to.eq(restingColor);
   }).then($button => inputAt($button, 'Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1 }));
   cy.get('button[type=submit]').should($button => {
+    // JT-110: no press movement; motion only answers an action.
     expect($button[0].matches(':active')).to.eq(true);
-    expect($button[0].ownerDocument.defaultView.getComputedStyle($button[0]).transform).to.eq('matrix(1, 0, 0, 1, 0, 1)');
   });
   cy.then(() => Cypress.automation('remote:debugger:protocol', { command: 'Input.dispatchMouseEvent', params: { type: 'mouseReleased', x: 0, y: 0, button: 'left', clickCount: 1 } }));
   cy.get('input[name=password]').focus();
@@ -75,7 +75,7 @@ it('JT-101 mobile drawer supports touch, focus trapping, Escape and focus return
   cy.get('[role=dialog] nav a, [role=dialog] button, header a[aria-label="JobTrack home"]').each($control => {
     expect($control[0].getBoundingClientRect().height).to.be.at.least(44);
   });
-  cy.get('[role=dialog] nav a').should('have.length', 10).last().focus();
+  cy.get('[role=dialog] nav a').should('have.length', 6).last().focus();
   cy.press(Cypress.Keyboard.Keys.TAB);
   cy.focused().should('have.attr', 'aria-label', 'JobTrack home');
   cy.press(Cypress.Keyboard.Keys.ESC);
@@ -91,16 +91,17 @@ it('JT-101 mobile drawer supports touch, focus trapping, Escape and focus return
   enterOnMenu();
   cy.get('button[aria-label="Open navigation"]').should('have.attr', 'aria-expanded', 'true');
   cy.get('[role=dialog]').should('be.visible');
-  cy.contains('[role=dialog] nav a', /^Saved jobs$/).click();
+  cy.contains('[role=dialog] nav a', /^Saved$/).click();
   cy.location('pathname').should('eq', '/applicant/saved-jobs');
   cy.get('button[aria-label="Open navigation"]').should('have.attr', 'aria-expanded', 'false');
 });
 
+// JT-110 home pages. The stubs give an applicant a profile but no resume, and an unverified employer with no request.
 for (const [role, destinations] of Object.entries({
-  applicant: [['Search jobs', 'jobs'], ['View applications', 'applications'], ['Your profile & skills', 'profile'], ['Your resumes', 'resumes'], ['Saved opportunities', 'saved-jobs']],
-  employer: [['My jobs', 'jobs'], ['View applications', 'applications'], ['Your company', 'company'], ['Employer verification', 'verification'], ['Your offers', 'offers']],
-  admin: [['Review employers', 'verification'], ['View analytics', 'analytics'], ['Job reports', 'moderation'], ['Audit trail', 'audit-log'], ['Notifications', 'notifications']],
-})) it(`JT-101 ${role} home links lead to existing authorized features`, () => {
+  applicant: [[/^Find jobs$/, 'jobs'], [/^All applications$/, 'applications'], [/^All saved jobs$/, 'saved-jobs'], [/^Upload resume$/, 'resumes']],
+  employer: [[/^Post a job$/, 'jobs/new'], [/^Request verification$/, 'verification'], [/^All jobs$/, 'jobs'], [/^All applicants$/, 'applications']],
+  admin: [['Pending verification', 'verification'], ['Open reports', 'moderation'], ['Count hiring events', 'analytics'], ['Every domain event', 'audit-log']],
+})) it(`JT-110 ${role} home links lead to existing authorized features`, () => {
   cy.viewport(1280, 900);
   login(role);
   for (const [label, path] of destinations) {
@@ -111,15 +112,15 @@ for (const [role, destinations] of Object.entries({
   }
 });
 
-for (const path of ['/login', '/register']) it(`JT-101 ${path} artwork and footer stay in separate flow at every width`, () => {
+for (const path of ['/login', '/register']) it(`JT-110 ${path} card fits every width without horizontal scrolling`, () => {
   cy.visit(path);
-  cy.get('.auth-illustration').should('be.visible');
   for (const width of [320, 390, 768, 1024, 1280]) {
     cy.viewport(width, 900);
-    cy.document().then(doc => {
-      const art = doc.querySelector('.auth-illustration').getBoundingClientRect();
-      const footer = doc.querySelector('.auth-story-footer').getBoundingClientRect();
-      expect(footer.top).to.be.at.least(art.bottom);
+    cy.get('main form').should($form => {
+      const doc = $form[0].ownerDocument;
+      const card = $form[0].getBoundingClientRect();
+      expect(card.left).to.be.at.least(0);
+      expect(card.right).to.be.at.most(doc.documentElement.clientWidth);
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
     cy.get('main h1').should('be.visible');

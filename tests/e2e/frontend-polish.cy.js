@@ -47,6 +47,8 @@ describe('JT-101 shared presentation', () => {
   for (const role of ['applicant', 'employer', 'admin']) {
     it(`${role}: captures all five widths, preserves role navigation and readable content`, () => {
       cy.viewport(1280, 900);
+      // Registered first, so the specific stubs below take precedence.
+      cy.intercept('GET', `${gateway}/v1/**`, { body: {} });
       cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs, pagination: { totalCount: jobs.length } });
       cy.intercept('GET', `${gateway}/v1/employer/jobs?*`, { jobs, pagination: { totalCount: jobs.length } });
       cy.intercept('GET', `${gateway}/v1/verification-requests*`, { requests: [], pagination: {} });
@@ -59,7 +61,7 @@ describe('JT-101 shared presentation', () => {
       cy.screenshot(`${role}-navigation-mobile`, { capture: 'viewport', overwrite: true });
       closeNavigation();
       cy.viewport(1280, 900);
-      const page = role === 'applicant' ? 'Search jobs' : role === 'employer' ? 'My jobs' : 'Analytics';
+      const page = role === 'applicant' ? 'Find jobs' : role === 'employer' ? 'Jobs' : 'Analytics';
       cy.contains('nav a', new RegExp(`^${page}$`)).click();
       if (role === 'admin') {
         cy.intercept('GET', `${gateway}/v1/analytics/summary*`, req => req.reply({ summary: { startTime: req.query.start_time, endTime: req.query.end_time, jobsPublished: 24, applicationsSubmitted: 86, offersMade: 12, offersAccepted: 9, statusChanges: [{ status: 'SHORTLISTED', count: 18 }] } }));
@@ -81,7 +83,7 @@ describe('JT-101 shared presentation', () => {
       cy.viewport(320, 760);
       cy.document().then(doc => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
       capture(`${role}-small`);
-      cy.contains('nav a', role === 'applicant' ? /^My jobs$/ : /^Search jobs$/).should('not.exist');
+      cy.contains('nav a', role === 'applicant' ? /^Jobs$/ : /^Find jobs$/).should('not.exist');
       openAccountMenu();
       cy.screenshot(`${role}-account-small`, { capture: 'viewport', overwrite: true });
       cy.press(Cypress.Keyboard.Keys.ESC);

@@ -28,7 +28,7 @@ export function NotificationsPage() {
     <ResourceState {...resource} />{error && <Alert severity="error">{error}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
     {resource.data && <Typography variant="subtitle2" color="text.secondary">{unread ? 'Unread notifications' : 'Notifications'}: {resource.data.pagination?.totalCount ?? 0}</Typography>}
     {resource.data && !resource.data.notifications?.length && <EmptyState>No notifications on this page.</EmptyState>}
-    {resource.data?.notifications?.map(n => <Card key={n.notificationId} sx={{ borderLeft: n.read ? undefined : '3px solid #70947c', bgcolor: n.read ? 'background.paper' : '#f7f9f0' }}><CardContent><Stack spacing={1}>
+    {resource.data?.notifications?.map(n => <Card key={n.notificationId} sx={{ borderLeft: n.read ? undefined : '3px solid', borderLeftColor: 'primary.main', bgcolor: n.read ? 'background.paper' : 'action.selected' }}><CardContent><Stack spacing={1}>
       <Typography variant="h6" component="h2">{n.title}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{n.body}</Typography>
       <Typography variant="body2" color="text.secondary">{formatTime(n.createdAt)} · {n.read ? 'Read' : 'Unread'}</Typography>
       {!n.read && <Button variant="outlined" disabled={busy} onClick={() => void read(n.notificationId)}>Mark as read</Button>}

@@ -27,7 +27,7 @@ export function MessagesPage() {
     <Button disabled={busy || resource.loading} onClick={resource.refresh}>Refresh messages</Button><ResourceState {...resource} />
     {resource.data && !resource.data.messages?.length && <EmptyState>No messages on this page.</EmptyState>}
     {resource.data?.messages?.map(m => <Card key={m.messageId} sx={{ ml: m.senderId === session?.user.userId ? { xs: 2, sm: 8 } : 0,
-      mr: m.senderId === session?.user.userId ? 0 : { xs: 2, sm: 8 }, bgcolor: m.senderId === session?.user.userId ? '#eaf1e5' : 'background.paper', boxShadow: 'none' }}><CardContent>
+      mr: m.senderId === session?.user.userId ? 0 : { xs: 2, sm: 8 }, bgcolor: m.senderId === session?.user.userId ? 'action.selected' : 'background.paper', boxShadow: 'none' }}><CardContent>
       <Typography variant="body2" color="text.secondary" fontWeight={650}>{m.senderId === session?.user.userId ? 'You' : 'Other participant'}{m.timestamps?.createdAt ? ` · ${new Date(m.timestamps.createdAt).toLocaleString()}` : ''}</Typography>
       <Typography sx={{ mt: 1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.content}</Typography>
     </CardContent></Card>)}

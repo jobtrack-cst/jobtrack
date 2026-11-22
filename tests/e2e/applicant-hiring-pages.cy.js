@@ -1,3 +1,4 @@
+import { openApplications, settleHome } from './home';
 // JT-83 pages. Gateway responses are stubbed, so these tests check the UI and
 // the requests it sends, not live services (see docs/testing/jt-83-test-cases.md).
 const gateway = 'http://localhost:8000';
@@ -6,6 +7,9 @@ beforeEach(() => cy.intercept('GET', `${gateway}/v1/applicant/profile/photo`, { 
 const userId = '11111111-1111-4111-8111-111111111111';
 const year = new Date().getFullYear();
 
+function navigate(path) {
+  cy.window().then(win => { win.history.pushState({}, '', path); win.dispatchEvent(new PopStateEvent('popstate')); });
+}
 function login(role = 'ROLE_APPLICANT') {
   const user = { userId, email: 'pema@example.test', fullName: 'Pema', role };
   cy.intercept('POST', `${gateway}/v1/auth/login`, { accessToken: 'jt83-token', expiresAt: new Date(Date.now() + 3600000).toISOString(), user });
@@ -19,6 +23,7 @@ function login(role = 'ROLE_APPLICANT') {
   cy.get('input[name=password]').type('password123', { log: false });
   cy.get('button[type=submit]').click();
   cy.location('pathname').should('eq', role === 'ROLE_APPLICANT' ? '/applicant' : '/employer');
+  settleHome();
 }
 function field(label) {
   return cy.contains('label', new RegExp(`^${Cypress._.escapeRegExp(label)}`)).parent().find('input, textarea').first();
@@ -223,9 +228,9 @@ describe('JT-83 resume upload', () => {
   const pending = { resumeId, fileName: 'cv.pdf', contentType: 'application/pdf', sizeBytes: '9', validationStatus: 'RESUME_VALIDATION_STATUS_PENDING', timestamps: { createdAt: '2026-11-15T10:00:00Z' } };
   const pdf = (size = 9) => Cypress.Buffer.concat([Cypress.Buffer.from('%PDF-1.7\n'), Cypress.Buffer.alloc(Math.max(0, size - 9), 0x20)]).subarray(0, size);
   function openResumes(resumes = []) {
-    cy.intercept('GET', `${gateway}/v1/resumes?*`, { resumes, pagination: {} }).as('list');
     login();
-    cy.contains('a', 'Resumes').click();
+    cy.intercept('GET', `${gateway}/v1/resumes?*`, { resumes, pagination: {} }).as('list');
+    navigate('/applicant/resumes');
     cy.wait('@list');
   }
   function choose(contents, fileName = 'cv.pdf', mimeType = 'application/pdf') {
@@ -316,7 +321,7 @@ describe('JT-83 resume upload', () => {
       req.reply(req.query['pagination.page_token'] === '20' ? { resumes: [rejected], pagination: {} } : { resumes: [pending, validated], pagination: { nextPageToken: '20' } });
     });
     login();
-    cy.contains('a', 'Resumes').click();
+    navigate('/applicant/resumes');
     cy.contains('Pending validation').should('be.visible');
     cy.contains('Validated').should('be.visible');
     cy.contains('button', 'Next page').click();
@@ -351,9 +356,9 @@ describe('JT-83 application status, review and interviews', () => {
     return { value: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(hour)}:00`, iso: d.toISOString() };
   };
   function openCard(role, button) {
-    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
     login(role);
-    cy.contains('a', 'Applications').click();
+    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
+    openApplications(role);
     cy.wait('@applications');
     if (button) cy.contains('a', new RegExp(`^${button}$`)).click();
   }
