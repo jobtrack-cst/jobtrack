@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ResumeService_UploadResume_FullMethodName   = "/jobtrack.resume.v1.ResumeService/UploadResume"
-	ResumeService_GetResume_FullMethodName      = "/jobtrack.resume.v1.ResumeService/GetResume"
-	ResumeService_ListMyResumes_FullMethodName  = "/jobtrack.resume.v1.ResumeService/ListMyResumes"
-	ResumeService_DownloadResume_FullMethodName = "/jobtrack.resume.v1.ResumeService/DownloadResume"
+	ResumeService_UploadResume_FullMethodName              = "/jobtrack.resume.v1.ResumeService/UploadResume"
+	ResumeService_GetResume_FullMethodName                 = "/jobtrack.resume.v1.ResumeService/GetResume"
+	ResumeService_ListMyResumes_FullMethodName             = "/jobtrack.resume.v1.ResumeService/ListMyResumes"
+	ResumeService_DownloadResume_FullMethodName            = "/jobtrack.resume.v1.ResumeService/DownloadResume"
+	ResumeService_DownloadApplicationResume_FullMethodName = "/jobtrack.resume.v1.ResumeService/DownloadApplicationResume"
 )
 
 // ResumeServiceClient is the client API for ResumeService service.
@@ -44,6 +45,9 @@ type ResumeServiceClient interface {
 	ListMyResumes(ctx context.Context, in *ListMyResumesRequest, opts ...grpc.CallOption) (*ListMyResumesResponse, error)
 	// DownloadResume returns the owned file; protobuf JSON encodes bytes as base64.
 	DownloadResume(ctx context.Context, in *DownloadResumeRequest, opts ...grpc.CallOption) (*DownloadResumeResponse, error)
+	// DownloadApplicationResume returns the resume submitted with one
+	// application. Employer only, and only the application's owning employer.
+	DownloadApplicationResume(ctx context.Context, in *DownloadApplicationResumeRequest, opts ...grpc.CallOption) (*DownloadApplicationResumeResponse, error)
 }
 
 type resumeServiceClient struct {
@@ -94,6 +98,16 @@ func (c *resumeServiceClient) DownloadResume(ctx context.Context, in *DownloadRe
 	return out, nil
 }
 
+func (c *resumeServiceClient) DownloadApplicationResume(ctx context.Context, in *DownloadApplicationResumeRequest, opts ...grpc.CallOption) (*DownloadApplicationResumeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DownloadApplicationResumeResponse)
+	err := c.cc.Invoke(ctx, ResumeService_DownloadApplicationResume_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ResumeServiceServer is the server API for ResumeService service.
 // All implementations must embed UnimplementedResumeServiceServer
 // for forward compatibility.
@@ -113,6 +127,9 @@ type ResumeServiceServer interface {
 	ListMyResumes(context.Context, *ListMyResumesRequest) (*ListMyResumesResponse, error)
 	// DownloadResume returns the owned file; protobuf JSON encodes bytes as base64.
 	DownloadResume(context.Context, *DownloadResumeRequest) (*DownloadResumeResponse, error)
+	// DownloadApplicationResume returns the resume submitted with one
+	// application. Employer only, and only the application's owning employer.
+	DownloadApplicationResume(context.Context, *DownloadApplicationResumeRequest) (*DownloadApplicationResumeResponse, error)
 	mustEmbedUnimplementedResumeServiceServer()
 }
 
@@ -134,6 +151,9 @@ func (UnimplementedResumeServiceServer) ListMyResumes(context.Context, *ListMyRe
 }
 func (UnimplementedResumeServiceServer) DownloadResume(context.Context, *DownloadResumeRequest) (*DownloadResumeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DownloadResume not implemented")
+}
+func (UnimplementedResumeServiceServer) DownloadApplicationResume(context.Context, *DownloadApplicationResumeRequest) (*DownloadApplicationResumeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DownloadApplicationResume not implemented")
 }
 func (UnimplementedResumeServiceServer) mustEmbedUnimplementedResumeServiceServer() {}
 func (UnimplementedResumeServiceServer) testEmbeddedByValue()                       {}
@@ -228,6 +248,24 @@ func _ResumeService_DownloadResume_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ResumeService_DownloadApplicationResume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DownloadApplicationResumeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ResumeServiceServer).DownloadApplicationResume(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ResumeService_DownloadApplicationResume_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ResumeServiceServer).DownloadApplicationResume(ctx, req.(*DownloadApplicationResumeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ResumeService_ServiceDesc is the grpc.ServiceDesc for ResumeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -250,6 +288,10 @@ var ResumeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DownloadResume",
 			Handler:    _ResumeService_DownloadResume_Handler,
+		},
+		{
+			MethodName: "DownloadApplicationResume",
+			Handler:    _ResumeService_DownloadApplicationResume_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

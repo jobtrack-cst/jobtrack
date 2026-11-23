@@ -22,8 +22,10 @@ import (
 )
 
 const (
-	stubResumeID    = "33333333-3333-4333-8333-333333333333"
-	stubApplicantID = "11111111-1111-4111-8111-111111111111"
+	stubResumeID      = "33333333-3333-4333-8333-333333333333"
+	stubApplicantID   = "11111111-1111-4111-8111-111111111111"
+	stubApplicationID = "44444444-4444-4444-8444-444444444444"
+	stubEmployerID    = "55555555-5555-4555-8555-555555555555"
 )
 
 var stubContent = []byte("%PDF-1.7 stub")
@@ -55,6 +57,20 @@ func (stubResumes) ListByApplicant(context.Context, string, domain.Page) ([]doma
 	return []domain.Resume{stubResume()}, 1, nil
 }
 
+// stubApplicationResumes knows one application, owned by stubEmployerID.
+type stubApplicationResumes struct{}
+
+func (stubApplicationResumes) Record(context.Context, string, domain.ApplicationResume) error {
+	return nil
+}
+
+func (stubApplicationResumes) GetByApplicationID(_ context.Context, id string) (domain.ApplicationResume, error) {
+	if id != stubApplicationID {
+		return domain.ApplicationResume{}, domain.ErrApplicationNotFound
+	}
+	return domain.ApplicationResume{ApplicationID: id, ApplicantID: stubApplicantID, EmployerID: stubEmployerID, ResumeID: stubResumeID}, nil
+}
+
 // recordingRegistrar keeps what registerResume registers.
 type recordingRegistrar struct {
 	descs []*grpc.ServiceDesc
@@ -68,7 +84,7 @@ func (r *recordingRegistrar) RegisterService(desc *grpc.ServiceDesc, impl any) {
 
 func TestRegisterResume_RegistersPublicAndInternalServices(t *testing.T) {
 	var reg recordingRegistrar
-	registerResume(stubResumes{})(&reg)
+	registerResume(stubResumes{}, stubApplicationResumes{})(&reg)
 	if len(reg.descs) != 2 ||
 		reg.descs[0].ServiceName != "jobtrack.resume.v1.ResumeService" ||
 		reg.descs[1].ServiceName != "jobtrack.resume.v1.ResumeInternalService" {
@@ -108,7 +124,7 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerResume(stubResumes{}),
+		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerResume(stubResumes{}, stubApplicationResumes{}),
 			grpcListener, httpListener, serverOpts...)
 	}()
 	t.Cleanup(func() {
@@ -184,6 +200,20 @@ func TestServe_InternalInterceptorGuardsOnlyTheInternalService(t *testing.T) {
 	})
 	t.Run("ListMyResumes as employer", func(t *testing.T) {
 		_, err := public(t).ListMyResumes(asRole(t, "employer"), &resumev1.ListMyResumesRequest{})
+		if status.Code(err) != codes.PermissionDenied {
+			t.Fatalf("code=%v (%v), want PermissionDenied", status.Code(err), err)
+		}
+	})
+	// JT-114: the employer RPC needs no internal token either.
+	t.Run("DownloadApplicationResume as the owning employer", func(t *testing.T) {
+		ctx := metadata.AppendToOutgoingContext(rpcCtx(t), "x-user-id", stubEmployerID, "x-user-role", "employer")
+		resp, err := public(t).DownloadApplicationResume(ctx, &resumev1.DownloadApplicationResumeRequest{ApplicationId: stubApplicationID})
+		if status.Code(err) != codes.OK || string(resp.GetContent()) != string(stubContent) {
+			t.Fatalf("resp=%v err=%v, want the stub file", resp, err)
+		}
+	})
+	t.Run("DownloadApplicationResume as applicant", func(t *testing.T) {
+		_, err := public(t).DownloadApplicationResume(asRole(t, "applicant"), &resumev1.DownloadApplicationResumeRequest{ApplicationId: stubApplicationID})
 		if status.Code(err) != codes.PermissionDenied {
 			t.Fatalf("code=%v (%v), want PermissionDenied", status.Code(err), err)
 		}

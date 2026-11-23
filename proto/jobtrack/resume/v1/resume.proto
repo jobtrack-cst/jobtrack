@@ -36,6 +36,12 @@ service ResumeService {
   rpc DownloadResume(DownloadResumeRequest) returns (DownloadResumeResponse) {
     option (google.api.http) = {get: "/v1/resumes/{resume_id}/content"};
   }
+
+  // DownloadApplicationResume returns the resume submitted with one
+  // application. Employer only, and only the application's owning employer.
+  rpc DownloadApplicationResume(DownloadApplicationResumeRequest) returns (DownloadApplicationResumeResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/resume"};
+  }
 }
 
 // ResumeInternalService has no HTTP routes and does not require user identity.
@@ -100,6 +106,16 @@ message DownloadResumeRequest {
 }
 
 message DownloadResumeResponse {
+  string file_name = 1;
+  string content_type = 2;
+  bytes content = 3;
+}
+
+message DownloadApplicationResumeRequest {
+  string application_id = 1;
+}
+
+message DownloadApplicationResumeResponse {
   string file_name = 1;
   string content_type = 2;
   bytes content = 3;

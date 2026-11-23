@@ -36,9 +36,10 @@ var (
 )
 
 type handlers struct {
-	public   *adapter.ResumeHandler
-	internal *adapter.ResumeInternalHandler
-	repo     *mocks.MockResumeRepository
+	public     *adapter.ResumeHandler
+	internal   *adapter.ResumeInternalHandler
+	repo       *mocks.MockResumeRepository
+	projection *mocks.MockApplicationResumeRepository
 }
 
 // Handlers are tested with the real app layer and a mocked repository. Any
@@ -47,9 +48,10 @@ func newHandlers(t *testing.T) handlers {
 	ctrl := gomock.NewController(t)
 	clock := mocks.NewMockClock(ctrl)
 	clock.EXPECT().Now().Return(now).AnyTimes()
-	h := handlers{repo: mocks.NewMockResumeRepository(ctrl)}
+	h := handlers{repo: mocks.NewMockResumeRepository(ctrl), projection: mocks.NewMockApplicationResumeRepository(ctrl)}
 	svc := app.NewResumes(h.repo, clock)
-	h.public, h.internal = adapter.NewResumeHandler(svc), adapter.NewResumeInternalHandler(svc)
+	h.public = adapter.NewResumeHandler(svc, app.NewApplicationResumes(h.projection, h.repo))
+	h.internal = adapter.NewResumeInternalHandler(svc)
 	return h
 }
 
@@ -122,7 +124,7 @@ func TestResumeHandler_RejectsBadIdentity(t *testing.T) {
 	}
 }
 
-// Every public RPC is applicant only, and the role is checked before any
+// Every applicant RPC is applicant only, and the role is checked before any
 // repository call.
 func TestResumeHandler_ApplicantOnlyRPCs(t *testing.T) {
 	for _, role := range []string{"employer", "admin"} {
