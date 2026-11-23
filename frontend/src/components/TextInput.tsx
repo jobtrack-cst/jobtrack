@@ -11,8 +11,16 @@ export const inputSx = {
   '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: tokens.accent },
   '&.Mui-error .MuiOutlinedInput-notchedOutline': { borderColor: tokens.danger },
   '& .MuiOutlinedInput-input': { py: '12px', px: '14px' },
-  '& .MuiOutlinedInput-inputMultiline': { p: 0 },
+  // Multiline: the root carries the padding, so the textarea has none and its text starts
+  // at the same left edge as a single-line input. MUI 7 puts only MuiInputBase-* classes
+  // on the textarea, and this selector outranks the rule above.
   '&.MuiInputBase-multiline': { py: '12px', px: '14px' },
+  '&.MuiInputBase-multiline .MuiInputBase-input': { p: 0 },
+  // MUI's hidden "shadow" textarea (used to measure the height) is absolutely positioned and
+  // keeps the previous pixel width until its debounced resize sync, so after the layout narrows
+  // it widened the page (864px at 320px). Capped at the input box, which is never narrower than
+  // the width it measures with.
+  '&.MuiInputBase-multiline textarea[aria-hidden="true"]': { maxWidth: '100%' },
   '& input::placeholder, & textarea::placeholder': { color: tokens.textMuted, opacity: 1 },
   // Light picker icons on the dark input.
   '& input::-webkit-calendar-picker-indicator': { filter: 'invert(0.85)' },
@@ -51,7 +59,8 @@ export function TextInput({ label, name, type = 'text', value, defaultValue, onC
       {label}
     </FormLabel>
     {select
-      ? <Select id={id} labelId={labelId} name={name} value={value} defaultValue={defaultValue} disabled={disabled} error={error}
+      // displayEmpty shows the label of an option whose value is '' (for example "No category").
+      ? <Select id={id} labelId={labelId} name={name} value={value} defaultValue={defaultValue} disabled={disabled} error={error} displayEmpty
         onChange={onChange as never} input={<OutlinedInput sx={inputSx} />} aria-describedby={helperId}>{children}</Select>
       : <OutlinedInput id={id} name={name} type={type} value={value} defaultValue={defaultValue} onChange={onChange} required={required}
         disabled={disabled} autoComplete={autoComplete} placeholder={placeholder} multiline={multiline} minRows={minRows} error={error}

@@ -23,17 +23,19 @@ interface Props {
   secondary?: ReactNode;
   // Under the actions, for example a Save error.
   footer?: ReactNode;
+  // Replaces the deadline pill, for example a Closed or Removed status chip.
+  chip?: ReactNode;
 }
 
 // Job card for browse pages (redesign doc Section 4).
-export function JobCard({ job, viewTo, viewLabel = 'View job', tags = [], extra, secondary, footer }: Props) {
+export function JobCard({ job, viewTo, viewLabel = 'View job', tags = [], extra, secondary, footer, chip }: Props) {
   const { company } = useCompany(job.employerId);
   const meta = [company?.name, job.location].filter(Boolean).join(', ');
   return <Box component="li" sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, p: 3, bgcolor: tokens.surface,
     border: `1px solid ${tokens.border}`, borderRadius: '20px', overflowWrap: 'anywhere' }}>
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
       <LogoSquare src={company?.url} name={company?.name} size={48} />
-      <DeadlineTag deadline={job.deadline} />
+      {chip ?? <DeadlineTag deadline={job.deadline} />}
     </Stack>
     <Box sx={{ minWidth: 0 }}>
       <Typography component="h3" sx={{ fontSize: '1.1875rem', fontWeight: 700, lineHeight: 1.35 }}>{job.title || 'Untitled job'}</Typography>

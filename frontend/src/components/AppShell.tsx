@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppBar, Box, Button, Drawer, IconButton, Stack, Toolbar, useMediaQuery, useTheme } from '@mui/material';
-import { NavLink, useLocation } from 'react-router';
+import { NavLink, useLocation, useNavigationType } from 'react-router';
 import type { Role, User } from '../api/auth';
 import { AccountMenu, roleLabel } from '../features/auth/AccountMenu';
 import { landingPath } from '../features/auth/routes';
@@ -14,7 +14,7 @@ import { Icon, type IconName } from './Icon';
 export const navigation: Record<Role, [path: string, label: string, icon: IconName][]> = {
   ROLE_APPLICANT: [['', 'Home', 'home'], ['jobs', 'Find jobs', 'search'], ['saved', 'Saved', 'bookmark'], ['applications', 'Applications', 'applications'],
     ['profile', 'Profile', 'profile'], ['job-alerts', 'Job alerts', 'alerts']],
-  ROLE_EMPLOYER: [['', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['applications', 'Applicants', 'people'], ['company', 'Company', 'company']],
+  ROLE_EMPLOYER: [['', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['applicants', 'Applicants', 'people'], ['company', 'Company', 'company']],
   ROLE_ADMIN: [['', 'Home', 'home'], ['verification', 'Verification', 'verification'], ['moderation', 'Moderation', 'moderation'],
     ['analytics', 'Analytics', 'analytics'], ['audit-log', 'Audit log', 'audit']],
 };
@@ -57,6 +57,11 @@ export function AppShell({ user, onSignOut, children }: { user?: User; onSignOut
   const desktop = useMediaQuery(theme.breakpoints.up('md'), { noSsr: true });
   // A drawer left open on a phone must not reappear after the window grows and shrinks again.
   useEffect(() => { if (desktop) setMenuLocation(null); }, [desktop]);
+  // A new page starts at the top, so its header and back link are not left under the sticky
+  // top bar at the previous page's scroll position (JT-115 item 2). Back and Forward (POP)
+  // keep the browser's own restoration; query changes such as ?tab= keep the position.
+  const navigationType = useNavigationType();
+  useEffect(() => { if (navigationType !== 'POP') window.scrollTo(0, 0); }, [location.pathname, navigationType]);
   return <>
     <Box component="a" href="#main-content" sx={{ position: 'fixed', top: -100, left: 16, zIndex: 1500, px: 2, py: 1.5, borderRadius: '12px',
       bgcolor: tokens.accent, color: tokens.onAccent, fontWeight: 700, textDecoration: 'none', '&:focus': { top: 12 } }}>Skip to content</Box>

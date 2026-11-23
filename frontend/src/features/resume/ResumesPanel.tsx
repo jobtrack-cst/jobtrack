@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Box, Button, Link, Stack, Typography } from '@mui/material';
 import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
@@ -11,6 +11,7 @@ import { useResource } from '../application/shared';
 import { gatewayMessage, grpcCode } from '../application-status/shared';
 import { downloadResume, listMyResumes, uploadResume, type Resume } from './api';
 import { checkResume } from './upload';
+import { usePdfOpener } from './usePdfOpener';
 
 const uploadMessages = {
   413: 'The file is too large. Resumes can be at most 2 MB (2,000,000 bytes).',
@@ -22,43 +23,10 @@ const viewMessages = {
   [grpcCode.permissionDenied]: 'You can only open your own resumes.',
 };
 const sizeText = (size?: string | number) => size === undefined ? '' : `${(Number(size) / 1_000_000).toFixed(2)} MB`;
-// How long a file opened in a new tab keeps its address; the tab has loaded it by then.
-const keepOpenedMs = 60_000;
-
-function base64ToBlob(base64: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  // Always a PDF: only validated PDFs are stored (JT-48), and nothing else may open from here.
-  return new Blob([bytes], { type: 'application/pdf' });
-}
 
 function ResumeRow({ resume }: { resume: Resume }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  // Shown when the browser blocked the new tab.
-  const [fallback, setFallback] = useState('');
-  useEffect(() => () => { if (fallback) URL.revokeObjectURL(fallback); }, [fallback]);
-  async function view() {
-    if (busy) return;
-    setError('');
-    // Opened during the click, so popup blockers allow it; the address is set once the file arrives.
-    const tab = window.open('', '_blank');
-    if (tab) { tab.opener = null; tab.document.title = resume.fileName; }
-    setBusy(true);
-    try {
-      const file = await downloadResume(resume.resumeId);
-      if (!file.content) throw new Error('The file could not be read. Please try again.');
-      const url = URL.createObjectURL(base64ToBlob(file.content));
-      if (tab && !tab.closed) {
-        tab.location.href = url;
-        window.setTimeout(() => URL.revokeObjectURL(url), keepOpenedMs);
-      } else setFallback(url);
-    } catch (reason) {
-      tab?.close();
-      setError(gatewayMessage(reason, viewMessages));
-    } finally { setBusy(false); }
-  }
+  const { busy, error, fallback, open } = usePdfOpener(viewMessages);
+  const view = () => open(() => downloadResume(resume.resumeId), resume.fileName);
   const rejected = resume.validationStatus === 'RESUME_VALIDATION_STATUS_REJECTED';
   const uploaded = shortDate(resume.timestamps?.createdAt);
   return <ListRow>
@@ -73,7 +41,7 @@ function ResumeRow({ resume }: { resume: Resume }) {
         <Button variant="outlined" disabled={busy} onClick={() => void view()} aria-label={`View PDF ${resume.fileName}`}>{busy ? 'Opening…' : 'View PDF'}</Button>
       </Stack>
     </Stack>
-    {fallback && <Alert severity="info" sx={{ mt: 1.5 }}>Your browser blocked the new tab. <Link href={fallback} download={resume.fileName}>Download PDF</Link></Alert>}
+    {fallback && <Alert severity="info" sx={{ mt: 1.5 }}>Your browser blocked the new tab. <Link href={fallback.url} download={resume.fileName}>Download PDF</Link></Alert>}
     {error && <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert>}
   </ListRow>;
 }

@@ -1,5 +1,5 @@
 import { length } from '../application-status/shared';
-import type { CompanyFields, CompanyProfile, VerificationStatus } from './api';
+import type { CompanyFields, CompanyProfile } from './api';
 
 export const emptyCompany: CompanyFields = { companyName: '', description: '', website: '', location: '' };
 
@@ -24,7 +24,7 @@ export function companyProblems(f: CompanyFields) {
   return problems;
 }
 
-function webAddress(value: string) {
+export function webAddress(value: string) {
   try {
     const url = new URL(value);
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '';
@@ -33,12 +33,6 @@ function webAddress(value: string) {
   }
 }
 
-type Color = 'default' | 'success' | 'error';
-const views: Record<VerificationStatus, { label: string; color: Color }> = {
-  VERIFICATION_STATUS_UNSPECIFIED: { label: 'Unknown', color: 'default' },
-  VERIFICATION_STATUS_UNVERIFIED: { label: 'Not verified', color: 'default' },
-  VERIFICATION_STATUS_VERIFIED: { label: 'Verified', color: 'success' },
-  VERIFICATION_STATUS_REJECTED: { label: 'Rejected', color: 'error' },
-};
-export const verificationOf = (status?: VerificationStatus) =>
-  views[status ?? 'VERIFICATION_STATUS_UNSPECIFIED'] ?? views.VERIFICATION_STATUS_UNSPECIFIED;
+// Save stays disabled until a field differs from the saved profile (JT-109).
+export const sameCompany = (a: CompanyFields, b: CompanyFields) =>
+  JSON.stringify(trimCompany(a)) === JSON.stringify(trimCompany(b));

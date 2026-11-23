@@ -54,21 +54,33 @@ describe('JT-110 optional list filters', () => {
       // The newest-applicants list is the one call without a filter.
       expect(jobIds.filter(id => id === undefined)).to.have.length(1);
     });
-    cy.contains('li', 'Applicant, applied 12 Nov').should('contain', 'Frontend intern').and('contain', 'Under review');
+    // JT-111 rows: photo or initials, the name ("Applicant" before JT-114), job and date, status; the row opens the application page.
+    cy.contains('section[aria-label="Newest applicants"] li', 'Frontend intern, applied 12 Nov').within(() => {
+      cy.contains('h3', /^Applicant$/).should('be.visible');
+      cy.contains('Under review').should('be.visible');
+      cy.get('a').should('have.attr', 'href', '/employer/applicants/55555555-5555-4555-8555-555555555555');
+    });
     cy.contains('Your company is verified').should('be.visible');
     noUuidOnPage();
   });
 
-  it('sends neither status nor job_id when the pages do not give them', () => {
+  it('sends each Jobs tab its own status, and no job_id when no job is chosen', () => {
     login('ROLE_EMPLOYER');
     signIn('/employer');
     settleHome();
-    cy.intercept('GET', `${gateway}/v1/employer/jobs?*`, req => {
-      expect(req.query).not.to.have.property('status');
-      req.reply({ jobs: [], pagination: {} });
-    }).as('allJobs');
+    // JT-111: Jobs has Active, Drafts and Closed tabs, each using the ListMyJobs status filter.
+    cy.intercept('GET', `${gateway}/v1/employer/jobs?*`, { jobs: [], pagination: { totalCount: 0 } }).as('jobs');
     cy.contains('nav a', /^Jobs$/).click();
-    cy.wait('@allJobs').its('request.url').should('not.contain', 'status=');
+    cy.wait('@jobs').its('request.query.status').should('eq', 'JOB_STATUS_PUBLISHED');
+    cy.contains('[role=tab]', /^Drafts$/).click();
+    cy.wait('@jobs').its('request.query.status').should('eq', 'JOB_STATUS_DRAFT');
+    // Closed lists closed and removed jobs, one request per status.
+    cy.contains('[role=tab]', /^Closed$/).click();
+    cy.wait(['@jobs', '@jobs']).then(calls => {
+      expect(calls.map(c => c.request.query.status).sort()).to.deep.eq(['JOB_STATUS_CLOSED', 'JOB_STATUS_REMOVED']);
+    });
+    // No Jobs request is ever sent without a status.
+    cy.get('@jobs.all').each(call => expect(call.request.query).to.have.property('status'));
     cy.intercept('GET', `${gateway}/v1/applications?*`, req => {
       expect(req.query).not.to.have.property('job_id');
       req.reply({ applications: [], pagination: {} });

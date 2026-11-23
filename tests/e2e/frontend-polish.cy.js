@@ -67,7 +67,7 @@ describe('JT-101 shared presentation', () => {
         cy.intercept('GET', `${gateway}/v1/analytics/summary*`, req => req.reply({ summary: { startTime: req.query.start_time, endTime: req.query.end_time, jobsPublished: 24, applicationsSubmitted: 86, offersMade: 12, offersAccepted: 9, statusChanges: [{ status: 'SHORTLISTED', count: 18 }] } }));
         cy.contains('button', 'Show summary').click();
         cy.contains('td', '86').should('be.visible');
-      } else cy.contains(role === 'applicant' ? 'ul[aria-label=Jobs] > li' : '.MuiCard-root', job.title).should('be.visible');
+      } else cy.contains(role === 'applicant' ? 'ul[aria-label=Jobs] > li' : 'ul[aria-label="Active jobs"] > li', job.title).should('be.visible');
       cy.get('main h1').should('have.length', 1).and('be.visible');
       capture(`${role}-desktop`);
       cy.viewport(1024, 900);

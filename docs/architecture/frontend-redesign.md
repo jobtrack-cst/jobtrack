@@ -285,9 +285,9 @@ or college text anywhere.
 |---|---|---|
 | `/employer` | Home: verification state with next step, open jobs with applicant counts, newest applicants | Useful start page |
 | `/employer/jobs` | Tabs Active, Drafts, Closed (from the `ListMyJobs` status filter). Closed and removed jobs open read-only, with no Manage or Edit button | Closed jobs with a Manage button that failed |
-| `/employer/jobs/new`, `/employer/jobs/:jobId` | Job editor for drafts and published jobs; Publish and Close with confirmation; read-only view for closed and removed jobs | Same |
-| `/employer/applicants` | Job filter (dropdown of the employer's jobs, using the `ListApplications` `job_id` filter) and small minimal cards in the card grid: applicant photo circle, name, job title, applied date, `StatusChip`, one View button. Until JT-114: initials, "Applicant" and the applied date | Job IDs, no filter by job, applicant IDs |
-| `/employer/applicants/:applicationId` | One application page (detail header with a back link): the applicant's profile, photo and resume (JT-114), job summary, `StatusRail` and history, Review (only if not reviewed), Schedule interview (only when Shortlisted or Interview), Make offer (only when Interview and no offer exists), offer status, and the conversation with the applicant embedded at the bottom. Until JT-114 the page shows initials and "Applicant", and no profile or resume | Actions shown at every stage, offer ID lookups |
+| `/employer/jobs/new`, `/employer/jobs/:jobId` | `/employer/jobs/new` opens straight into the job editor. An existing job opens read-only with every detail (category and tag names, never IDs; a category or tag no longer listed shows as "Unknown category" or "Unknown tag" and is kept when saving); drafts and published jobs have Edit (Save and Cancel return to read-only, JT-109 pattern) with Publish or Close beside it, each with confirmation; closed and removed jobs are read-only with no actions | Same |
+| `/employer/applicants` | Job filter (dropdown of the employer's jobs, using the `ListApplications` `job_id` filter) and small minimal cards in the card grid: applicant photo circle, name, job title, applied date, `StatusChip`, one View button. Applications submitted before JT-114 have no stored name or photo, so their cards show initials and "Applicant" | Job IDs, no filter by job, applicant IDs |
+| `/employer/applicants/:applicationId` | One application page (detail header with a back link): the applicant's profile, photo and resume (JT-114), job summary, `StatusRail` and history, Review (only if not reviewed), Schedule interview (only when Shortlisted or Interview), Make offer (only when Interview and no offer exists), offer status, and the conversation with the applicant embedded at the bottom. Applications submitted before JT-114 show initials and "Applicant", with short empty states ("No profile is available for this application.", "No resume is available for this application.") instead of the profile and resume | Actions shown at every stage, offer ID lookups |
 | `/employer/messages` | Messages inbox (Section 6, Phase 4) with a job filter | Unorganised chats |
 | `/employer/company` | Company profile read-only with Edit, Save and Cancel; logo upload; verification status, rejection reason and the request form on the same page | Accidental edits, separate verification page |
 
@@ -332,9 +332,10 @@ A chat-style inbox, like WhatsApp.
 - Notifications: notification-dispatcher is not wired (AGENTS.md Section 16),
   so the inbox stays empty. The Notifications item is removed from menus
   until delivery works.
-- Applicant names, photos, profiles and resumes for employers need JT-114.
-  Until then the UI never invents them: it shows initials, "Applicant" and
-  the applied date.
+- Applicant names, photos, profiles and resumes for employers come from
+  JT-114 (done). Applications submitted before JT-114 have none of them, and
+  the UI never invents them: it shows initials, "Applicant" and short empty
+  states instead.
 - Offer eligibility is not enforced by the offer service (Section 16), so the
   UI only shows Make offer at the Interview stage.
 

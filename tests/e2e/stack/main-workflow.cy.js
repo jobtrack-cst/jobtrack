@@ -82,6 +82,14 @@ function login(email, secret, landing) {
   cy.get('button[type=submit]').click();
   cy.location('pathname', { timeout: 15000 }).should('eq', landing);
 }
+// Switching user inside one step: log out through the account menu first, because a
+// signed-in session (kept in sessionStorage) sends /login straight back to its home page.
+function logOut() {
+  cy.get('#account-menu-button').click();
+  cy.contains('#account-menu button', 'Log out').click();
+  cy.location('pathname').should('eq', '/login');
+  cy.get('#account-menu-button').should('not.exist');
+}
 function register(account, role) {
   cy.visit('/register');
   cy.get('input[name=fullName]').type(account.name);
@@ -92,24 +100,35 @@ function register(account, role) {
   cy.get('button[type=submit]').click();
   cy.contains('Account created. Log in to continue.', { timeout: 15000 }).should('be.visible');
 }
-// Opens one of the application card buttons for this run's application. The ID is
-// read when the command runs, not when it is queued, because step 06 sets it.
-function openApplication(button) {
-  // Employers reach applications through Applicants (JT-110).
-  cy.location('pathname').then(path => nav(path.startsWith('/employer') ? 'Applicants' : 'Applications'));
-  cy.then(() => {
-    until('the application in the list', () => cy.contains('button', 'Refresh applications').click(),
-      body => body.text().includes(state.applicationId));
-    cy.contains('p', `Application: ${state.applicationId}`).parents('.MuiCard-root').within(() => {
-      cy.contains('a', new RegExp(`^${button}$`)).click();
-    });
-  });
+// JT-111: the employer opens this run's application from Applicants, filtered by this
+// run's job, by the applicant's name (stored at submission, JT-114). No IDs are typed.
+function openApplicantPage() {
+  nav('Applicants');
+  cy.get('form[role=search] select option').should('contain', `JT-95 Developer ${run}`);
+  cy.get('form[role=search] select').select(`JT-95 Developer ${run}`);
+  cy.get('form[role=search]').contains('button', 'Show applicants').click();
+  cy.contains('ul[aria-label=Applicants] > li', applicant.name, { timeout: 15000 }).contains('a', /^View$/).click();
+  cy.location('pathname').should('match', /^\/employer\/applicants\/[0-9a-f-]{36}$/);
+  cy.contains('main h1', applicant.name).should('be.visible');
 }
-// Waits on the Status page until the current status is the expected one.
-function waitForStatus(label) {
-  openApplication('Status');
-  until(`status ${label}`, () => cy.contains('button', 'Refresh status').click(),
-    body => hasExact(body, '.MuiChip-label', label));
+// Waits on the employer application page until the status rail shows the label as current.
+function waitForEmployerStatus(label) {
+  until(`employer status ${label}`, () => cy.get('section[aria-label=Status]').contains('button', /^Refresh$/).click(),
+    body => body.find(`section[aria-label=Status] ol[aria-label*=", ${label}, current"]`).length > 0);
+}
+// Runs one action dialog on the application page: opens it with its button (unless it is
+// still open after a failed attempt, for example "not available yet" while an event is on
+// its way), fills it on first open, and confirms.
+function dialogAction(open, fill, confirm) {
+  cy.get('body').then(body => {
+    if (!body.find('[role=dialog]').length) {
+      cy.contains('main button', new RegExp(`^${open}$`), { timeout: 15000 }).click();
+      cy.get('[role=dialog]').should('be.visible');
+      // Not scoped to the dialog: a select's options open in a popover outside it.
+      fill();
+    }
+    cy.get('[role=dialog]').contains('button', new RegExp(`^${confirm}$`)).click();
+  });
 }
 
 // JT-112: the applicant follows the application on its own page. Status events arrive
@@ -136,15 +155,22 @@ describe('JT-95 main workflow against the running stack', () => {
     field('Company name').type(company);
     cy.contains('button', 'Create profile').click();
     cy.contains('Company profile created', { timeout: 15000 }).should('be.visible');
+    // JT-111: the saved profile is read-only with Edit (JT-109 pattern).
+    cy.contains('button', 'Edit profile').should('be.visible');
+    cy.get('section[aria-label="Company profile"]').should('contain', company);
     evidence('01-company-profile', () => cy.contains('Company profile created'));
   });
 
-  it('02 employer requests verification', () => {
+  it('02 employer requests verification on the Company page', () => {
     login(employer.email, password, '/employer');
-    go('/employer/verification');
-    field('Registration number').type(registration);
-    cy.contains('button', 'Send request').click();
-    cy.contains('Request sent.', { timeout: 15000 }).should('be.visible');
+    // JT-111: the request form is in the Verification section of Company.
+    nav('Company');
+    cy.get('section[aria-label=Verification]').within(() => {
+      field('Registration number').type(registration);
+      cy.contains('button', 'Send request').click();
+      cy.contains('Request sent.', { timeout: 15000 }).should('be.visible');
+      cy.contains('.MuiChip-label', /^Pending$/).should('be.visible');
+    });
   });
 
   it('03 admin approves the verification request', () => {
@@ -187,23 +213,29 @@ describe('JT-95 main workflow against the running stack', () => {
 
   it('04 employer sees Verified, creates and publishes a job', () => {
     login(employer.email, password, '/employer');
-    until('company Verified', () => nav('Company'), body => hasExact(body, '.MuiChip-label', 'Verified'));
+    nav('Company');
+    until('company Verified', () => cy.get('section[aria-label=Verification]').contains('button', /^Refresh$/).click(),
+      body => hasExact(body, 'section[aria-label=Verification] .MuiChip-label', 'Verified'));
     nav('Jobs');
-    cy.contains('a', 'Create job').click();
+    cy.contains('main a', 'Post a job').click();
     field('Title').type(`JT-95 Developer ${run}`);
     field('Deadline').type(localInput(3, 17));
     cy.contains('button', 'Create draft').should('be.enabled').click();
     cy.location('pathname', { timeout: 15000 }).should('match', /^\/employer\/jobs\/[0-9a-f-]{36}$/).then(path => {
       state.jobId = path.split('/').pop();
     });
-    cy.contains('Status: Draft').should('be.visible');
+    // JT-111: the new job opens read-only as a draft, with Publish beside Edit.
+    cy.contains('Draft created.').should('be.visible');
+    cy.contains('main .MuiChip-label', /^Draft$/).should('be.visible');
     submitUntil('publish job', () => cy.get('body').then(body => {
       // After a failed attempt the confirmation dialog is still open.
       if (!body.find('button:contains("Confirm publish")').length) cy.contains('button', 'Publish job').click();
       cy.contains('button', 'Confirm publish').click();
     }), 'Job published.');
-    cy.contains('Status: Published', { timeout: 15000 }).should('be.visible');
-    evidence('04-job-published', () => cy.contains('Status: Published'));
+    cy.contains('main .MuiChip-label', /^Published$/, { timeout: 15000 }).should('be.visible');
+    nav('Jobs');
+    cy.contains('ul[aria-label="Active jobs"] > li', `JT-95 Developer ${run}`).should('be.visible');
+    evidence('04-job-published', () => cy.contains('ul[aria-label="Active jobs"] > li', `JT-95 Developer ${run}`));
   });
 
   it('05 applicant registers and uploads a resume that is validated', () => {
@@ -237,40 +269,43 @@ describe('JT-95 main workflow against the running stack', () => {
     waitForApplicantStatus('Submitted');
   });
 
-  it('07 employer reviews and shortlists', () => {
+  it('07 employer reviews and shortlists on the application page', () => {
     login(employer.email, password, '/employer');
-    openApplication('Review');
-    chooseOption('Score', /^4$/);
-    cy.contains('label', 'Shortlist').click();
-    submitUntil('complete review', () => {
-      cy.contains('button', 'Complete review').click();
-      cy.contains('button', 'Confirm review').click();
-    }, 'Review completed');
-    cy.contains('Review completed').should('be.visible');
-    evidence('07-review-completed', () => cy.contains('Review completed'));
-    waitForStatus('Shortlisted');
+    openApplicantPage();
+    // The applicant's profile area and the history are on the same page (JT-111).
+    cy.get('section[aria-label=Applicant]').should('contain', applicant.name);
+    waitForEmployerStatus('Submitted');
+    submitUntil('complete review', () => dialogAction('Review application', () => {
+      chooseOption('Score', '4 of 5');
+      cy.contains('label', 'Shortlist').click();
+    }, 'Shortlist applicant'), 'Review saved.');
+    cy.get('section[aria-label=Review]').should('contain', 'Score 4 of 5');
+    evidence('07-review-completed', () => cy.get('section[aria-label=Review]'));
+    waitForEmployerStatus('Shortlisted');
   });
 
   it('08 employer schedules an interview', () => {
     login(employer.email, password, '/employer');
-    openApplication('Interviews');
-    field('Date and time').type(localInput(2, 10));
-    field('Details').type('Room 2, JT-95 synthetic interview');
-    submitUntil('schedule interview', () => cy.contains('button', 'Schedule interview').click(), 'Interview scheduled for');
-    cy.contains('Room 2, JT-95 synthetic interview').should('be.visible');
-    waitForStatus('Interview');
+    openApplicantPage();
+    waitForEmployerStatus('Shortlisted');
+    submitUntil('schedule interview', () => dialogAction('Schedule interview', () => {
+      field('Date and time').type(localInput(2, 10));
+      field('Details').type('Room 2, JT-95 synthetic interview');
+    }, 'Schedule interview'), 'Interview scheduled for');
+    cy.get('section[aria-label=Interviews]').should('contain', 'Room 2, JT-95 synthetic interview');
+    waitForEmployerStatus('Interview');
   });
 
   it('09 employer makes an offer', () => {
     login(employer.email, password, '/employer');
-    openApplication('Make offer');
-    field('Offer terms').type('JT-95 offer: start next month.');
-    submitUntil('make offer', () => cy.contains('button', 'Make offer').click(), 'Offer made.');
-    cy.contains('Offer made.').invoke('text').then(text => {
-      state.offerId = text.match(/[0-9a-f-]{36}/)[0];
-    });
-    evidence('09-offer-made', () => cy.contains('Offer made.'));
-    waitForStatus('Offered');
+    openApplicantPage();
+    waitForEmployerStatus('Interview');
+    submitUntil('make offer', () => dialogAction('Make offer', () => {
+      field('Offer terms').type('JT-95 offer: start next month.');
+    }, 'Send offer'), 'Offer sent.');
+    cy.get('section[aria-label=Offer]').should('contain', 'JT-95 offer: start next month.').and('contain', 'Awaiting reply');
+    evidence('09-offer-made', () => cy.get('section[aria-label=Offer]'));
+    waitForEmployerStatus('Offer');
   });
 
   it('10 applicant accepts the offer', () => {
@@ -290,11 +325,27 @@ describe('JT-95 main workflow against the running stack', () => {
     waitForApplicantStatus('Accepted', true);
     const expected = [['None', 'Submitted'], ['Submitted', 'Under review'], ['Under review', 'Shortlisted'],
       ['Shortlisted', 'Interview'], ['Interview', 'Offered'], ['Offered', 'Accepted']];
-    // Each row reads "<new status> from <previous status>", oldest first.
+    // Applicant page: each row reads "<new status> from <previous status>", oldest first. The
+    // first row still says "from None" there until JT-115 item 3 switches it to StatusHistory.
     cy.get('ul[aria-label="Status history"] > li').should('have.length', expected.length).each((row, i) => {
       cy.wrap(row).should('contain', `${expected[i][1]} from ${expected[i][0]}`);
     });
     evidence('11-status-history', () => cy.get('ul[aria-label="Status history"]'));
-    cy.then(() => cy.log(`job ${state.jobId}, application ${state.applicationId}, offer ${state.offerId}`));
+
+    // Employer page (JT-111): the same history, the first entry without a "from" part, and no actions left.
+    logOut();
+    login(employer.email, password, '/employer');
+    openApplicantPage();
+    cy.get('section[aria-label=Status] .MuiChip-label').filter((_, el) => el.textContent.trim() === 'Accepted').should('have.length', 1);
+    cy.get('ul[aria-label="Status history"] > li').should('have.length', expected.length).each((row, i) => {
+      if (i === 0) cy.wrap(row).invoke('text').should('match', /^Submitted/).and('not.contain', 'from');
+      else cy.wrap(row).should('contain', `${expected[i][1]} from ${expected[i][0]}`);
+    });
+    for (const action of ['Review application', 'Schedule interview', 'Schedule another interview', 'Make offer']) {
+      cy.contains('main button', new RegExp(`^${action}$`)).should('not.exist');
+    }
+    cy.get('section[aria-label=Conversation]').should('contain', 'view only');
+    evidence('11-employer-history', () => cy.get('ul[aria-label="Status history"]'));
+    cy.then(() => cy.log(`job ${state.jobId}, application ${state.applicationId}`));
   });
 });

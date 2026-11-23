@@ -9,25 +9,20 @@ import { EmployerHome } from './features/home/EmployerHome';
 import { AuthPage } from './features/auth/AuthPage';
 import { useAuth } from './features/auth/AuthProvider';
 import { landingPath } from './features/auth/routes';
-import { ApplicationsPage } from './features/application/ApplicationsPage';
+import { ApplicantsPage } from './features/application/ApplicantsPage';
 import { MyApplicationsPage } from './features/application/MyApplicationsPage';
 import { ApplicationPage } from './features/application/ApplicationPage';
-import { OffersPage } from './features/offer/OffersPage';
-import { MessagesPage } from './features/messaging/MessagesPage';
+import { EmployerApplicationPage } from './features/application/EmployerApplicationPage';
 import { JobAlertsPage } from './features/job-alert/JobAlertsPage';
 import { ProfilePage } from './features/applicant-profile/ProfilePage';
-import { StatusPage } from './features/application-status/StatusPage';
-import { ReviewPage } from './features/review/ReviewPage';
-import { InterviewsPage } from './features/interview/InterviewsPage';
 import { CompanyPage } from './features/employer/CompanyPage';
-import { VerificationPage } from './features/company-verification/VerificationPage';
 import { AdminVerificationPage } from './features/company-verification/AdminVerificationPage';
 import { ReportJobPage } from './features/moderation/ReportJobPage';
 import { AdminModerationPage } from './features/moderation/AdminModerationPage';
 import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { AuditLogPage } from './features/audit-log/AuditLogPage';
 import { JobsPage } from './features/job-posting/JobsPage';
-import { ManageJobPage } from './features/job-posting/ManageJobPage';
+import { JobPage } from './features/job-posting/JobPage';
 import { SearchJobsPage } from './features/job-search/SearchJobsPage';
 import { JobDetailsPage } from './features/job-search/JobDetailsPage';
 import { SavedJobsPage } from './features/saved-jobs/SavedJobsPage';
@@ -46,8 +41,8 @@ function Home() {
   return <Navigate to={session && session.expiresAt > Date.now() ? landingPath(session.user.role) : '/login'} replace />;
 }
 
-// Old applicant addresses with an ID (path or query) go to the page that replaced them;
-// without a valid ID they go to the list.
+// Old addresses with an ID (path or query) go to the page that replaced them;
+// without a valid ID they go to the list (JT-112 applicant, JT-111 employer).
 function ToJob({ query }: { query?: string }) {
   const { jobId = '' } = useParams();
   const [params] = useSearchParams();
@@ -55,12 +50,13 @@ function ToJob({ query }: { query?: string }) {
   return <Navigate to={validId(id) ? `/applicant/jobs/${encodeURIComponent(id.toLowerCase())}` : '/applicant/jobs'} replace />;
 }
 
-function ToApplication({ query }: { query?: string }) {
+function ToApplication({ query, list = '/applicant/applications' }: { query?: string; list?: string }) {
   const { applicationId = '' } = useParams();
   const [params] = useSearchParams();
   const id = query ? params.get(query) ?? '' : applicationId;
-  return <Navigate to={validId(id) ? `/applicant/applications/${encodeURIComponent(id.toLowerCase())}` : '/applicant/applications'} replace />;
+  return <Navigate to={validId(id) ? `${list}/${encodeURIComponent(id.toLowerCase())}` : list} replace />;
 }
+const employerList = '/employer/applicants';
 
 export default function App() {
   const { session, initializing, signOut } = useAuth();
@@ -96,21 +92,25 @@ export default function App() {
       </Route>
       <Route path="/employer" element={<Workspace role="ROLE_EMPLOYER" />}>
         <Route index element={<EmployerHome />} />
-        <Route path="applications" element={<ApplicationsPage />} />
-        <Route path="applications/:applicationId/status" element={<StatusPage />} />
-        <Route path="applications/:applicationId/review" element={<ReviewPage />} />
-        <Route path="applications/:applicationId/interviews" element={<InterviewsPage />} />
-        <Route path="offers" element={<OffersPage key="employer-offers" />} />
-        <Route path="offers/new/:applicationId" element={<OffersPage key="make-offer" create />} />
-        <Route path="messages/:applicationId" element={<MessagesPage />} />
+        <Route path="applicants" element={<ApplicantsPage />} />
+        <Route path="applicants/:applicationId" element={<EmployerApplicationPage />} />
         <Route path="jobs" element={<JobsPage />} />
-        <Route path="jobs/new" element={<ManageJobPage key="create-job" create />} />
-        <Route path="jobs/:jobId" element={<ManageJobPage key="manage-job" />} />
+        <Route path="jobs/new" element={<JobPage key="create-job" create />} />
+        <Route path="jobs/:jobId" element={<JobPage key="manage-job" />} />
         <Route path="notifications" element={<NotificationsPage key="employer-notifications" />} />
         <Route path="company" element={<CompanyPage />} />
-        <Route path="verification" element={<VerificationPage />} />
-        <Route path="report-job" element={<ReportJobPage />} />
-        <Route path="report-job/:jobId" element={<ReportJobPage />} />
+        {/* JT-111: addresses of the pages that the redesign merged into others. Employers
+            only manage their own jobs, so they have no Report a job page. */}
+        <Route path="verification" element={<Navigate to="/employer/company" replace />} />
+        <Route path="applications" element={<Navigate to={employerList} replace />} />
+        <Route path="applications/:applicationId/status" element={<ToApplication list={employerList} />} />
+        <Route path="applications/:applicationId/review" element={<ToApplication list={employerList} />} />
+        <Route path="applications/:applicationId/interviews" element={<ToApplication list={employerList} />} />
+        <Route path="messages/:applicationId" element={<ToApplication list={employerList} />} />
+        <Route path="offers" element={<ToApplication query="applicationId" list={employerList} />} />
+        <Route path="offers/new/:applicationId" element={<ToApplication list={employerList} />} />
+        <Route path="report-job" element={<Navigate to="/employer/jobs" replace />} />
+        <Route path="report-job/:jobId" element={<Navigate to="/employer/jobs" replace />} />
         <Route path="*" element={<Navigate to="/employer" replace />} />
       </Route>
       <Route path="/admin" element={<Workspace role="ROLE_ADMIN" />}>

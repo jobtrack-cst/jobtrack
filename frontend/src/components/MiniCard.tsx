@@ -12,11 +12,13 @@ interface Props {
   // One chip: a deadline or a status.
   chip?: ReactNode;
   viewTo: string;
+  // Accessible name of the View button when "View <title>" is not unique enough.
+  viewLabel?: string;
 }
 
 // Small minimal card for Saved jobs, My applications and Applicants (redesign doc
 // Section 4): avatar, title, one line, one chip and one View button. Goes in a CardGrid.
-export function MiniCard({ avatar, title, line, chip, viewTo }: Props) {
+export function MiniCard({ avatar, title, line, chip, viewTo, viewLabel }: Props) {
   return <Box component="li" sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, p: 3, bgcolor: tokens.surface,
     border: `1px solid ${tokens.border}`, borderRadius: '20px', overflowWrap: 'anywhere' }}>
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -28,7 +30,7 @@ export function MiniCard({ avatar, title, line, chip, viewTo }: Props) {
       {line && <Typography sx={{ fontSize: '0.9375rem', color: tokens.textSecondary, mt: 0.5 }}>{line}</Typography>}
     </Box>
     {/* The title names the card for screen readers, so the button says which one it opens. */}
-    <Button component={Link} to={viewTo} variant="contained" aria-label={`View ${title}`}
+    <Button component={Link} to={viewTo} variant="contained" aria-label={viewLabel ?? `View ${title}`}
       sx={{ mt: 'auto', minHeight: 44, borderRadius: '12px' }}>View</Button>
   </Box>;
 }
