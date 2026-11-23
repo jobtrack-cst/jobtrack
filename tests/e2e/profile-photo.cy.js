@@ -144,7 +144,7 @@ describe('JT-103 applicant profile photo', () => {
   it('offers the upload only after the profile exists', () => {
     login();
     openProfile({ statusCode: 404, body: { code: 5, message: 'private' } });
-    cy.contains('You can add a photo after that.').should('be.visible');
+    cy.contains('Save your profile to add a photo.').should('be.visible');
     cy.get('input[type=file][name=photo]').should('not.exist');
   });
 

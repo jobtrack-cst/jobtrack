@@ -380,30 +380,11 @@ describe('JT-88 verification path', () => {
   });
 });
 
+// Applicants report from the job page since JT-112 (applicant-pages.cy.js); employers and admins keep this form until JT-111.
 describe('JT-88 report a job', () => {
   const application = { applicationId: '44444444-4444-4444-8444-444444444444', jobId, resumeId: '33333333-3333-4333-8333-333333333333', applicantId: people.ROLE_APPLICANT.userId, employerId, withdrawn: false };
   const reportUrl = `${gateway}/v1/jobs/${jobId}/reports`;
   const report = { reportId, jobId, reason: 'Asks applicants for a fee', status: 'REPORT_STATUS_OPEN', timestamps };
-
-  it('reports a job from the application card with the job ID filled in', () => {
-    login('ROLE_APPLICANT');
-    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
-    open('Applications');
-    cy.wait('@applications');
-    cy.contains('a', exact('Report job')).click();
-    cy.location('pathname').should('eq', `/applicant/report-job/${jobId}`);
-    field('Job ID').should('have.value', jobId);
-    cy.contains('button', 'Send report').should('be.disabled');
-    field('Reason').type('  Asks applicants for a fee  ');
-    cy.intercept('POST', reportUrl, req => {
-      expect(req.body).to.deep.eq({ reason: 'Asks applicants for a fee' });
-      req.reply({ report });
-    }).as('report');
-    cy.contains('button', 'Send report').click();
-    cy.wait('@report');
-    cy.contains('Report sent').should('be.visible');
-    field('Reason').should('have.value', '');
-  });
 
   it('lets an employer report by ID, blocking a bad ID and a reason over 1000 characters', () => {
     login('ROLE_EMPLOYER');
@@ -437,8 +418,8 @@ describe('JT-88 report a job', () => {
   for (const [statusCode, code, message] of [[409, 6, 'already have an open report'], [400, 9, 'already been removed'], [400, 3, 'not accepted']]) {
     it(`explains a ${statusCode} answer with code ${code} to Send report`, () => {
       cy.intercept('POST', reportUrl, { statusCode, body: { code, message: 'private-input' } });
-      login('ROLE_APPLICANT');
-      visit('/applicant/report-job');
+      login('ROLE_EMPLOYER');
+      visit('/employer/report-job');
       field('Job ID').type(jobId);
       field('Reason').type('Fake job');
       cy.contains('button', 'Send report').click();

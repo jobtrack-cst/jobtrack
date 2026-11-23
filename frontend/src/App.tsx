@@ -1,5 +1,6 @@
 import { Box, LinearProgress, Typography } from '@mui/material';
-import { Navigate, Outlet, Route, Routes } from 'react-router';
+import { Navigate, Outlet, Route, Routes, useParams, useSearchParams } from 'react-router';
+import { validId } from './features/application/shared';
 import type { Role } from './api/auth';
 import { AppShell } from './components/AppShell';
 import { AdminHome } from './features/home/AdminHome';
@@ -9,12 +10,12 @@ import { AuthPage } from './features/auth/AuthPage';
 import { useAuth } from './features/auth/AuthProvider';
 import { landingPath } from './features/auth/routes';
 import { ApplicationsPage } from './features/application/ApplicationsPage';
-import { ApplyPage } from './features/application/ApplyPage';
+import { MyApplicationsPage } from './features/application/MyApplicationsPage';
+import { ApplicationPage } from './features/application/ApplicationPage';
 import { OffersPage } from './features/offer/OffersPage';
 import { MessagesPage } from './features/messaging/MessagesPage';
 import { JobAlertsPage } from './features/job-alert/JobAlertsPage';
 import { ProfilePage } from './features/applicant-profile/ProfilePage';
-import { ResumesPage } from './features/resume/ResumesPage';
 import { StatusPage } from './features/application-status/StatusPage';
 import { ReviewPage } from './features/review/ReviewPage';
 import { InterviewsPage } from './features/interview/InterviewsPage';
@@ -45,6 +46,22 @@ function Home() {
   return <Navigate to={session && session.expiresAt > Date.now() ? landingPath(session.user.role) : '/login'} replace />;
 }
 
+// Old applicant addresses with an ID (path or query) go to the page that replaced them;
+// without a valid ID they go to the list.
+function ToJob({ query }: { query?: string }) {
+  const { jobId = '' } = useParams();
+  const [params] = useSearchParams();
+  const id = query ? params.get(query) ?? '' : jobId;
+  return <Navigate to={validId(id) ? `/applicant/jobs/${encodeURIComponent(id.toLowerCase())}` : '/applicant/jobs'} replace />;
+}
+
+function ToApplication({ query }: { query?: string }) {
+  const { applicationId = '' } = useParams();
+  const [params] = useSearchParams();
+  const id = query ? params.get(query) ?? '' : applicationId;
+  return <Navigate to={validId(id) ? `/applicant/applications/${encodeURIComponent(id.toLowerCase())}` : '/applicant/applications'} replace />;
+}
+
 export default function App() {
   const { session, initializing, signOut } = useAuth();
   const user = session && session.expiresAt > Date.now() ? session.user : undefined;
@@ -59,19 +76,22 @@ export default function App() {
         <Route index element={<ApplicantHome />} />
         <Route path="jobs" element={<SearchJobsPage />} />
         <Route path="jobs/:jobId" element={<JobDetailsPage />} />
-        <Route path="saved-jobs" element={<SavedJobsPage />} />
+        <Route path="saved" element={<SavedJobsPage />} />
         <Route path="notifications" element={<NotificationsPage key="applicant-notifications" />} />
-        <Route path="apply" element={<ApplyPage />} />
-        <Route path="applications" element={<ApplicationsPage />} />
-        <Route path="applications/:applicationId/status" element={<StatusPage />} />
-        <Route path="applications/:applicationId/interviews" element={<InterviewsPage />} />
-        <Route path="offers" element={<OffersPage key="applicant-offers" />} />
-        <Route path="messages/:applicationId" element={<MessagesPage />} />
+        <Route path="applications" element={<MyApplicationsPage />} />
+        <Route path="applications/:applicationId" element={<ApplicationPage />} />
         <Route path="job-alerts" element={<JobAlertsPage />} />
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="resumes" element={<ResumesPage />} />
-        <Route path="report-job" element={<ReportJobPage />} />
-        <Route path="report-job/:jobId" element={<ReportJobPage />} />
+        {/* JT-112: addresses of the pages that the redesign merged into others. */}
+        <Route path="saved-jobs" element={<Navigate to="/applicant/saved" replace />} />
+        <Route path="resumes" element={<Navigate to="/applicant/profile?tab=resumes" replace />} />
+        <Route path="apply" element={<ToJob query="jobId" />} />
+        <Route path="report-job" element={<Navigate to="/applicant/jobs" replace />} />
+        <Route path="report-job/:jobId" element={<ToJob />} />
+        <Route path="offers" element={<ToApplication query="applicationId" />} />
+        <Route path="messages/:applicationId" element={<ToApplication />} />
+        <Route path="applications/:applicationId/status" element={<ToApplication />} />
+        <Route path="applications/:applicationId/interviews" element={<ToApplication />} />
         <Route path="*" element={<Navigate to="/applicant" replace />} />
       </Route>
       <Route path="/employer" element={<Workspace role="ROLE_EMPLOYER" />}>

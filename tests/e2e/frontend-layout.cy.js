@@ -77,14 +77,14 @@ it('JT-101 long job data reflows at all five widths and at 200% text size', () =
   cy.get('button[type=submit]').click();
   openNavigation();
   cy.contains('nav a', /^Find jobs$/).click();
-  cy.get('.MuiCard-root h2').should('contain', '界'.repeat(150));
+  cy.get('ul[aria-label=Jobs] > li h3').should('contain', '界'.repeat(150));
   for (const width of [320, 390, 768, 1024, 1280]) {
     cy.viewport(width, 900);
     cy.document().then(doc => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
-    cy.get('.MuiCard-root').each($card => expect($card[0].scrollWidth).to.be.at.most($card[0].clientWidth));
+    cy.get('ul[aria-label=Jobs] > li').each($card => expect($card[0].scrollWidth).to.be.at.most($card[0].clientWidth));
   }
   cy.document().then(doc => { doc.documentElement.style.fontSize = '200%'; });
-  cy.get('.MuiCard-root h2').should('be.visible');
+  cy.get('ul[aria-label=Jobs] > li h3').should('be.visible');
   cy.document().then(doc => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
   cy.get('nav a').each($link => expect($link[0].scrollWidth).to.be.at.most($link[0].clientWidth));
   cy.document().then(doc => { doc.documentElement.style.fontSize = ''; });

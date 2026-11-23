@@ -23,5 +23,6 @@ export function Card({ children, to, label, sx, component = 'div' }: {
     // A list item keeps the list valid; the link fills it.
     return component === 'li' ? <Box component="li" sx={{ minWidth: 0 }}>{link}</Box> : link;
   }
-  return <Box component={component} sx={[base, ...extra]}>{children}</Box>;
+  // Without a link, label names the region (for example a section).
+  return <Box component={component} aria-label={label} sx={[base, ...extra]}>{children}</Box>;
 }

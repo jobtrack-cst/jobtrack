@@ -92,13 +92,13 @@ it('JT-101 mobile drawer supports touch, focus trapping, Escape and focus return
   cy.get('button[aria-label="Open navigation"]').should('have.attr', 'aria-expanded', 'true');
   cy.get('[role=dialog]').should('be.visible');
   cy.contains('[role=dialog] nav a', /^Saved$/).click();
-  cy.location('pathname').should('eq', '/applicant/saved-jobs');
+  cy.location('pathname').should('eq', '/applicant/saved');
   cy.get('button[aria-label="Open navigation"]').should('have.attr', 'aria-expanded', 'false');
 });
 
 // JT-110 home pages. The stubs give an applicant a profile but no resume, and an unverified employer with no request.
 for (const [role, destinations] of Object.entries({
-  applicant: [[/^Find jobs$/, 'jobs'], [/^All applications$/, 'applications'], [/^All saved jobs$/, 'saved-jobs'], [/^Upload resume$/, 'resumes']],
+  applicant: [[/^Find jobs$/, 'jobs'], [/^All applications$/, 'applications'], [/^All saved jobs$/, 'saved'], [/^Upload resume$/, 'profile']],
   employer: [[/^Post a job$/, 'jobs/new'], [/^Request verification$/, 'verification'], [/^All jobs$/, 'jobs'], [/^All applicants$/, 'applications']],
   admin: [['Pending verification', 'verification'], ['Open reports', 'moderation'], ['Count hiring events', 'analytics'], ['Every domain event', 'audit-log']],
 })) it(`JT-110 ${role} home links lead to existing authorized features`, () => {

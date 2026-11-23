@@ -112,6 +112,22 @@ function waitForStatus(label) {
     body => hasExact(body, '.MuiChip-label', label));
 }
 
+// JT-112: the applicant follows the application on its own page. Status events arrive
+// with a delay, so the page is reloaded until the Status section shows the label.
+function waitForApplicantStatus(label, final = false) {
+  cy.then(() => go(`/applicant/applications/${state.applicationId}`));
+  until(`applicant status ${label}`, () => cy.reload(), body => final
+    ? hasExact(body, 'section[aria-label=Status] .MuiChip-label', label)
+    : body.find(`section[aria-label=Status] ol[aria-label*=", ${label}, current"]`).length > 0);
+}
+
+// Evidence screenshots capture only the viewport: full-page captures time out on slower
+// machines. The relevant part is scrolled into view first, clear of the sticky top bar.
+function evidence(name, target) {
+  target().scrollIntoView({ offset: { top: -120, left: 0 } }).should('be.visible');
+  cy.screenshot(name, { capture: 'viewport' });
+}
+
 describe('JT-95 main workflow against the running stack', () => {
   it('01 employer registers and creates a company profile', () => {
     register(employer, 'Employer');
@@ -120,7 +136,7 @@ describe('JT-95 main workflow against the running stack', () => {
     field('Company name').type(company);
     cy.contains('button', 'Create profile').click();
     cy.contains('Company profile created', { timeout: 15000 }).should('be.visible');
-    cy.screenshot('01-company-profile');
+    evidence('01-company-profile', () => cy.contains('Company profile created'));
   });
 
   it('02 employer requests verification', () => {
@@ -142,20 +158,31 @@ describe('JT-95 main workflow against the running stack', () => {
       cy.location('pathname', { timeout: 15000 }).should('eq', '/admin');
     });
     nav('Verification');
-    const findRequest = (tries = 20) => cy.get('body').then(body => {
-      if (body.text().includes(`Registration number: ${registration}`)) return;
-      if (tries <= 1 || !body.find('nav[aria-label=Pages] button:contains("Next"):enabled').length) throw new Error('verification request not listed');
-      cy.contains('nav[aria-label=Pages] button', /^Next$/).click();
-      cy.wait(500);
-      findRequest(tries - 1);
-    });
+    // The Pending tab lists the oldest first, 20 per page, so pending requests left by
+    // earlier runs can push this run's request to a later page. Each page is read only
+    // after it has loaded: the list (or the empty state) is shown and the Pager names its range.
+    const settled = page => {
+      cy.contains('main h1', /^Verification$/).should('be.visible');
+      cy.get('main [role=status][aria-label="Loading requests"]', { timeout: 15000 }).should('not.exist');
+      cy.get('main ul[aria-label="Verification requests"], main [role=status]:contains("No requests here")', { timeout: 15000 }).should('exist');
+      if (page > 0) cy.contains('nav[aria-label=Pages] [role=status]', `Showing ${page * 20 + 1} to`, { timeout: 15000 }).should('exist');
+    };
+    const findRequest = (page = 0) => {
+      settled(page);
+      cy.get('main').then(main => {
+        if (main.find('h2').filter((_, el) => el.textContent.trim() === `Registration number: ${registration}`).length) return;
+        if (page >= 49 || !main.find('nav[aria-label=Pages] button:contains("Next"):enabled').length) throw new Error('verification request not listed');
+        cy.contains('nav[aria-label=Pages] button', /^Next$/).click();
+        findRequest(page + 1);
+      });
+    };
     findRequest();
     cy.contains('h2', `Registration number: ${registration}`).parents('li').first().within(() => {
       cy.contains('button', 'Approve').click();
     });
     cy.contains('button', 'Confirm approval').click();
     cy.contains('Request approved.', { timeout: 15000 }).should('be.visible');
-    cy.screenshot('03-admin-approved');
+    evidence('03-admin-approved', () => cy.contains('Request approved.'));
   });
 
   it('04 employer sees Verified, creates and publishes a job', () => {
@@ -176,7 +203,7 @@ describe('JT-95 main workflow against the running stack', () => {
       cy.contains('button', 'Confirm publish').click();
     }), 'Job published.');
     cy.contains('Status: Published', { timeout: 15000 }).should('be.visible');
-    cy.screenshot('04-job-published');
+    evidence('04-job-published', () => cy.contains('Status: Published'));
   });
 
   it('05 applicant registers and uploads a resume that is validated', () => {
@@ -185,23 +212,29 @@ describe('JT-95 main workflow against the running stack', () => {
     go('/applicant/resumes');
     cy.get('input[type=file][name=resume]').selectFile({ contents: Cypress.Buffer.from(resumePdf, 'base64'), fileName: resumeName, mimeType: 'application/pdf' }, { force: true });
     cy.contains(`${resumeName} uploaded`, { timeout: 15000 }).should('be.visible');
-    until('resume Validated', () => cy.contains('button', 'Refresh resumes').click(),
+    until('resume Validated', () => cy.contains('button', /^Refresh$/).click(),
       body => hasExact(body, '.MuiChip-label', 'Validated'));
-    cy.screenshot('05-resume-validated');
+    evidence('05-resume-validated', () => cy.contains('main li', resumeName));
   });
 
   it('06 applicant applies for the job', () => {
     login(applicant.email, password, '/applicant');
-    go('/applicant/apply');
-    field('Job ID').type(state.jobId);
-    cy.contains('button', 'Load job').click();
-    cy.contains(`JT-95 Developer ${run}`, { timeout: 15000 }).should('be.visible');
-    chooseOption('Validated resume', resumeName);
-    cy.contains('button', 'Submit application').click();
-    cy.contains('Application submitted. ID:', { timeout: 15000 }).invoke('text').then(text => {
-      state.applicationId = text.match(/[0-9a-f-]{36}/)[0];
+    // Applicants find the job by its title; job-search builds its read model from events.
+    nav('Find jobs');
+    field('Job title').type(`JT-95 Developer ${run}`);
+    until('the job in the search', () => cy.get('form[role=search]').contains('button', /^Search$/).click(),
+      body => body.text().includes(`JT-95 Developer ${run}`) && !body.text().includes('No open roles match'));
+    cy.contains('ul[aria-label=Jobs] > li', `JT-95 Developer ${run}`).contains('a', 'View job').click();
+    cy.contains('main button', /^Apply$/, { timeout: 15000 }).should('be.enabled').click();
+    cy.get('[role=dialog]').contains('label', resumeName).click();
+    cy.get('[role=dialog]').contains('button', 'Send application').click();
+    cy.contains('Application sent.', { timeout: 15000 }).should('be.visible');
+    cy.contains('a', 'View application', { timeout: 15000 }).click();
+    cy.location('pathname').should('match', /^\/applicant\/applications\/[0-9a-f-]{36}$/).then(path => {
+      state.applicationId = path.split('/').pop();
     });
-    waitForStatus('Submitted');
+    evidence('06-applied', () => cy.get('section[aria-label=Status]'));
+    waitForApplicantStatus('Submitted');
   });
 
   it('07 employer reviews and shortlists', () => {
@@ -214,7 +247,7 @@ describe('JT-95 main workflow against the running stack', () => {
       cy.contains('button', 'Confirm review').click();
     }, 'Review completed');
     cy.contains('Review completed').should('be.visible');
-    cy.screenshot('07-review-completed');
+    evidence('07-review-completed', () => cy.contains('Review completed'));
     waitForStatus('Shortlisted');
   });
 
@@ -236,30 +269,32 @@ describe('JT-95 main workflow against the running stack', () => {
     cy.contains('Offer made.').invoke('text').then(text => {
       state.offerId = text.match(/[0-9a-f-]{36}/)[0];
     });
-    cy.screenshot('09-offer-made');
+    evidence('09-offer-made', () => cy.contains('Offer made.'));
     waitForStatus('Offered');
   });
 
   it('10 applicant accepts the offer', () => {
     login(applicant.email, password, '/applicant');
-    go('/applicant/offers');
-    field('Offer ID').type(state.offerId);
-    cy.contains('button', 'Load offer').click();
-    cy.contains('button', 'Accept offer', { timeout: 15000 }).click();
-    cy.contains('button', 'Confirm decision').click();
-    cy.contains('button', 'Accept offer').should('not.exist');
+    // The offer is loaded on the application page with GetOfferByApplication (JT-108).
+    cy.then(() => go(`/applicant/applications/${state.applicationId}`));
+    until('the offer on the application page', () => cy.reload(),
+      body => body.find('section[aria-label=Offer] button:contains("Accept offer")').length > 0);
+    cy.get('section[aria-label=Offer]').contains('button', 'Accept offer').click();
+    cy.get('[role=dialog]').contains('button', 'Accept offer').click();
+    cy.contains('Offer accepted.', { timeout: 15000 }).should('be.visible');
+    cy.get('section[aria-label=Offer]').contains('button', 'Accept offer').should('not.exist');
   });
 
   it('11 status history shows the whole workflow', () => {
     login(applicant.email, password, '/applicant');
-    waitForStatus('Accepted');
+    waitForApplicantStatus('Accepted', true);
     const expected = [['None', 'Submitted'], ['Submitted', 'Under review'], ['Under review', 'Shortlisted'],
       ['Shortlisted', 'Interview'], ['Interview', 'Offered'], ['Offered', 'Accepted']];
-    cy.get('table[aria-label="Status history"] tbody tr').should('have.length', expected.length).each((row, i) => {
-      cy.wrap(row).find('td').eq(0).should('have.text', expected[i][0]);
-      cy.wrap(row).find('td').eq(1).should('have.text', expected[i][1]);
+    // Each row reads "<new status> from <previous status>", oldest first.
+    cy.get('ul[aria-label="Status history"] > li').should('have.length', expected.length).each((row, i) => {
+      cy.wrap(row).should('contain', `${expected[i][1]} from ${expected[i][0]}`);
     });
-    cy.screenshot('11-status-history');
+    evidence('11-status-history', () => cy.get('ul[aria-label="Status history"]'));
     cy.then(() => cy.log(`job ${state.jobId}, application ${state.applicationId}, offer ${state.offerId}`));
   });
 });

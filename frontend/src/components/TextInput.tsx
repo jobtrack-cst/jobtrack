@@ -30,6 +30,7 @@ interface Props {
   autoComplete?: string;
   placeholder?: string;
   maxLength?: number;
+  inputMode?: 'numeric' | 'text' | 'email';
   multiline?: boolean;
   minRows?: number;
   error?: boolean;
@@ -39,7 +40,7 @@ interface Props {
   children?: ReactNode;
 }
 
-export function TextInput({ label, name, type = 'text', value, defaultValue, onChange, required, disabled, autoComplete, placeholder, maxLength,
+export function TextInput({ label, name, type = 'text', value, defaultValue, onChange, required, disabled, autoComplete, placeholder, maxLength, inputMode,
   multiline, minRows, error, helperText, select, children }: Props) {
   const id = useId();
   const labelId = `${id}-label`;
@@ -54,7 +55,7 @@ export function TextInput({ label, name, type = 'text', value, defaultValue, onC
         onChange={onChange as never} input={<OutlinedInput sx={inputSx} />} aria-describedby={helperId}>{children}</Select>
       : <OutlinedInput id={id} name={name} type={type} value={value} defaultValue={defaultValue} onChange={onChange} required={required}
         disabled={disabled} autoComplete={autoComplete} placeholder={placeholder} multiline={multiline} minRows={minRows} error={error}
-        inputProps={{ maxLength, 'aria-describedby': helperId }} sx={inputSx} />}
+        inputProps={{ maxLength, inputMode, 'aria-describedby': helperId }} sx={inputSx} />}
     {helperText && <FormHelperText id={helperId} error={error} sx={{ m: 0, color: error ? tokens.danger : tokens.textMuted }}>{helperText}</FormHelperText>}
   </Box>;
 }

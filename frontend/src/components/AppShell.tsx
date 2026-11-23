@@ -12,7 +12,7 @@ import { Icon, type IconName } from './Icon';
 // role's landing path; '' is Home. Pages not rebuilt yet keep their current routes.
 // Messages joins both menus with the inbox in Phase 4 (JT-113).
 export const navigation: Record<Role, [path: string, label: string, icon: IconName][]> = {
-  ROLE_APPLICANT: [['', 'Home', 'home'], ['jobs', 'Find jobs', 'search'], ['saved-jobs', 'Saved', 'bookmark'], ['applications', 'Applications', 'applications'],
+  ROLE_APPLICANT: [['', 'Home', 'home'], ['jobs', 'Find jobs', 'search'], ['saved', 'Saved', 'bookmark'], ['applications', 'Applications', 'applications'],
     ['profile', 'Profile', 'profile'], ['job-alerts', 'Job alerts', 'alerts']],
   ROLE_EMPLOYER: [['', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['applications', 'Applicants', 'people'], ['company', 'Company', 'company']],
   ROLE_ADMIN: [['', 'Home', 'home'], ['verification', 'Verification', 'verification'], ['moderation', 'Moderation', 'moderation'],

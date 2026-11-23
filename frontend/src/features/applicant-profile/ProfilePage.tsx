@@ -1,9 +1,19 @@
-import { EmptyState } from '../../components/EmptyState';
 import { useEffect, useState } from 'react';
-import { Alert, Autocomplete, Button, Card, CardContent, Chip, CircularProgress, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Autocomplete, Box, Button, Chip, Stack, TextField, Typography } from '@mui/material';
+import { Card } from '../../components/Card';
+import { ErrorState } from '../../components/ErrorState';
+import { TagChip } from '../../components/JobCard';
+import { FormPanel } from '../../components/Lists';
+import { LoadingRows } from '../../components/LoadingRows';
+import { PageHeader } from '../../components/PageHeader';
+import { TabBar, TabPanel, useTab } from '../../components/Tabs';
+import { TextInput } from '../../components/TextInput';
+import { tokens } from '../../theme';
 import { gatewayMessage, grpcCode, isNotFound, length } from '../application-status/shared';
 import { useAuth } from '../auth/AuthProvider';
+import { ResumesPanel } from '../resume/ResumesPanel';
 import { createMyProfile, getMyProfile, updateMyProfile, type ApplicantProfile, type Education, type ProfileInput } from './api';
+import { ProfilePhoto } from './ProfilePhoto';
 import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 
 // JT-50 limits, checked here so the user sees the problem before saving.
@@ -49,21 +59,27 @@ const sameInput = (a: ProfileInput, b: ProfileInput) => JSON.stringify(a) === JS
 
 // Read-only view of the saved profile; Edit switches to the form (JT-109).
 function ProfileView({ saved }: { saved: Saved }) {
-  return <Stack spacing={2} sx={{ p: { xs: 2.5, sm: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '14px' }}>
-    <Typography variant="h6" component="h2">Summary</Typography>
-    <Typography sx={{ whiteSpace: 'pre-line' }}>{saved.summary.trim() || 'No summary.'}</Typography>
-    <Typography variant="h6" component="h2">Education</Typography>
-    {saved.rows.length === 0 ? <EmptyState>No education entries.</EmptyState>
-      : <Stack component="ul" spacing={1} sx={{ m: 0, pl: 3 }}>
-        {saved.rows.map((row, index) => <Typography component="li" key={index}>
-          {row.institution}, {row.qualification}, {row.startYear} to {row.endYear || 'ongoing'}
-        </Typography>)}
-      </Stack>}
-    <Typography variant="h6" component="h2">Skills</Typography>
-    {saved.skills.length === 0 ? <EmptyState>No skills.</EmptyState>
-      : <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-        {saved.skills.map(skill => <Chip key={skill} label={skill} />)}
-      </Stack>}
+  return <Stack spacing={3}>
+    <Box>
+      <Typography variant="h2" component="h2" sx={{ mb: 1 }}>Summary</Typography>
+      <Typography color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{saved.summary.trim() || 'No summary.'}</Typography>
+    </Box>
+    <Box>
+      <Typography variant="h2" component="h2" sx={{ mb: 1 }}>Education</Typography>
+      {saved.rows.length === 0 ? <Typography color="text.secondary">No education entries.</Typography>
+        : <Stack component="ul" spacing={1} sx={{ m: 0, pl: 3, color: tokens.textSecondary }}>
+          {saved.rows.map((row, index) => <Typography component="li" key={index}>
+            <Box component="strong" sx={{ color: tokens.text }}>{row.institution}</Box>, {row.qualification}, {row.startYear} to {row.endYear || 'ongoing'}
+          </Typography>)}
+        </Stack>}
+    </Box>
+    <Box>
+      <Typography variant="h2" component="h2" sx={{ mb: 1 }}>Skills</Typography>
+      {saved.skills.length === 0 ? <Typography color="text.secondary">No skills.</Typography>
+        : <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+          {saved.skills.map(skill => <TagChip key={skill} label={skill} />)}
+        </Stack>}
+    </Box>
   </Stack>;
 }
 
@@ -74,7 +90,21 @@ const saveMessages = {
   [grpcCode.permissionDenied]: 'Only applicants can have a profile.',
 };
 
+const tabs = ['profile', 'resumes'] as const;
+
+// Profile page with two tabs: the profile (read-only with Edit) and the resumes.
 export function ProfilePage() {
+  const [tab, setTab] = useTab(tabs);
+  return <Stack spacing={4}>
+    <PageHeader title="Profile" description="What employers read when you apply, and the resumes you apply with." />
+    <Stack spacing={3}>
+      <TabBar id="profile" label="Profile sections" value={tab} onChange={setTab} tabs={[['profile', 'Profile'], ['resumes', 'Resumes']]} />
+      <TabPanel id="profile" value={tab}>{tab === 'resumes' ? <ResumesPanel /> : <ProfileTab />}</TabPanel>
+    </Stack>
+  </Stack>;
+}
+
+function ProfileTab() {
   const { session } = useAuth();
   const [hasPhoto, setHasPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -126,46 +156,57 @@ export function ProfilePage() {
   function edit() { setNotice(''); setError(''); setEditing(true); }
   function cancel() { show(saved); setError(''); setEditing(false); }
   const setRow = (index: number, change: Partial<EducationRow>) => setRows(current => current.map((row, i) => i === index ? { ...row, ...change } : row));
-  if (loading) return <CircularProgress aria-label="Loading" size={24} />;
-  if (loadError) return <Stack spacing={2}><Alert severity="error">{loadError}</Alert><Button onClick={() => setRevision(n => n + 1)}>Try again</Button></Stack>;
-  return <Stack spacing={2}>
-    <Typography variant="h4" component="h1">My profile</Typography>
-    {!exists && <Alert severity="info">You do not have a profile yet. Fill in the details and create it. You can add a photo after that.</Alert>}
-    {/* The upload only changes the photo and updated_at, so unsaved form edits are kept (JT-103). */}
-    {exists && session && <ProfilePhotoUpload userId={session.user.userId} name={session.user.fullName} hasPhoto={hasPhoto}
-      onUploaded={profile => setHasPhoto(profile.hasPhoto === true)} />}
+  if (loading) return <LoadingRows rows={2} height={160} label="Loading profile" />;
+  if (loadError) return <ErrorState message={loadError} onRetry={() => setRevision(n => n + 1)} />;
+  return <Stack spacing={3}>
+    {/* The upload only changes the photo and updated_at, so unsaved form edits are kept (JT-103).
+        It needs a saved profile, so before that only the hint is shown. */}
+    {exists && session
+      ? <ProfilePhotoUpload userId={session.user.userId} name={session.user.fullName} hasPhoto={hasPhoto} onUploaded={profile => setHasPhoto(profile.hasPhoto === true)} />
+      : <Card component="section"><Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        {session && <ProfilePhoto userId={session.user.userId} name={session.user.fullName} hasPhoto={false} size={56} />}
+        <Box><Typography variant="h3" component="h2">Profile photo</Typography>
+          <Typography color="text.secondary">Save your profile to add a photo.</Typography></Box>
+      </Stack></Card>}
+    {!exists && <Alert severity="info">You do not have a profile yet. Fill in the details and create it.</Alert>}
     {notice && <Alert severity="success">{notice}</Alert>}
-    {exists && !editing && <>
-      <ProfileView saved={saved} />
-      <Button variant="contained" onClick={edit} sx={{ alignSelf: 'flex-start' }}>Edit profile</Button>
-    </>}
-    {(!exists || editing) && <Stack spacing={2} component="form" onSubmit={e => { e.preventDefault(); void save(); }}>
-      <TextField label="Summary" name="summary" multiline minRows={3} value={summary} disabled={busy}
+    {exists && !editing && <FormPanel>
+      <Stack spacing={3}>
+        <ProfileView saved={saved} />
+        <Button variant="contained" onClick={edit} sx={{ alignSelf: 'flex-start' }}>Edit profile</Button>
+      </Stack>
+    </FormPanel>}
+    {(!exists || editing) && <FormPanel><Stack spacing={3} component="form" noValidate onSubmit={e => { e.preventDefault(); void save(); }}>
+      <TextInput label="Summary" name="summary" multiline minRows={4} value={summary} disabled={busy}
         helperText={`${length(summary)} of ${limits.summary} characters`} onChange={e => setSummary(e.target.value)} />
-      <Typography variant="h6" component="h2">Education</Typography>
-      {rows.length === 0 && <EmptyState>No education entries.</EmptyState>}
-      {rows.map((row, index) => <Card key={index} variant="outlined"><CardContent><Stack spacing={2}>
-        <Typography variant="subtitle1" component="h3">Education entry {index + 1}</Typography>
-        <TextField label="Institution" required value={row.institution} disabled={busy} onChange={e => setRow(index, { institution: e.target.value })} />
-        <TextField label="Qualification" required value={row.qualification} disabled={busy} onChange={e => setRow(index, { qualification: e.target.value })} />
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField label="Start year" required value={row.startYear} disabled={busy} slotProps={{ htmlInput: { inputMode: 'numeric' } }} onChange={e => setRow(index, { startYear: e.target.value.trim() })} />
-          <TextField label="End year" value={row.endYear} disabled={busy} helperText="Leave empty if ongoing" slotProps={{ htmlInput: { inputMode: 'numeric' } }} onChange={e => setRow(index, { endYear: e.target.value.trim() })} />
-        </Stack>
-        <Button disabled={busy} onClick={() => setRows(current => current.filter((_, i) => i !== index))}>Remove entry {index + 1}</Button>
-      </Stack></CardContent></Card>)}
-      <Button disabled={busy || rows.length >= limits.education} onClick={() => setRows(current => [...current, { ...emptyRow }])}>Add education</Button>
+      <Stack spacing={2}>
+        <Typography variant="h2" component="h2">Education</Typography>
+        {rows.length === 0 && <Typography color="text.secondary">No education entries.</Typography>}
+        {rows.map((row, index) => <Box key={index} component="fieldset" sx={{ m: 0, p: { xs: 2, sm: 2.5 }, border: `1px solid ${tokens.border}`, borderRadius: '16px', minWidth: 0 }}>
+          <Typography component="legend" sx={{ px: 1, fontWeight: 700 }}>Education entry {index + 1}</Typography>
+          <Stack spacing={2}>
+            <TextInput label="Institution" required value={row.institution} disabled={busy} onChange={e => setRow(index, { institution: e.target.value })} />
+            <TextInput label="Qualification" required value={row.qualification} disabled={busy} onChange={e => setRow(index, { qualification: e.target.value })} />
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' } }}>
+              <TextInput label="Start year" required value={row.startYear} disabled={busy} inputMode="numeric" onChange={e => setRow(index, { startYear: e.target.value.trim() })} />
+              <TextInput label="End year" value={row.endYear} disabled={busy} inputMode="numeric" helperText="Leave empty if ongoing" onChange={e => setRow(index, { endYear: e.target.value.trim() })} />
+            </Box>
+            <Button color="error" disabled={busy} onClick={() => setRows(current => current.filter((_, i) => i !== index))} sx={{ alignSelf: 'flex-start' }}>Remove entry {index + 1}</Button>
+          </Stack>
+        </Box>)}
+        <Button variant="outlined" disabled={busy || rows.length >= limits.education} onClick={() => setRows(current => [...current, { ...emptyRow }])} sx={{ alignSelf: 'flex-start' }}>Add education</Button>
+      </Stack>
       <Autocomplete multiple freeSolo options={[]} value={skills} disabled={busy}
         onChange={(_, value) => setSkills(value.map(String))}
         renderValue={(value, getItemProps) => value.map((skill, index) => { const { key, ...props } = getItemProps({ index }); return <Chip key={key} label={skill} {...props} />; })}
         renderInput={params => <TextField {...params} label="Skills" helperText={`Type a skill and press Enter. ${skills.length} of ${limits.skills}.`} />} />
       {problem && <Alert severity="warning">{problem}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
-      {exists && !changed && <Typography variant="body2">No changes to save.</Typography>}
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+      {exists && !changed && <Typography variant="body2" color="text.secondary">No changes to save.</Typography>}
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
         <Button type="submit" variant="contained" disabled={busy || !!problem || !changed}>{exists ? 'Save profile' : 'Create profile'}</Button>
         {exists && <Button disabled={busy} onClick={cancel}>Cancel</Button>}
       </Stack>
-    </Stack>}
+    </Stack></FormPanel>}
   </Stack>;
 }

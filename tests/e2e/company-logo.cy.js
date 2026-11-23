@@ -12,7 +12,9 @@ const jobs = [
 ];
 // A real 1x1 PNG, so the browser can draw it and MUI keeps the img.
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNQSQsHAAGTAOLTSNOPAAAAAElFTkSuQmCC';
-const card = text => cy.contains('.MuiCard-root', text);
+// JT-112 job cards are list items; the logo is decorative because the company name is shown as text.
+const card = text => cy.contains('ul[aria-label=Jobs] > li', text);
+const logo = $el => cy.wrap($el).find('.MuiAvatar-root img');
 
 beforeEach(() => {
   // Defined first, so it only answers calls no other stub handles; never reaches a real gateway.
@@ -40,7 +42,7 @@ describe('JT-102 company logo on jobs', () => {
   it('shows the logo on search cards and loads it once per employer', () => {
     cy.contains('nav a', /^Find jobs$/).click();
     for (const title of ['Frontend intern', 'Backend intern']) {
-      card(title).should('contain', 'Druk Tech').find('img[alt="Druk Tech logo"]')
+      card(title).should('contain', 'Druk Tech').then(logo)
         .should('have.attr', 'src').and('match', /^data:image\/png;base64,/);
     }
     cy.get('@profile.all').should('have.length', 1);
@@ -58,7 +60,7 @@ describe('JT-102 company logo on jobs', () => {
     cy.contains('nav a', /^Find jobs$/).click();
     card('Frontend intern').contains('a', 'View job').click();
     cy.contains('Build pages').should('be.visible');
-    card('Build pages').should('contain', 'Druk Tech').find('img[alt="Druk Tech logo"]')
+    cy.contains('main section', 'Build pages').should('contain', 'Druk Tech').then(logo)
       .should('have.attr', 'src').and('match', /^data:image\/png;base64,/);
   });
 });

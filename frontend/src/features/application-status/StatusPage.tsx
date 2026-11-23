@@ -7,7 +7,7 @@ import { getStatus, listHistory } from './api';
 import { formatTime, grpcCode, statusLabel } from './shared';
 import { useLoad } from './useLoad';
 
-const readMessages = {
+export const readMessages = {
   [grpcCode.notFound]: 'This application has no status yet. It appears shortly after the application is submitted; refresh to try again.',
   [grpcCode.permissionDenied]: 'Only the applicant and the employer of this application can see its status.',
 };

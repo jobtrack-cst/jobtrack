@@ -221,81 +221,7 @@ describe('JT-73 employer jobs', () => {
   });
 });
 
-describe('JT-73 applicant jobs', () => {
-  it('sends search filters, resets pagination, views full details and links to Apply', () => {
-    cy.intercept('GET', `${gateway}/v1/search/jobs?*`, req => {
-      req.reply({ jobs: [job], pagination: { nextPageToken: '20', totalCount: 21 } });
-    }).as('search');
-    cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: { ...job, status: 'JOB_STATUS_PUBLISHED' } });
-    login('ROLE_APPLICANT'); open('Find jobs'); cy.wait('@search');
-    cy.contains('button', 'Next page').click(); cy.wait('@search').its('request.query').should('include', { 'pagination.page_token': '20' });
-    field('Search title').type(' intern '); choose('Category', 'Technology'); choose('Tags', 'React'); field('Tags').type('{esc}'); field('Location').type('Thimphu{esc}');
-    cy.contains('button', exact('Search')).click();
-    cy.wait('@search').its('request.query').should('include', { query: 'intern', category_id: categoryId, tag_ids: tagId, location: 'Thimphu', 'pagination.page_token': '' });
-    card(job.title).contains('a', 'View job').click(); cy.contains(job.description).should('be.visible');
-    cy.contains('a', 'Apply for this job').should('have.attr', 'href', `/applicant/apply?jobId=${jobId}`);
-    cy.contains('a', 'Report job').should('have.attr', 'href', `/applicant/report-job/${jobId}`);
-  });
-
-  it('saves from search, lists the bookmark, views it, and unsaves it', () => {
-    let saved = [];
-    cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs: [job], pagination: {} });
-    cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: { ...job, status: 'JOB_STATUS_PUBLISHED' } });
-    cy.intercept('POST', `${gateway}/v1/saved-jobs`, req => {
-      expect(req.body).to.deep.eq({ jobId }); saved = [{ jobId, applicantId: userId, savedAt: deadline }]; req.reply({ savedJob: saved[0] });
-    }).as('save');
-    cy.intercept('GET', `${gateway}/v1/saved-jobs?*`, req => req.reply({ savedJobs: saved, pagination: { totalCount: saved.length } }));
-    cy.intercept('DELETE', `${gateway}/v1/saved-jobs/${jobId}`, req => { saved = []; req.reply({ statusCode: 200, body: {} }); }).as('unsave');
-    login('ROLE_APPLICANT'); open('Find jobs'); card(job.title).contains('button', exact('Save job')).click(); cy.wait('@save');
-    card(job.title).should('contain', 'Job saved.');
-    open('Saved'); card(jobId).contains('a', 'View job').click(); cy.contains(job.description).should('be.visible');
-    open('Saved'); card(jobId).contains('button', 'Unsave job').click(); cy.wait('@unsave');
-    cy.contains('No saved jobs on this page.').should('be.visible');
-  });
-
-  it('unsaves a newly saved job directly from its details', () => {
-    cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: { ...job, status: 'JOB_STATUS_PUBLISHED' } });
-    cy.intercept('POST', `${gateway}/v1/saved-jobs`, { savedJob: { jobId } });
-    cy.intercept('DELETE', `${gateway}/v1/saved-jobs/${jobId}`, { statusCode: 200, body: {} }).as('unsave');
-    login('ROLE_APPLICANT'); visit(`/applicant/jobs/${jobId}`);
-    cy.contains('button', exact('Save job')).click(); cy.contains('button', 'Unsave job').click(); cy.wait('@unsave');
-    cy.contains('button', exact('Save job')).should('be.enabled');
-  });
-
-  for (const [statusCode, code, message] of [[409, 6, 'already saved'], [400, 9, 'closed'], [503, 14, 'request failed']]) {
-    it(`shows a safe save failure ${code}`, () => {
-      cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs: [job], pagination: {} });
-      cy.intercept('POST', `${gateway}/v1/saved-jobs`, { statusCode, body: { code, message: 'private-input' } });
-      login('ROLE_APPLICANT'); open('Find jobs'); cy.contains('button', exact('Save job')).click();
-      cy.get('[role=alert]').should('contain', message).and('not.contain', 'private-input');
-    });
-  }
-
-  for (const value of [{ ...job, status: 'JOB_STATUS_CLOSED' }, { ...job, status: 'JOB_STATUS_PUBLISHED', deadline: '2020-01-01T00:00:00Z' }]) {
-    it(`blocks save and apply on a ${value.status} job with deadline ${value.deadline}`, () => {
-      cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: value });
-      login('ROLE_APPLICANT'); visit(`/applicant/jobs/${jobId}`);
-      cy.contains('past its deadline').should('be.visible'); cy.contains('button', exact('Save job')).should('not.exist');
-      cy.contains('a', 'Apply for this job').should('not.exist');
-    });
-  }
-
-  it('handles an unavailable job and invalid address safely', () => {
-    cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { statusCode: 404, body: { code: 5, message: 'private-input' } });
-    login('ROLE_APPLICANT'); visit(`/applicant/jobs/${jobId}`);
-    cy.get('[role=alert]').should('contain', 'not found').and('not.contain', 'private-input');
-    visit('/applicant/jobs/bad-id'); cy.contains('job ID in the address is not valid').should('be.visible');
-  });
-
-  it('clears search filters and shows an empty result', () => {
-    cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs: [], pagination: {} }).as('search');
-    login('ROLE_APPLICANT'); open('Find jobs'); cy.wait('@search');
-    field('Search title').type('Nothing'); cy.contains('button', exact('Search')).click(); cy.wait('@search');
-    cy.contains('No open jobs match these filters.').should('be.visible');
-    cy.contains('button', 'Clear filters').click(); cy.wait('@search').its('request.query').should('include', { query: '', category_id: '', location: '', 'pagination.page_token': '' });
-    field('Search title').should('have.value', '');
-  });
-});
+// The applicant job pages were rebuilt in JT-112; their tests are in applicant-pages.cy.js.
 
 describe('JT-73 notifications and routing', () => {
   for (const role of ['ROLE_APPLICANT', 'ROLE_EMPLOYER', 'ROLE_ADMIN']) {
@@ -337,14 +263,14 @@ describe('JT-73 notifications and routing', () => {
     openAccountMenu();
     cy.contains('button', 'Log out').click(); login();
     cy.contains('nav a', exact('Find jobs')).should('not.exist'); cy.contains('nav a', exact('Saved')).should('not.exist');
-    visit('/applicant/saved-jobs'); cy.location('pathname').should('eq', '/employer');
+    visit('/applicant/saved'); cy.location('pathname').should('eq', '/employer');
     openAccountMenu();
     cy.contains('button', 'Log out').click(); login('ROLE_ADMIN');
     visit('/employer/jobs/new'); cy.location('pathname').should('eq', '/admin');
   });
 
   it('requires login for the new protected pages', () => {
-    for (const path of ['/employer/jobs/new', '/applicant/jobs', '/applicant/saved-jobs', '/admin/notifications']) {
+    for (const path of ['/employer/jobs/new', '/applicant/jobs', '/applicant/saved', '/admin/notifications']) {
       cy.visit(path); cy.location('pathname').should('eq', '/login');
     }
   });
@@ -413,26 +339,4 @@ describe('JT-73 recovery and boundaries', () => {
     cy.contains('button', 'Save changes').should('be.enabled');
   });
 
-  it('validates search text limits and recovers from a network failure', () => {
-    cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { forceNetworkError: true });
-    login('ROLE_APPLICANT'); open('Find jobs');
-    cy.contains('Cannot reach JobTrack.').should('be.visible');
-    fill('Search title', 'x'.repeat(151)); cy.contains('button', exact('Search')).should('be.disabled');
-    fill('Search title', 'x'.repeat(150)); cy.contains('button', exact('Search')).should('be.enabled');
-    fill('Location', 'x'.repeat(101)); cy.contains('button', exact('Search')).should('be.disabled');
-    fill('Location', 'x'.repeat(100)); cy.contains('button', exact('Search')).should('be.enabled');
-    cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs: [], pagination: {} });
-    cy.contains('button', 'Refresh search').click(); cy.contains('No open jobs match these filters.').should('be.visible');
-  });
-
-  it('paginates saved jobs and refreshes after a bookmark disappears', () => {
-    login('ROLE_APPLICANT');
-    cy.intercept('GET', `${gateway}/v1/saved-jobs?*`, req => req.reply({ savedJobs: [{ jobId, applicantId: userId, savedAt: deadline }], pagination: req.query['pagination.page_token'] ? {} : { nextPageToken: '20' } })).as('saved');
-    open('Saved'); cy.wait('@saved');
-    cy.contains('button', 'Next page').click(); cy.wait('@saved').its('request.query').should('include', { 'pagination.page_token': '20' });
-    cy.intercept('DELETE', `${gateway}/v1/saved-jobs/${jobId}`, { statusCode: 404, body: { code: 5, message: 'private-input' } });
-    cy.contains('button', 'Unsave job').click(); cy.get('[role=alert]').should('contain', 'no longer available').and('not.contain', 'private-input');
-    cy.intercept('GET', `${gateway}/v1/saved-jobs?*`, { savedJobs: [], pagination: {} });
-    cy.contains('button', 'Refresh saved jobs').click(); cy.contains('No saved jobs on this page.').should('be.visible');
-  });
 });

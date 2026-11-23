@@ -41,77 +41,15 @@ function login(role = 'ROLE_APPLICANT') {
 function navigate(path) {
   cy.window().then(win => { win.history.pushState({}, '', path); win.dispatchEvent(new PopStateEvent('popstate')); });
 }
-function setupApply(status = 'JOB_STATUS_PUBLISHED') {
-  cy.intercept('GET', `${gateway}/v1/resumes?*`, { resumes: [
-    { resumeId, fileName: 'validated.pdf', validationStatus: 'RESUME_VALIDATION_STATUS_VALIDATED' },
-    { resumeId: 'pending', fileName: 'pending.pdf', validationStatus: 'RESUME_VALIDATION_STATUS_PENDING' },
-    { resumeId: 'rejected', fileName: 'rejected.pdf', validationStatus: 'RESUME_VALIDATION_STATUS_REJECTED' },
-  ] }).as('resumes');
-  cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: { jobId, title: 'Synthetic internship', description: 'Job description', status, deadline: new Date(Date.now() + 86400000).toISOString() } }).as('job');
-  login();
-  navigate('/applicant/apply');
-  cy.get('input').first().type(jobId);
-  cy.contains('button', 'Load job').click();
-  cy.wait(['@resumes', '@job']);
-  cy.get('[role=combobox]').click();
-  cy.get('[role=option]').should('have.length', 1).and('contain', 'validated.pdf').click();
-}
 function applications(role = 'ROLE_APPLICANT') {
   login(role);
   cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('applications');
   openApplications(role);
   cy.wait('@applications');
 }
-describe('JT-78 apply and applications', () => {
-  it('applies with only a validated resume, then lists and withdraws the application', () => {
-    cy.intercept('POST', `${gateway}/v1/applications`, req => {
-      expect(req.body).to.deep.eq({ jobId, resumeId });
-      req.reply({ application });
-    }).as('submit');
-    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application] });
-    setupApply();
-    cy.contains('button', 'Submit application').click();
-    cy.wait('@submit');
-    cy.contains('Application submitted.').should('be.visible');
-    cy.contains('button', 'Submit application').should('be.disabled');
-    cy.contains('a', 'My applications').click();
-    cy.contains(applicationId).should('be.visible');
-    cy.intercept('POST', `${gateway}/v1/applications/${applicationId}/withdraw`, req => {
-      expect(req.body).to.deep.eq({});
-      req.reply({ application: { ...application, withdrawn: true } });
-    }).as('withdraw');
-    cy.contains('button', 'Withdraw').click();
-    cy.contains('button', 'Cancel').click();
-    cy.contains('button', 'Withdraw').click();
-    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [{ ...application, withdrawn: true }] });
-    cy.contains('button', 'Confirm withdrawal').click();
-    cy.wait('@withdraw');
-    cy.contains('Application withdrawn.').should('be.visible');
-    cy.contains('button', 'Withdraw').should('be.disabled');
-  });
-  it('blocks a closed job before submission', () => {
-    setupApply('JOB_STATUS_CLOSED');
-    cy.contains('This job is closed').should('be.visible');
-    cy.contains('button', 'Submit application').should('be.disabled');
-  });
-  for (const [statusCode, code, expected] of [[400, 9, 'resume is not validated'], [409, 6, 'already applied'], [403, 7, 'permission'], [404, 5, 'not found']]) {
-    it(`shows safe business error ${code} and permits retry`, () => {
-      cy.intercept('POST', `${gateway}/v1/applications`, { statusCode, body: { code, message: 'private-input' } });
-      setupApply();
-      cy.contains('button', 'Submit application').click();
-      cy.get('[role=alert]').should('contain', expected).and('not.contain', 'private-input');
-      cy.contains('button', 'Submit application').should('be.enabled');
-    });
-  }
-  it('handles empty and failed resume lists with refresh', () => {
-    cy.intercept('GET', `${gateway}/v1/resumes?*`, { statusCode: 503, body: {} });
-    login(); navigate('/applicant/apply');
-    cy.contains('The request failed').should('be.visible');
-    cy.intercept('GET', `${gateway}/v1/resumes?*`, { resumes: [] });
-    cy.contains('button', 'Refresh resumes').click();
-    cy.contains('No validated resume').should('be.visible');
-    cy.contains('button', 'Submit application').should('be.disabled');
-  });
+// Applicant apply, applications and offers moved to applicant-pages.cy.js (JT-112);
+// the employer pages keep their JT-78 tests until JT-111.
+describe('JT-78 applications', () => {
   it('uses nested pagination query fields and reaches later applications', () => {
     cy.intercept('GET', `${gateway}/v1/applications?*`, req => {
       expect(req.query['pagination.page_size']).to.eq('20');
@@ -119,7 +57,7 @@ describe('JT-78 apply and applications', () => {
         ? { applications: [], pagination: {} }
         : { applications: [application], pagination: { nextPageToken: '20' } });
     });
-    login(); openApplications();
+    login('ROLE_EMPLOYER'); openApplications('ROLE_EMPLOYER');
     cy.contains(applicationId).should('be.visible');
     cy.contains('button', 'Next page').click();
     cy.contains('No applications').should('be.visible');
@@ -141,26 +79,9 @@ describe('JT-78 offers', () => {
     cy.contains('button', 'Make offer').should('be.disabled');
     cy.contains('button', 'Accept offer').should('not.exist');
   });
-  for (const decision of ['accept', 'decline']) {
-    it(`views and confirms ${decision}; final offers cannot be answered again`, () => {
-      cy.intercept('GET', `${gateway}/v1/offers/${offerId}`, { offer });
-      cy.intercept('POST', `${gateway}/v1/offers/${offerId}/${decision}`, req => {
-        expect(req.body).to.deep.eq({});
-        req.reply({ offer: { ...offer, status: decision === 'accept' ? 'OFFER_STATUS_ACCEPTED' : 'OFFER_STATUS_DECLINED' } });
-      }).as('decision');
-      login(); navigate('/applicant/offers');
-      cy.get('input').type(offerId); cy.contains('button', 'Load offer').click();
-      cy.contains('Synthetic offer terms').should('be.visible');
-      cy.contains('button', decision === 'accept' ? 'Accept offer' : 'Decline offer').click();
-      cy.contains('button', 'Confirm decision').click(); cy.wait('@decision');
-      cy.contains('Status: ' + (decision === 'accept' ? 'ACCEPTED' : 'DECLINED')).should('be.visible');
-      cy.contains('button', 'Accept offer').should('not.exist');
-      cy.contains('button', 'Decline offer').should('not.exist');
-    });
-  }
 });
 describe('JT-78 messages and alerts', () => {
-  for (const role of ['ROLE_APPLICANT', 'ROLE_EMPLOYER']) {
+  for (const role of ['ROLE_EMPLOYER']) {
     it(`reads and sends application messages for ${role}`, () => {
       cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/messages?*`, { messages: [{ messageId: 'm1', senderId: 'other', content: 'Existing message' }] });
       applications(role); cy.contains('.workspace-content a', 'Messages').click();
@@ -209,32 +130,6 @@ describe('JT-78 messages and alerts', () => {
 });
 
 describe('JT-78 boundaries and recovery', () => {
-  it('loads validated resumes on a later page', () => {
-    cy.intercept('GET', `${gateway}/v1/resumes?*`, req => {
-      req.reply(req.query['pagination.page_token'] === '20'
-        ? { resumes: [{ resumeId, fileName: 'later.pdf', validationStatus: 'RESUME_VALIDATION_STATUS_VALIDATED' }] }
-        : { resumes: [], pagination: { nextPageToken: '20' } });
-    });
-    login(); navigate('/applicant/apply');
-    cy.contains('No validated resume').should('be.visible');
-    cy.contains('button', 'Next page').click();
-    // The select is disabled while the next page loads; a click before then is ignored.
-    cy.get('[role=combobox]').should('not.have.attr', 'aria-disabled', 'true').click(); cy.get('[role=option]').contains('later.pdf').click();
-  });
-  it('blocks a passed deadline even when the job is published', () => {
-    setupApply();
-    cy.intercept('GET', `${gateway}/v1/jobs/${jobId}`, { job: { jobId, title: 'Expired', status: 'JOB_STATUS_PUBLISHED', deadline: new Date(Date.now() - 1000).toISOString() } });
-    cy.contains('button', 'Load job').click();
-    cy.contains('This job is closed').should('be.visible');
-    cy.contains('button', 'Submit application').should('be.disabled');
-  });
-  it('prevents duplicate in-flight application submissions', () => {
-    cy.intercept('POST', `${gateway}/v1/applications`, { delay: 800, body: { application } }).as('submit');
-    setupApply();
-    cy.contains('button', 'Submit application').click().should('be.disabled');
-    cy.wait('@submit');
-    cy.get('@submit.all').should('have.length', 1);
-  });
   it('bounds offer terms at 2000 characters and reports duplicate offers', () => {
     applications('ROLE_EMPLOYER'); cy.contains('a', 'Make offer').click();
     cy.contains('button', 'Make offer').should('be.disabled');
@@ -252,7 +147,7 @@ describe('JT-78 boundaries and recovery', () => {
   });
   it('keeps the thread draft on failure and permits retry', () => {
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/messages?*`, { messages: [] });
-    applications(); cy.contains('.workspace-content a', 'Messages').click();
+    applications('ROLE_EMPLOYER'); cy.contains('.workspace-content a', 'Messages').click();
     cy.contains('No messages').should('be.visible');
     cy.contains('button', 'Send message').should('be.disabled');
     cy.get('textarea').first().type('Retry this draft');
@@ -264,7 +159,7 @@ describe('JT-78 boundaries and recovery', () => {
   });
   it('shows permission errors for a non-participant thread and blocks sending', () => {
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/messages?*`, { statusCode: 403, body: { code: 7 } });
-    applications(); cy.contains('.workspace-content a', 'Messages').click();
+    applications('ROLE_EMPLOYER'); cy.contains('.workspace-content a', 'Messages').click();
     cy.contains('You do not have permission').should('be.visible');
     cy.get('textarea').first().type('Cannot send');
     cy.contains('button', 'Send message').should('be.disabled');
@@ -373,7 +268,7 @@ describe('JT-78 location reference selection', () => {
 
 // JT-108: discover the lifetime offer through either participant's application.
 describe('JT-108 offer discovery', () => {
-  for (const role of ['ROLE_APPLICANT', 'ROLE_EMPLOYER']) {
+  for (const role of ['ROLE_EMPLOYER']) {
     const base = role === 'ROLE_EMPLOYER' ? '/employer' : '/applicant';
     it(`opens, revisits and reloads the offer from application cards for ${role}`, () => {
       cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { delay: 500, body: { offer } }).as('byApplication');
@@ -395,7 +290,7 @@ describe('JT-108 offer discovery', () => {
   }
   it('shows no offer separately from server errors and allows retry', () => {
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { statusCode: 404, body: { code: 5 } }).as('missingOffer');
-    applications(); cy.contains('a', 'View Offer').click(); cy.wait('@missingOffer');
+    applications('ROLE_EMPLOYER'); cy.contains('a', 'View Offer').click(); cy.wait('@missingOffer');
     cy.contains('No offer has been made for this application.').should('be.visible');
     cy.contains('button', 'Accept offer').should('not.exist');
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { statusCode: 503, body: { code: 14, message: 'private-details' } }).as('failedOffer');
@@ -407,28 +302,17 @@ describe('JT-108 offer discovery', () => {
     cy.contains(offer.terms).should('be.visible');
   });
   it('does not request a malformed application ID', () => {
-    login(); navigate('/applicant/offers?applicationId=bad');
+    login('ROLE_EMPLOYER'); navigate('/employer/offers?applicationId=bad');
     cy.contains('Application ID must be a UUID.').should('be.visible');
     cy.contains('button', 'Load offer').should('be.disabled');
   });
   it('switches from the existing offer-ID lookup to application lookup', () => {
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { offer }).as('byApplication');
-    login(); navigate('/applicant/offers');
+    login('ROLE_EMPLOYER'); navigate('/employer/offers');
     cy.contains('button', 'Use application ID').click();
     cy.get('input').type(applicationId);
     cy.contains('button', 'Load offer').click(); cy.wait('@byApplication');
     cy.contains(offer.terms).should('be.visible');
-  });
-  it('keeps a pending offer available after a failed decision for retry', () => {
-    cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, { offer });
-    applications(); cy.contains('a', 'View Offer').click();
-    cy.contains('button', 'Accept offer').click();
-    cy.intercept('POST', `${gateway}/v1/offers/${offerId}/accept`, { statusCode: 503, body: {} }).as('failedDecision');
-    cy.contains('button', 'Confirm decision').click(); cy.wait('@failedDecision');
-    cy.contains('button', 'Confirm decision').should('be.enabled');
-    cy.intercept('POST', `${gateway}/v1/offers/${offerId}/accept`, { offer: { ...offer, status: 'OFFER_STATUS_ACCEPTED' } });
-    cy.contains('button', 'Confirm decision').click();
-    cy.contains('Status: ACCEPTED').should('be.visible');
   });
   it('links a newly created offer to a reloadable application lookup', () => {
     cy.intercept('POST', `${gateway}/v1/applications/${applicationId}/offers`, { offer });
@@ -446,9 +330,9 @@ describe('JT-108 offer discovery', () => {
     const pending = new Promise(resolve => { release = resolve; });
     cy.intercept('GET', `${gateway}/v1/applications/${applicationId}/offer`, req => pending.then(() => req.reply({ offer }))).as('oldOffer');
     cy.intercept('GET', `${gateway}/v1/applications/${otherId}/offer`, { offer: { ...offer, applicationId: otherId, terms: 'Another application offer' } }).as('newOffer');
-    applications(); cy.contains('a', 'View Offer').click();
+    applications('ROLE_EMPLOYER'); cy.contains('a', 'View Offer').click();
     cy.contains('Loading offer').should('be.visible');
-    navigate(`/applicant/offers?applicationId=${otherId}`); cy.wait('@newOffer');
+    navigate(`/employer/offers?applicationId=${otherId}`); cy.wait('@newOffer');
     cy.contains('Another application offer').should('be.visible');
     cy.then(() => release()); cy.wait('@oldOffer');
     cy.contains('Another application offer').should('be.visible');

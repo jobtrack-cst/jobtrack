@@ -39,10 +39,12 @@ describe('JT-106 session persistence', () => {
       cy.reload();
       cy.wait('@me');
       cy.location('pathname').should('eq', base);
-      // Report form has no background reads and is available to every role.
-      cy.visit(`${base}/report-job?from=reload`);
+      // Pages without background reads: the report form (employer, admin) and, for applicants,
+      // a job address that is not a job ID, which never calls the gateway (JT-112).
+      const deepLink = role === 'ROLE_APPLICANT' ? '/applicant/jobs/not-a-job' : `${base}/report-job`;
+      cy.visit(`${deepLink}?from=reload`);
       cy.wait('@me');
-      cy.location('pathname').should('eq', `${base}/report-job`);
+      cy.location('pathname').should('eq', deepLink);
       cy.location('search').should('eq', '?from=reload');
       cy.window().should(win => expect(JSON.parse(win.sessionStorage.getItem(key))).to.deep.equal(saved));
       openAccountMenu();
