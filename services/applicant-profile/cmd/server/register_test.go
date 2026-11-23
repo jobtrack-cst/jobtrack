@@ -19,7 +19,26 @@ import (
 	"github.com/jobtrack-cst/jobtrack/services/applicant-profile/internal/domain"
 )
 
-const stubApplicantID = "11111111-1111-4111-8111-111111111111"
+const (
+	stubApplicantID   = "11111111-1111-4111-8111-111111111111"
+	stubApplicationID = "44444444-4444-4444-8444-444444444444"
+	stubEmployerID    = "55555555-5555-4555-8555-555555555555"
+)
+
+// stubParticipants knows one application of stubApplicantID, owned by
+// stubEmployerID.
+type stubParticipants struct{}
+
+func (stubParticipants) Record(context.Context, string, domain.ApplicationParticipant) error {
+	return nil
+}
+
+func (stubParticipants) GetByApplicationID(_ context.Context, id string) (domain.ApplicationParticipant, error) {
+	if id != stubApplicationID {
+		return domain.ApplicationParticipant{}, domain.ErrApplicationNotFound
+	}
+	return domain.ApplicationParticipant{ApplicationID: id, ApplicantID: stubApplicantID, EmployerID: stubEmployerID}, nil
+}
 
 // stubProfiles is an in-memory repository for wiring tests; the real one is
 // covered by the Testcontainers integration test.
@@ -105,7 +124,7 @@ func (r *recordingRegistrar) RegisterService(desc *grpc.ServiceDesc, impl any) {
 
 func TestRegisterApplicantProfile_RegistersOnlyThePublicService(t *testing.T) {
 	var reg recordingRegistrar
-	registerApplicantProfile(&stubProfiles{})(&reg)
+	registerApplicantProfile(&stubProfiles{}, stubParticipants{})(&reg)
 	if len(reg.descs) != 1 || reg.descs[0].ServiceName != "jobtrack.applicant_profile.v1.ApplicantProfileService" {
 		t.Fatalf("registered %v, want only ApplicantProfileService", reg.descs)
 	}
@@ -126,7 +145,7 @@ func TestServe_ApplicantProfileOverGRPC(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerApplicantProfile(&stubProfiles{}),
+		done <- serve(ctx, logging.New("test", io.Discard), app.NewHealth(), registerApplicantProfile(&stubProfiles{}, stubParticipants{}),
 			grpcListener, httpListener)
 	}()
 	t.Cleanup(func() {
@@ -141,11 +160,12 @@ func TestServe_ApplicantProfileOverGRPC(t *testing.T) {
 	}
 	t.Cleanup(func() { conn.Close() })
 	client := apv1.NewApplicantProfileServiceClient(conn)
-	as := func(t *testing.T, role string) context.Context {
+	asUser := func(t *testing.T, id, role string) context.Context {
 		c, stop := context.WithTimeout(context.Background(), 2*time.Second)
 		t.Cleanup(stop)
-		return metadata.AppendToOutgoingContext(c, "x-user-id", stubApplicantID, "x-user-role", role)
+		return metadata.AppendToOutgoingContext(c, "x-user-id", id, "x-user-role", role)
 	}
+	as := func(t *testing.T, role string) context.Context { return asUser(t, stubApplicantID, role) }
 
 	if _, err := client.GetMyProfile(as(t, "applicant"), &apv1.GetMyProfileRequest{}); status.Code(err) != codes.NotFound {
 		t.Fatalf("get before create: %v, want NotFound", err)
@@ -170,5 +190,22 @@ func TestServe_ApplicantProfileOverGRPC(t *testing.T) {
 	}
 	if _, err := client.UpdateMyProfile(as(t, "employer"), &apv1.UpdateMyProfileRequest{}); status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("employer update: %v, want PermissionDenied", err)
+	}
+
+	// JT-114: the owning employer reads the applicant's current profile; the
+	// public RPCs need no internal token.
+	asEmployer := func(t *testing.T) context.Context { return asUser(t, stubEmployerID, "employer") }
+	forApp, err := client.GetApplicantProfileForApplication(asEmployer(t),
+		&apv1.GetApplicantProfileForApplicationRequest{ApplicationId: stubApplicationID})
+	if err != nil || forApp.GetProfile().GetSummary() != "Updated" || forApp.GetProfile().GetApplicantId() != stubApplicantID {
+		t.Fatalf("employer profile read: resp=%v err=%v", forApp, err)
+	}
+	if _, err := client.GetApplicantPhotoForApplication(asEmployer(t),
+		&apv1.GetApplicantPhotoForApplicationRequest{ApplicationId: stubApplicationID}); status.Code(err) != codes.NotFound {
+		t.Fatalf("employer photo read without a photo: %v, want NotFound", err)
+	}
+	if _, err := client.GetApplicantProfileForApplication(as(t, "applicant"),
+		&apv1.GetApplicantProfileForApplicationRequest{ApplicationId: stubApplicationID}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("applicant read for an application: %v, want PermissionDenied", err)
 	}
 }

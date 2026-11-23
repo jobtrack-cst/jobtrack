@@ -17,6 +17,7 @@ import (
 
 	applicantprofilev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/applicant_profile/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/applicant-profile/internal/adapters/grpc"
@@ -95,6 +96,8 @@ func loadConfig(getenv func(string) string) (config, error) {
 type deps struct {
 	checker  ports.HealthChecker
 	profiles ports.ProfileRepository
+	// participants is the JT-114 application.submitted projection.
+	participants ports.ApplicationParticipantRepository
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -103,7 +106,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return runWithPublisher(ctx, cfg, logger, d,
 				func(url string) (publisherResource, error) { return rabbitmq.NewPublisher(url) },
 				func(ctx context.Context, cfg config, logger *slog.Logger, d deps) error {
-					return runServers(ctx, cfg, logger, d.checker, registerApplicantProfile(d.profiles))
+					return runServers(ctx, cfg, logger, d.checker, registerApplicantProfile(d.profiles, d.participants))
 				})
 		})
 }
@@ -116,8 +119,9 @@ func (systemClock) Now() time.Time { return time.Now().UTC() }
 // registerApplicantProfile returns a function that registers
 // ApplicantProfileService. The service has no internal RPCs, so it needs no
 // INTERNAL_TOKEN (AGENTS.md Section 9).
-func registerApplicantProfile(profiles ports.ProfileRepository) func(grpc.ServiceRegistrar) {
-	handler := grpcadapter.NewApplicantProfileHandler(app.NewProfiles(profiles, systemClock{}))
+func registerApplicantProfile(profiles ports.ProfileRepository, participants ports.ApplicationParticipantRepository) func(grpc.ServiceRegistrar) {
+	handler := grpcadapter.NewApplicantProfileHandler(app.NewProfiles(profiles, systemClock{}),
+		app.NewApplicationParticipants(participants, profiles))
 	return func(s grpc.ServiceRegistrar) {
 		applicantprofilev1.RegisterApplicantProfileServiceServer(s, handler)
 	}
@@ -147,18 +151,48 @@ func runWithPublisher(ctx context.Context, cfg config, logger *slog.Logger, d de
 			err = errors.Join(err, errors.New("close RabbitMQ publisher failed"))
 		}
 	}()
-	// Applicant-profile publishes and consumes no events; the broker
-	// connection is kept as in the template.
-	// Initialization must not publish events.
-	return start(ctx, cfg, logger, d)
+	// Applicant-profile publishes no events; the broker connection is kept as
+	// in the template. Initialization must not publish events.
+	if d.participants == nil {
+		// Only startup tests leave this unset; runWithDatabase always sets it.
+		return start(ctx, cfg, logger, d)
+	}
+	// JT-114: the shared events.Consume reconnects on its own; it returns only
+	// on shutdown or bad configuration.
+	consume := func(ctx context.Context) error {
+		return events.Consume(ctx, rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.participants))
+	}
+	return runWithConsumer(ctx, consume, func(ctx context.Context) error { return start(ctx, cfg, logger, d) })
+}
+
+// runWithConsumer runs the consumer beside the servers. When either stops,
+// the other is canceled and both results are returned.
+func runWithConsumer(ctx context.Context, consume, start func(context.Context) error) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	consumer := make(chan error, 1)
+	servers := make(chan error, 1)
+	go func() { consumer <- consume(ctx) }()
+	go func() { servers <- start(ctx) }()
+	var consumeErr, serveErr error
+	select {
+	case consumeErr = <-consumer:
+		cancel()
+		serveErr = <-servers
+	case serveErr = <-servers:
+		cancel()
+		consumeErr = <-consumer
+	}
+	return errors.Join(consumeErr, serveErr)
 }
 
 // databaseHandle holds operations on one owned pool, without creating another pool manager.
 type databaseHandle struct {
-	readiness ports.Readiness
-	profiles  ports.ProfileRepository
-	migrate   func(context.Context, string) error
-	close     func()
+	readiness    ports.Readiness
+	profiles     ports.ProfileRepository
+	participants ports.ApplicationParticipantRepository
+	migrate      func(context.Context, string) error
+	close        func()
 }
 
 func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
@@ -167,10 +201,11 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 		return nil, err
 	}
 	return &databaseHandle{
-		readiness: postgres.NewReadiness(pool),
-		profiles:  postgres.NewProfiles(pool),
-		migrate:   func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
-		close:     pool.Close,
+		readiness:    postgres.NewReadiness(pool),
+		profiles:     postgres.NewProfiles(pool),
+		participants: postgres.NewApplicationParticipants(pool),
+		migrate:      func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
+		close:        pool.Close,
 	}, nil
 }
 
@@ -195,7 +230,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), profiles: database.profiles})
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), profiles: database.profiles, participants: database.participants})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,

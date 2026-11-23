@@ -34,11 +34,19 @@ var (
 // Handlers are tested with the real app layer and a mocked repository. Any
 // repository call a case does not expect fails the test.
 func newHandler(t *testing.T) (*adapter.ApplicantProfileHandler, *mocks.MockProfileRepository) {
+	h, repo, _ := newHandlerWithParticipants(t)
+	return h, repo
+}
+
+// newHandlerWithParticipants also returns the JT-114 projection mock.
+func newHandlerWithParticipants(t *testing.T) (*adapter.ApplicantProfileHandler, *mocks.MockProfileRepository, *mocks.MockApplicationParticipantRepository) {
 	ctrl := gomock.NewController(t)
 	clock := mocks.NewMockClock(ctrl)
 	clock.EXPECT().Now().Return(now).AnyTimes()
 	repo := mocks.NewMockProfileRepository(ctrl)
-	return adapter.NewApplicantProfileHandler(app.NewProfiles(repo, clock)), repo
+	participants := mocks.NewMockApplicationParticipantRepository(ctrl)
+	h := adapter.NewApplicantProfileHandler(app.NewProfiles(repo, clock), app.NewApplicationParticipants(participants, repo))
+	return h, repo, participants
 }
 
 func withCaller(id, role string) context.Context {

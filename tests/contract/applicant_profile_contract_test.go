@@ -15,9 +15,10 @@ func TestApplicantProfileContract_PublicRPCsAndHTTPBindings(t *testing.T) {
 		t.Fatalf("unexpected package or service count: %s, %d", file.Package(), file.Services().Len())
 	}
 	service := file.Services().ByName("ApplicantProfileService")
-	// JT-103 added the two photo RPCs (approved on 19 Nov 2026, AGENTS.md Section 15).
-	if service == nil || service.Methods().Len() != 5 {
-		t.Fatal("expected only ApplicantProfileService with five public RPCs")
+	// JT-103 added the two photo RPCs (approved on 19 Nov 2026) and JT-114
+	// the two employer RPCs (23 Nov 2026), AGENTS.md Section 15.
+	if service == nil || service.Methods().Len() != 7 {
+		t.Fatal("expected only ApplicantProfileService with seven public RPCs")
 	}
 	for _, tc := range []struct {
 		method, verb, path, body string
@@ -27,6 +28,8 @@ func TestApplicantProfileContract_PublicRPCsAndHTTPBindings(t *testing.T) {
 		{"UpdateMyProfile", "PUT", "/v1/applicant/profile", "*"},
 		{"PutMyProfilePhoto", "PUT", "/v1/applicant/profile/photo", "*"},
 		{"GetMyProfilePhoto", "GET", "/v1/applicant/profile/photo", ""},
+		{"GetApplicantProfileForApplication", "GET", "/v1/applications/{application_id}/applicant-profile", ""},
+		{"GetApplicantPhotoForApplication", "GET", "/v1/applications/{application_id}/applicant-photo", ""},
 	} {
 		t.Run(tc.method, func(t *testing.T) {
 			method := service.Methods().ByName(protoreflect.Name(tc.method))
@@ -89,6 +92,10 @@ func TestApplicantProfileContract_ResourcesAndEditableFields(t *testing.T) {
 		{"PutMyProfilePhotoResponse", []string{"profile"}},
 		{"GetMyProfilePhotoRequest", nil},
 		{"GetMyProfilePhotoResponse", []string{"content_type", "content"}},
+		{"GetApplicantProfileForApplicationRequest", []string{"application_id"}},
+		{"GetApplicantProfileForApplicationResponse", []string{"profile"}},
+		{"GetApplicantPhotoForApplicationRequest", []string{"application_id"}},
+		{"GetApplicantPhotoForApplicationResponse", []string{"content_type", "content"}},
 	}
 	// Exact message and enum counts reject unintended events or extra resources.
 	if file.Messages().Len() != len(cases) || file.Enums().Len() != 0 {
@@ -136,6 +143,16 @@ func TestApplicantProfileContract_ResourcesAndEditableFields(t *testing.T) {
 	for _, name := range []protoreflect.Name{"CreateMyProfileRequest", "UpdateMyProfileRequest", "PutMyProfilePhotoRequest", "GetMyProfilePhotoRequest"} {
 		if file.Messages().ByName(name).Fields().ByName("applicant_id") != nil {
 			t.Errorf("%s must derive applicant identity from metadata", name)
+		}
+	}
+	// JT-114: the employer names only the application; the applicant and the
+	// caller come from the projection and metadata, never from the request.
+	for _, name := range []protoreflect.Name{"GetApplicantProfileForApplicationRequest", "GetApplicantPhotoForApplicationRequest"} {
+		fields := file.Messages().ByName(name).Fields()
+		for _, identity := range []protoreflect.Name{"applicant_id", "employer_id", "user_id", "role"} {
+			if fields.ByName(identity) != nil {
+				t.Errorf("%s must not carry %s", name, identity)
+			}
 		}
 	}
 }

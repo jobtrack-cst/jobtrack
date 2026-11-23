@@ -16,17 +16,19 @@ import (
 )
 
 // ApplicantProfileHandler serves ApplicantProfileService through the gateway.
-// Every RPC works on the caller's own profile; no request field names an
-// applicant.
+// The applicant RPCs work on the caller's own profile; no request field names
+// an applicant. The two JT-114 employer RPCs name an application instead, and
+// the applicant comes from the local projection.
 type ApplicantProfileHandler struct {
 	applicantprofilev1.UnimplementedApplicantProfileServiceServer
-	profiles *app.Profiles
+	profiles     *app.Profiles
+	applications *app.ApplicationParticipants
 }
 
 var _ applicantprofilev1.ApplicantProfileServiceServer = (*ApplicantProfileHandler)(nil)
 
-func NewApplicantProfileHandler(profiles *app.Profiles) *ApplicantProfileHandler {
-	return &ApplicantProfileHandler{profiles: profiles}
+func NewApplicantProfileHandler(profiles *app.Profiles, applications *app.ApplicationParticipants) *ApplicantProfileHandler {
+	return &ApplicantProfileHandler{profiles: profiles, applications: applications}
 }
 
 // The generated getters are nil-safe, so a nil request is an empty one.
@@ -94,15 +96,40 @@ func (h *ApplicantProfileHandler) GetMyProfilePhoto(ctx context.Context, _ *appl
 	return &applicantprofilev1.GetMyProfilePhotoResponse{ContentType: photo.ContentType, Content: photo.Content}, nil
 }
 
+// GetApplicantProfileForApplication is employer only (JT-114 Part C): the
+// role is checked before the application_id is read. The profile never
+// carries photo bytes (JT-103).
+func (h *ApplicantProfileHandler) GetApplicantProfileForApplication(ctx context.Context, req *applicantprofilev1.GetApplicantProfileForApplicationRequest) (*applicantprofilev1.GetApplicantProfileForApplicationResponse, error) {
+	caller, err := employerFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	p, err := h.applications.Profile(ctx, caller, req.GetApplicationId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &applicantprofilev1.GetApplicantProfileForApplicationResponse{Profile: profileToProto(p)}, nil
+}
+
+// GetApplicantPhotoForApplication has the same access rule and returns the
+// stored, already validated content type.
+func (h *ApplicantProfileHandler) GetApplicantPhotoForApplication(ctx context.Context, req *applicantprofilev1.GetApplicantPhotoForApplicationRequest) (*applicantprofilev1.GetApplicantPhotoForApplicationResponse, error) {
+	caller, err := employerFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	photo, err := h.applications.Photo(ctx, caller, req.GetApplicationId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &applicantprofilev1.GetApplicantPhotoForApplicationResponse{ContentType: photo.ContentType, Content: photo.Content}, nil
+}
+
 // applicantFrom trusts x-user-id and x-user-role only because the gateway
 // sets them and strips any client-sent values (JT-31). The role is checked
 // before any input, so other roles learn nothing about the validation rules.
 func applicantFrom(ctx context.Context) (domain.Caller, error) {
-	identity, ok := authctx.FromContext(ctx)
-	if !ok {
-		return domain.Caller{}, domain.ErrUnauthenticated
-	}
-	caller, err := domain.NewCaller(identity.UserID, identity.Role)
+	caller, err := callerFrom(ctx)
 	if err != nil {
 		return domain.Caller{}, err
 	}
@@ -110,6 +137,26 @@ func applicantFrom(ctx context.Context) (domain.Caller, error) {
 		return domain.Caller{}, err
 	}
 	return caller, nil
+}
+
+// employerFrom is applicantFrom for the two JT-114 employer RPCs.
+func employerFrom(ctx context.Context) (domain.Caller, error) {
+	caller, err := callerFrom(ctx)
+	if err != nil {
+		return domain.Caller{}, err
+	}
+	if err := caller.RequireEmployer(); err != nil {
+		return domain.Caller{}, err
+	}
+	return caller, nil
+}
+
+func callerFrom(ctx context.Context) (domain.Caller, error) {
+	identity, ok := authctx.FromContext(ctx)
+	if !ok {
+		return domain.Caller{}, domain.ErrUnauthenticated
+	}
+	return domain.NewCaller(identity.UserID, identity.Role)
 }
 
 func input(summary string, education []*applicantprofilev1.Education, skills []string) domain.ProfileInput {
@@ -153,13 +200,16 @@ func toStatus(err error) error {
 		errors.Is(err, domain.ErrInvalidStartYear), errors.Is(err, domain.ErrInvalidEndYear),
 		errors.Is(err, domain.ErrTooManySkills), errors.Is(err, domain.ErrInvalidSkill),
 		errors.Is(err, domain.ErrDuplicateSkill), errors.Is(err, domain.ErrInvalidPhotoSize),
-		errors.Is(err, domain.ErrInvalidPhotoType), errors.Is(err, domain.ErrInvalidPhotoContent):
+		errors.Is(err, domain.ErrInvalidPhotoType), errors.Is(err, domain.ErrInvalidPhotoContent),
+		errors.Is(err, domain.ErrInvalidApplicationID):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrUnauthenticated):
 		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, domain.ErrApplicantRoleRequired):
+	case errors.Is(err, domain.ErrApplicantRoleRequired), errors.Is(err, domain.ErrEmployerRoleRequired),
+		errors.Is(err, domain.ErrNotApplicationEmployer):
 		return status.Error(codes.PermissionDenied, err.Error())
-	case errors.Is(err, domain.ErrProfileNotFound), errors.Is(err, domain.ErrPhotoNotFound):
+	case errors.Is(err, domain.ErrProfileNotFound), errors.Is(err, domain.ErrPhotoNotFound),
+		errors.Is(err, domain.ErrApplicationNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrProfileExists):
 		return status.Error(codes.AlreadyExists, err.Error())
