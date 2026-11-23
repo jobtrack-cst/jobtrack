@@ -58,6 +58,9 @@ message Application {
   string employer_id = 5;
   bool withdrawn = 6;
   jobtrack.common.v1.ResourceTimestamps timestamps = 7;
+  // The applicant's full name from auth at submission time. Empty for
+  // applications submitted before JT-114.
+  string applicant_name = 8;
 }
 
 message SubmitApplicationRequest {

@@ -39,7 +39,8 @@ service AuthService {
 // the server only accepts calls with a valid x-internal-token from an allowed
 // caller (see AGENTS.md Section 6).
 service AuthInternalService {
-  // GetUser returns one user's details. Allowed caller: notification-dispatcher.
+  // GetUser returns one user's details. Allowed callers: notification-dispatcher
+  // and application (applicant name at submission, JT-114).
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
 
   // ListUsersByRole lists users with one role. Allowed caller: weekly-summary

@@ -225,7 +225,8 @@ const (
 // the server only accepts calls with a valid x-internal-token from an allowed
 // caller (see AGENTS.md Section 6).
 type AuthInternalServiceClient interface {
-	// GetUser returns one user's details. Allowed caller: notification-dispatcher.
+	// GetUser returns one user's details. Allowed callers: notification-dispatcher
+	// and application (applicant name at submission, JT-114).
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
 	// ListUsersByRole lists users with one role. Allowed caller: weekly-summary
 	// (admin emails).
@@ -268,7 +269,8 @@ func (c *authInternalServiceClient) ListUsersByRole(ctx context.Context, in *Lis
 // the server only accepts calls with a valid x-internal-token from an allowed
 // caller (see AGENTS.md Section 6).
 type AuthInternalServiceServer interface {
-	// GetUser returns one user's details. Allowed caller: notification-dispatcher.
+	// GetUser returns one user's details. Allowed callers: notification-dispatcher
+	// and application (applicant name at submission, JT-114).
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	// ListUsersByRole lists users with one role. Allowed caller: weekly-summary
 	// (admin emails).
