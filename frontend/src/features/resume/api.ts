@@ -13,3 +13,6 @@ export const uploadResume = (fileName: string, content: string) =>
 // JT-112: the owned file for View PDF; content is base64 like the upload.
 export interface ResumeFile { fileName?: string; contentType?: string; content?: string }
 export const downloadResume = (resumeId: string) => api<ResumeFile>(`/v1/resumes/${idPath(resumeId)}/content`);
+// JT-114: the resume submitted with one application, for its owning employer only.
+export const downloadApplicationResume = (applicationId: string) =>
+  api<ResumeFile>(`/v1/applications/${idPath(applicationId)}/resume`);

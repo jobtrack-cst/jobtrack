@@ -19,13 +19,14 @@ import (
 // GetResume for application with the applicant's identity forwarded.
 type ResumeHandler struct {
 	resumev1.UnimplementedResumeServiceServer
-	resumes *app.Resumes
+	resumes            *app.Resumes
+	applicationResumes *app.ApplicationResumes
 }
 
 var _ resumev1.ResumeServiceServer = (*ResumeHandler)(nil)
 
-func NewResumeHandler(resumes *app.Resumes) *ResumeHandler {
-	return &ResumeHandler{resumes: resumes}
+func NewResumeHandler(resumes *app.Resumes, applicationResumes *app.ApplicationResumes) *ResumeHandler {
+	return &ResumeHandler{resumes: resumes, applicationResumes: applicationResumes}
 }
 
 // UploadResume is applicant only. The generated getters are nil-safe, so a
@@ -87,6 +88,20 @@ func (h *ResumeHandler) DownloadResume(ctx context.Context, req *resumev1.Downlo
 	return &resumev1.DownloadResumeResponse{FileName: file.FileName, ContentType: file.ContentType, Content: file.Content}, nil
 }
 
+// DownloadApplicationResume is employer only (JT-114 Part B): the role is
+// checked before the application_id is read.
+func (h *ResumeHandler) DownloadApplicationResume(ctx context.Context, req *resumev1.DownloadApplicationResumeRequest) (*resumev1.DownloadApplicationResumeResponse, error) {
+	caller, err := employerFrom(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	file, err := h.applicationResumes.Download(ctx, caller, req.GetApplicationId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &resumev1.DownloadApplicationResumeResponse{FileName: file.FileName, ContentType: file.ContentType, Content: file.Content}, nil
+}
+
 // ResumeInternalHandler serves ResumeInternalService. The gateway never
 // registers it, and the internal server interceptor (pkg/authctx) has already
 // checked INTERNAL_TOKEN and that the caller is resume-validator, so there is
@@ -136,6 +151,18 @@ func applicantFrom(ctx context.Context) (domain.Caller, error) {
 	return caller, nil
 }
 
+// employerFrom is applicantFrom for the one employer RPC.
+func employerFrom(ctx context.Context) (domain.Caller, error) {
+	caller, err := callerFrom(ctx)
+	if err != nil {
+		return domain.Caller{}, err
+	}
+	if err := caller.RequireEmployer(); err != nil {
+		return domain.Caller{}, err
+	}
+	return caller, nil
+}
+
 func statusToProto(s domain.ValidationStatus) resumev1.ResumeValidationStatus {
 	switch s {
 	case domain.ValidationStatusPending:
@@ -172,13 +199,14 @@ func toStatus(err error) error {
 	case errors.Is(err, domain.ErrInvalidResumeID), errors.Is(err, domain.ErrInvalidFileName),
 		errors.Is(err, domain.ErrInvalidContentType), errors.Is(err, domain.ErrInvalidContentSize),
 		errors.Is(err, domain.ErrInvalidPDF), errors.Is(err, domain.ErrInvalidPageSize),
-		errors.Is(err, domain.ErrInvalidPageToken):
+		errors.Is(err, domain.ErrInvalidPageToken), errors.Is(err, domain.ErrInvalidApplicationID):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrUnauthenticated):
 		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, domain.ErrApplicantRoleRequired), errors.Is(err, domain.ErrNotResumeOwner):
+	case errors.Is(err, domain.ErrApplicantRoleRequired), errors.Is(err, domain.ErrNotResumeOwner),
+		errors.Is(err, domain.ErrEmployerRoleRequired), errors.Is(err, domain.ErrNotApplicationEmployer):
 		return status.Error(codes.PermissionDenied, err.Error())
-	case errors.Is(err, domain.ErrResumeNotFound):
+	case errors.Is(err, domain.ErrResumeNotFound), errors.Is(err, domain.ErrApplicationNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, context.Canceled):
 		return status.Error(codes.Canceled, "request canceled")

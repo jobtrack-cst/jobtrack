@@ -18,6 +18,7 @@ import (
 	resumev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
+	"github.com/jobtrack-cst/jobtrack/pkg/events"
 	"github.com/jobtrack-cst/jobtrack/pkg/logging"
 	"github.com/jobtrack-cst/jobtrack/pkg/requestmetrics"
 	grpcadapter "github.com/jobtrack-cst/jobtrack/services/resume/internal/adapters/grpc"
@@ -107,6 +108,8 @@ type deps struct {
 	outbox     ports.OutboxRepository
 	publisher  ports.EventPublisher
 	validation ports.ValidationRepository
+	// applicationResumes is the JT-114 application.submitted projection.
+	applicationResumes ports.ApplicationResumeRepository
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -127,7 +130,14 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 							return runWithDispatcher(ctx, worker.Run, func(ctx context.Context) error {
 								consumer := &rabbitmq.ValidationConsumer{Broker: cfg.rabbitMQURL, Handler: &rabbitmq.ValidationHandler{Results: app.NewValidationResults(d.validation, systemClock{}), Logger: logger}, Logger: logger}
 								return runWithDispatcher(ctx, consumer.Run, func(ctx context.Context) error {
-									return runServers(ctx, cfg, logger, d.checker, registerResume(d.resumes), serverOpts...)
+									// JT-114: the shared events.Consume reconnects on its
+									// own; it returns only on shutdown or bad config.
+									applications := func(ctx context.Context) error {
+										return events.Consume(ctx, rabbitmq.ApplicationConsumerConfig(cfg.rabbitMQURL, logger, d.applicationResumes))
+									}
+									return runWithDispatcher(ctx, applications, func(ctx context.Context) error {
+										return runServers(ctx, cfg, logger, d.checker, registerResume(d.resumes, d.applicationResumes), serverOpts...)
+									})
 								})
 							})
 						})
@@ -172,9 +182,9 @@ func (systemClock) Now() time.Time { return time.Now().UTC() }
 // resume gRPC server. The gateway registers only the public ResumeService;
 // the internal interceptor passed to serve guards ResumeInternalService
 // (resume-validator only) and lets public RPCs through unchanged.
-func registerResume(resumes ports.ResumeRepository) func(grpc.ServiceRegistrar) {
+func registerResume(resumes ports.ResumeRepository, applicationResumes ports.ApplicationResumeRepository) func(grpc.ServiceRegistrar) {
 	svc := app.NewResumes(resumes, systemClock{})
-	public := grpcadapter.NewResumeHandler(svc)
+	public := grpcadapter.NewResumeHandler(svc, app.NewApplicationResumes(applicationResumes, resumes))
 	internal := grpcadapter.NewResumeInternalHandler(svc)
 	return func(s grpc.ServiceRegistrar) {
 		resumev1.RegisterResumeServiceServer(s, public)
@@ -217,8 +227,10 @@ type databaseHandle struct {
 	resumes    ports.ResumeRepository
 	outbox     ports.OutboxRepository
 	validation ports.ValidationRepository
-	migrate    func(context.Context, string) error
-	close      func()
+	// applicationResumes is the JT-114 projection repository.
+	applicationResumes ports.ApplicationResumeRepository
+	migrate            func(context.Context, string) error
+	close              func()
 }
 
 func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
@@ -227,12 +239,13 @@ func openDatabase(ctx context.Context, url string) (*databaseHandle, error) {
 		return nil, err
 	}
 	return &databaseHandle{
-		readiness:  postgres.NewReadiness(pool),
-		resumes:    postgres.NewResumes(pool),
-		outbox:     postgres.NewOutbox(pool),
-		validation: postgres.NewValidation(pool),
-		migrate:    func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
-		close:      pool.Close,
+		readiness:          postgres.NewReadiness(pool),
+		resumes:            postgres.NewResumes(pool),
+		outbox:             postgres.NewOutbox(pool),
+		validation:         postgres.NewValidation(pool),
+		applicationResumes: postgres.NewApplicationResumes(pool),
+		migrate:            func(ctx context.Context, dir string) error { return db.Migrate(ctx, pool, dir) },
+		close:              pool.Close,
 	}, nil
 }
 
@@ -257,7 +270,7 @@ func runWithDatabase(ctx context.Context, cfg config, logger *slog.Logger,
 	if err := database.migrate(ctx, cfg.migrationsDir); err != nil {
 		return errors.New("apply database migrations failed")
 	}
-	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), resumes: database.resumes, outbox: database.outbox, validation: database.validation})
+	return start(ctx, cfg, logger, deps{checker: app.NewHealthWithReadiness(database.readiness), resumes: database.resumes, outbox: database.outbox, validation: database.validation, applicationResumes: database.applicationResumes})
 }
 
 func runServers(ctx context.Context, cfg config, logger *slog.Logger, checker ports.HealthChecker,

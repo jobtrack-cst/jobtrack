@@ -18,7 +18,7 @@ func TestResumeContract_ServicesAndHTTPRoutes(t *testing.T) {
 		service string
 		methods int
 	}{
-		{"ResumeService", 4},
+		{"ResumeService", 5},
 		{"ResumeInternalService", 1},
 	} {
 		service := file.Services().ByName(protoreflect.Name(tc.service))
@@ -39,6 +39,7 @@ func TestResumeContract_ServicesAndHTTPRoutes(t *testing.T) {
 		{"ResumeService", "GetResume", "GET", "/v1/resumes/{resume_id}", ""},
 		{"ResumeService", "ListMyResumes", "GET", "/v1/resumes", ""},
 		{"ResumeService", "DownloadResume", "GET", "/v1/resumes/{resume_id}/content", ""},
+		{"ResumeService", "DownloadApplicationResume", "GET", "/v1/applications/{application_id}/resume", ""},
 		{"ResumeInternalService", "GetResumeFile", "", "", ""},
 	} {
 		t.Run(tc.service+"/"+tc.method, func(t *testing.T) {
@@ -80,7 +81,7 @@ func TestResumeContract_ServicesAndHTTPRoutes(t *testing.T) {
 
 func TestResumeContract_OwnershipAndFileTransfer(t *testing.T) {
 	file := resumev1.File_jobtrack_resume_v1_resume_proto
-	for _, name := range []protoreflect.Name{"UploadResumeRequest", "GetResumeRequest", "ListMyResumesRequest", "DownloadResumeRequest"} {
+	for _, name := range []protoreflect.Name{"UploadResumeRequest", "GetResumeRequest", "ListMyResumesRequest", "DownloadResumeRequest", "DownloadApplicationResumeRequest"} {
 		t.Run(string(name), func(t *testing.T) {
 			fields := file.Messages().ByName(name).Fields()
 			for _, identity := range []protoreflect.Name{"applicant_id", "user_id", "role"} {
@@ -90,7 +91,7 @@ func TestResumeContract_OwnershipAndFileTransfer(t *testing.T) {
 			}
 		})
 	}
-	for _, name := range []protoreflect.Name{"UploadResumeRequest", "DownloadResumeResponse", "GetResumeFileResponse"} {
+	for _, name := range []protoreflect.Name{"UploadResumeRequest", "DownloadResumeResponse", "DownloadApplicationResumeResponse", "GetResumeFileResponse"} {
 		t.Run(string(name)+"/content", func(t *testing.T) {
 			content := file.Messages().ByName(name).Fields().ByName("content")
 			if content == nil || content.Kind() != protoreflect.BytesKind {

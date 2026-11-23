@@ -571,6 +571,110 @@ func (x *DownloadResumeResponse) GetContent() []byte {
 	return nil
 }
 
+type DownloadApplicationResumeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ApplicationId string                 `protobuf:"bytes,1,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadApplicationResumeRequest) Reset() {
+	*x = DownloadApplicationResumeRequest{}
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadApplicationResumeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadApplicationResumeRequest) ProtoMessage() {}
+
+func (x *DownloadApplicationResumeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadApplicationResumeRequest.ProtoReflect.Descriptor instead.
+func (*DownloadApplicationResumeRequest) Descriptor() ([]byte, []int) {
+	return file_jobtrack_resume_v1_resume_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DownloadApplicationResumeRequest) GetApplicationId() string {
+	if x != nil {
+		return x.ApplicationId
+	}
+	return ""
+}
+
+type DownloadApplicationResumeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileName      string                 `protobuf:"bytes,1,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	ContentType   string                 `protobuf:"bytes,2,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Content       []byte                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadApplicationResumeResponse) Reset() {
+	*x = DownloadApplicationResumeResponse{}
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadApplicationResumeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadApplicationResumeResponse) ProtoMessage() {}
+
+func (x *DownloadApplicationResumeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadApplicationResumeResponse.ProtoReflect.Descriptor instead.
+func (*DownloadApplicationResumeResponse) Descriptor() ([]byte, []int) {
+	return file_jobtrack_resume_v1_resume_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DownloadApplicationResumeResponse) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *DownloadApplicationResumeResponse) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *DownloadApplicationResumeResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 type GetResumeFileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ResumeId      string                 `protobuf:"bytes,1,opt,name=resume_id,json=resumeId,proto3" json:"resume_id,omitempty"`
@@ -580,7 +684,7 @@ type GetResumeFileRequest struct {
 
 func (x *GetResumeFileRequest) Reset() {
 	*x = GetResumeFileRequest{}
-	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[9]
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -592,7 +696,7 @@ func (x *GetResumeFileRequest) String() string {
 func (*GetResumeFileRequest) ProtoMessage() {}
 
 func (x *GetResumeFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[9]
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -605,7 +709,7 @@ func (x *GetResumeFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResumeFileRequest.ProtoReflect.Descriptor instead.
 func (*GetResumeFileRequest) Descriptor() ([]byte, []int) {
-	return file_jobtrack_resume_v1_resume_proto_rawDescGZIP(), []int{9}
+	return file_jobtrack_resume_v1_resume_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetResumeFileRequest) GetResumeId() string {
@@ -628,7 +732,7 @@ type GetResumeFileResponse struct {
 
 func (x *GetResumeFileResponse) Reset() {
 	*x = GetResumeFileResponse{}
-	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[10]
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -640,7 +744,7 @@ func (x *GetResumeFileResponse) String() string {
 func (*GetResumeFileResponse) ProtoMessage() {}
 
 func (x *GetResumeFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[10]
+	mi := &file_jobtrack_resume_v1_resume_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -653,7 +757,7 @@ func (x *GetResumeFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResumeFileResponse.ProtoReflect.Descriptor instead.
 func (*GetResumeFileResponse) Descriptor() ([]byte, []int) {
-	return file_jobtrack_resume_v1_resume_proto_rawDescGZIP(), []int{10}
+	return file_jobtrack_resume_v1_resume_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetResumeFileResponse) GetResumeId() string {
@@ -732,6 +836,12 @@ const file_jobtrack_resume_v1_resume_proto_rawDesc = "" +
 	"\x16DownloadResumeResponse\x12\x1b\n" +
 	"\tfile_name\x18\x01 \x01(\tR\bfileName\x12!\n" +
 	"\fcontent_type\x18\x02 \x01(\tR\vcontentType\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\fR\acontent\"I\n" +
+	" DownloadApplicationResumeRequest\x12%\n" +
+	"\x0eapplication_id\x18\x01 \x01(\tR\rapplicationId\"}\n" +
+	"!DownloadApplicationResumeResponse\x12\x1b\n" +
+	"\tfile_name\x18\x01 \x01(\tR\bfileName\x12!\n" +
+	"\fcontent_type\x18\x02 \x01(\tR\vcontentType\x12\x18\n" +
 	"\acontent\x18\x03 \x01(\fR\acontent\"3\n" +
 	"\x14GetResumeFileRequest\x12\x1b\n" +
 	"\tresume_id\x18\x01 \x01(\tR\bresumeId\"\xb1\x01\n" +
@@ -745,12 +855,13 @@ const file_jobtrack_resume_v1_resume_proto_rawDesc = "" +
 	"$RESUME_VALIDATION_STATUS_UNSPECIFIED\x10\x00\x12$\n" +
 	" RESUME_VALIDATION_STATUS_PENDING\x10\x01\x12&\n" +
 	"\"RESUME_VALIDATION_STATUS_VALIDATED\x10\x02\x12%\n" +
-	"!RESUME_VALIDATION_STATUS_REJECTED\x10\x032\x93\x04\n" +
+	"!RESUME_VALIDATION_STATUS_REJECTED\x10\x032\xd0\x05\n" +
 	"\rResumeService\x12y\n" +
 	"\fUploadResume\x12'.jobtrack.resume.v1.UploadResumeRequest\x1a(.jobtrack.resume.v1.UploadResumeResponse\"\x16\x82\xd3\xe4\x93\x02\x10:\x01*\"\v/v1/resumes\x12y\n" +
 	"\tGetResume\x12$.jobtrack.resume.v1.GetResumeRequest\x1a%.jobtrack.resume.v1.GetResumeResponse\"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/resumes/{resume_id}\x12y\n" +
 	"\rListMyResumes\x12(.jobtrack.resume.v1.ListMyResumesRequest\x1a).jobtrack.resume.v1.ListMyResumesResponse\"\x13\x82\xd3\xe4\x93\x02\r\x12\v/v1/resumes\x12\x90\x01\n" +
-	"\x0eDownloadResume\x12).jobtrack.resume.v1.DownloadResumeRequest\x1a*.jobtrack.resume.v1.DownloadResumeResponse\"'\x82\xd3\xe4\x93\x02!\x12\x1f/v1/resumes/{resume_id}/content2}\n" +
+	"\x0eDownloadResume\x12).jobtrack.resume.v1.DownloadResumeRequest\x1a*.jobtrack.resume.v1.DownloadResumeResponse\"'\x82\xd3\xe4\x93\x02!\x12\x1f/v1/resumes/{resume_id}/content\x12\xba\x01\n" +
+	"\x19DownloadApplicationResume\x124.jobtrack.resume.v1.DownloadApplicationResumeRequest\x1a5.jobtrack.resume.v1.DownloadApplicationResumeResponse\"0\x82\xd3\xe4\x93\x02*\x12(/v1/applications/{application_id}/resume2}\n" +
 	"\x15ResumeInternalService\x12d\n" +
 	"\rGetResumeFile\x12(.jobtrack.resume.v1.GetResumeFileRequest\x1a).jobtrack.resume.v1.GetResumeFileResponseBEZCgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1;resumev1b\x06proto3"
 
@@ -767,44 +878,48 @@ func file_jobtrack_resume_v1_resume_proto_rawDescGZIP() []byte {
 }
 
 var file_jobtrack_resume_v1_resume_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_jobtrack_resume_v1_resume_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_jobtrack_resume_v1_resume_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_jobtrack_resume_v1_resume_proto_goTypes = []any{
-	(ResumeValidationStatus)(0),    // 0: jobtrack.resume.v1.ResumeValidationStatus
-	(*Resume)(nil),                 // 1: jobtrack.resume.v1.Resume
-	(*UploadResumeRequest)(nil),    // 2: jobtrack.resume.v1.UploadResumeRequest
-	(*UploadResumeResponse)(nil),   // 3: jobtrack.resume.v1.UploadResumeResponse
-	(*GetResumeRequest)(nil),       // 4: jobtrack.resume.v1.GetResumeRequest
-	(*GetResumeResponse)(nil),      // 5: jobtrack.resume.v1.GetResumeResponse
-	(*ListMyResumesRequest)(nil),   // 6: jobtrack.resume.v1.ListMyResumesRequest
-	(*ListMyResumesResponse)(nil),  // 7: jobtrack.resume.v1.ListMyResumesResponse
-	(*DownloadResumeRequest)(nil),  // 8: jobtrack.resume.v1.DownloadResumeRequest
-	(*DownloadResumeResponse)(nil), // 9: jobtrack.resume.v1.DownloadResumeResponse
-	(*GetResumeFileRequest)(nil),   // 10: jobtrack.resume.v1.GetResumeFileRequest
-	(*GetResumeFileResponse)(nil),  // 11: jobtrack.resume.v1.GetResumeFileResponse
-	(*v1.ResourceTimestamps)(nil),  // 12: jobtrack.common.v1.ResourceTimestamps
-	(*v1.PaginationRequest)(nil),   // 13: jobtrack.common.v1.PaginationRequest
-	(*v1.PaginationResponse)(nil),  // 14: jobtrack.common.v1.PaginationResponse
+	(ResumeValidationStatus)(0),               // 0: jobtrack.resume.v1.ResumeValidationStatus
+	(*Resume)(nil),                            // 1: jobtrack.resume.v1.Resume
+	(*UploadResumeRequest)(nil),               // 2: jobtrack.resume.v1.UploadResumeRequest
+	(*UploadResumeResponse)(nil),              // 3: jobtrack.resume.v1.UploadResumeResponse
+	(*GetResumeRequest)(nil),                  // 4: jobtrack.resume.v1.GetResumeRequest
+	(*GetResumeResponse)(nil),                 // 5: jobtrack.resume.v1.GetResumeResponse
+	(*ListMyResumesRequest)(nil),              // 6: jobtrack.resume.v1.ListMyResumesRequest
+	(*ListMyResumesResponse)(nil),             // 7: jobtrack.resume.v1.ListMyResumesResponse
+	(*DownloadResumeRequest)(nil),             // 8: jobtrack.resume.v1.DownloadResumeRequest
+	(*DownloadResumeResponse)(nil),            // 9: jobtrack.resume.v1.DownloadResumeResponse
+	(*DownloadApplicationResumeRequest)(nil),  // 10: jobtrack.resume.v1.DownloadApplicationResumeRequest
+	(*DownloadApplicationResumeResponse)(nil), // 11: jobtrack.resume.v1.DownloadApplicationResumeResponse
+	(*GetResumeFileRequest)(nil),              // 12: jobtrack.resume.v1.GetResumeFileRequest
+	(*GetResumeFileResponse)(nil),             // 13: jobtrack.resume.v1.GetResumeFileResponse
+	(*v1.ResourceTimestamps)(nil),             // 14: jobtrack.common.v1.ResourceTimestamps
+	(*v1.PaginationRequest)(nil),              // 15: jobtrack.common.v1.PaginationRequest
+	(*v1.PaginationResponse)(nil),             // 16: jobtrack.common.v1.PaginationResponse
 }
 var file_jobtrack_resume_v1_resume_proto_depIdxs = []int32{
 	0,  // 0: jobtrack.resume.v1.Resume.validation_status:type_name -> jobtrack.resume.v1.ResumeValidationStatus
-	12, // 1: jobtrack.resume.v1.Resume.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
+	14, // 1: jobtrack.resume.v1.Resume.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
 	1,  // 2: jobtrack.resume.v1.UploadResumeResponse.resume:type_name -> jobtrack.resume.v1.Resume
 	1,  // 3: jobtrack.resume.v1.GetResumeResponse.resume:type_name -> jobtrack.resume.v1.Resume
-	13, // 4: jobtrack.resume.v1.ListMyResumesRequest.pagination:type_name -> jobtrack.common.v1.PaginationRequest
+	15, // 4: jobtrack.resume.v1.ListMyResumesRequest.pagination:type_name -> jobtrack.common.v1.PaginationRequest
 	1,  // 5: jobtrack.resume.v1.ListMyResumesResponse.resumes:type_name -> jobtrack.resume.v1.Resume
-	14, // 6: jobtrack.resume.v1.ListMyResumesResponse.pagination:type_name -> jobtrack.common.v1.PaginationResponse
+	16, // 6: jobtrack.resume.v1.ListMyResumesResponse.pagination:type_name -> jobtrack.common.v1.PaginationResponse
 	2,  // 7: jobtrack.resume.v1.ResumeService.UploadResume:input_type -> jobtrack.resume.v1.UploadResumeRequest
 	4,  // 8: jobtrack.resume.v1.ResumeService.GetResume:input_type -> jobtrack.resume.v1.GetResumeRequest
 	6,  // 9: jobtrack.resume.v1.ResumeService.ListMyResumes:input_type -> jobtrack.resume.v1.ListMyResumesRequest
 	8,  // 10: jobtrack.resume.v1.ResumeService.DownloadResume:input_type -> jobtrack.resume.v1.DownloadResumeRequest
-	10, // 11: jobtrack.resume.v1.ResumeInternalService.GetResumeFile:input_type -> jobtrack.resume.v1.GetResumeFileRequest
-	3,  // 12: jobtrack.resume.v1.ResumeService.UploadResume:output_type -> jobtrack.resume.v1.UploadResumeResponse
-	5,  // 13: jobtrack.resume.v1.ResumeService.GetResume:output_type -> jobtrack.resume.v1.GetResumeResponse
-	7,  // 14: jobtrack.resume.v1.ResumeService.ListMyResumes:output_type -> jobtrack.resume.v1.ListMyResumesResponse
-	9,  // 15: jobtrack.resume.v1.ResumeService.DownloadResume:output_type -> jobtrack.resume.v1.DownloadResumeResponse
-	11, // 16: jobtrack.resume.v1.ResumeInternalService.GetResumeFile:output_type -> jobtrack.resume.v1.GetResumeFileResponse
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
+	10, // 11: jobtrack.resume.v1.ResumeService.DownloadApplicationResume:input_type -> jobtrack.resume.v1.DownloadApplicationResumeRequest
+	12, // 12: jobtrack.resume.v1.ResumeInternalService.GetResumeFile:input_type -> jobtrack.resume.v1.GetResumeFileRequest
+	3,  // 13: jobtrack.resume.v1.ResumeService.UploadResume:output_type -> jobtrack.resume.v1.UploadResumeResponse
+	5,  // 14: jobtrack.resume.v1.ResumeService.GetResume:output_type -> jobtrack.resume.v1.GetResumeResponse
+	7,  // 15: jobtrack.resume.v1.ResumeService.ListMyResumes:output_type -> jobtrack.resume.v1.ListMyResumesResponse
+	9,  // 16: jobtrack.resume.v1.ResumeService.DownloadResume:output_type -> jobtrack.resume.v1.DownloadResumeResponse
+	11, // 17: jobtrack.resume.v1.ResumeService.DownloadApplicationResume:output_type -> jobtrack.resume.v1.DownloadApplicationResumeResponse
+	13, // 18: jobtrack.resume.v1.ResumeInternalService.GetResumeFile:output_type -> jobtrack.resume.v1.GetResumeFileResponse
+	13, // [13:19] is the sub-list for method output_type
+	7,  // [7:13] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -821,7 +936,7 @@ func file_jobtrack_resume_v1_resume_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobtrack_resume_v1_resume_proto_rawDesc), len(file_jobtrack_resume_v1_resume_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
