@@ -9,7 +9,7 @@ import { useLoad } from '../application-status/useLoad';
 import { listInterviews, scheduleInterview } from './api';
 import { checkSchedule, maxDetails } from './schedule';
 
-const listMessages = {
+export const listMessages = {
   [grpcCode.notFound]: 'This application is not available yet. It appears shortly after it is submitted; refresh to try again.',
   [grpcCode.permissionDenied]: 'Only the applicant and the employer of this application can see its interviews.',
 };

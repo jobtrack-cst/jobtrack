@@ -1,40 +1,48 @@
-import { EmptyState } from '../../components/EmptyState';
-import { useState } from 'react';
-import { Alert, Button, Card, CardContent, Stack, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Button, Stack } from '@mui/material';
 import { Link } from 'react-router';
-import { Pager, ResourceState } from '../application/shared';
-import { formatTime, gatewayMessage } from '../application-status/shared';
-import { useLoad } from '../application-status/useLoad';
-import { listSavedJobs, savedMessages, unsaveJob } from './api';
+import { LogoSquare, useCompany } from '../../components/CompanyAvatar';
+import { DeadlineTag } from '../../components/DeadlineTag';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorState } from '../../components/ErrorState';
+import { CardGrid, ResultsHeader } from '../../components/Lists';
+import { LoadingRows } from '../../components/LoadingRows';
+import { MiniCard } from '../../components/MiniCard';
 import { PageHeader } from '../../components/PageHeader';
+import { Pager } from '../../components/Pager';
+import { jobName, useJob } from '../../components/useJob';
+import { useLoad } from '../application-status/useLoad';
+import { listSavedJobs, savedMessages, type SavedJob } from './api';
+import { forgetSavedIds } from './savedState';
 
+function SavedCard({ saved }: { saved: SavedJob }) {
+  const state = useJob(saved.jobId);
+  const { company } = useCompany(state.job?.employerId);
+  const line = [company?.name, state.job?.location].filter(Boolean).join(', ');
+  return <MiniCard avatar={<LogoSquare src={company?.url} name={company?.name} size={48} />} title={jobName(state)} line={line || undefined}
+    chip={state.job && <DeadlineTag deadline={state.job.deadline} />} viewTo={`/applicant/jobs/${encodeURIComponent(saved.jobId)}`} />;
+}
+
+// Saved jobs as small minimal cards; Unsave is on each job's page.
 export function SavedJobsPage() {
   const [token, setToken] = useState('');
   const resource = useLoad(() => listSavedJobs(token), [token], savedMessages);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  async function remove(id: string) {
-    if (busy) return;
-    setBusy(true); setError(''); setNotice('');
-    try { await unsaveJob(id); setNotice('Job unsaved.'); setToken(''); resource.refresh(); }
-    catch (reason) { setError(gatewayMessage(reason, savedMessages)); }
-    finally { setBusy(false); }
-  }
-  return <Stack spacing={2}>
-    <PageHeader title="Saved jobs" description="Closed jobs are removed after their closure event is processed. Open View job for the latest details."
-      actions={<Button disabled={busy || resource.loading} onClick={() => { setError(''); resource.refresh(); }}>Refresh saved jobs</Button>} />
-    <ResourceState {...resource} />{error && <Alert severity="error">{error}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
-    {resource.data && <Typography variant="subtitle2" color="text.secondary">Saved jobs: {resource.data.pagination?.totalCount ?? 0}</Typography>}
-    {resource.data && !resource.data.savedJobs?.length && <EmptyState>No saved jobs on this page.</EmptyState>}
-    {resource.data?.savedJobs?.map(job => <Card key={job.jobId}><CardContent><Stack spacing={1}>
-      <Typography variant="h6" component="h2">Saved opportunity</Typography>
-      <Typography className="record-id">Job ID: {job.jobId}</Typography><Typography variant="body2" color="text.secondary">Saved: {formatTime(job.savedAt)}</Typography>
-      <Stack className="record-actions">
-        <Button variant="outlined" component={Link} to={`/applicant/jobs/${job.jobId}`}>View job</Button>
-        <Button color="error" disabled={busy} onClick={() => void remove(job.jobId)}>Unsave job</Button>
-      </Stack>
-    </Stack></CardContent></Card>)}
-    <Pager token={token} next={resource.data?.pagination?.nextPageToken} busy={busy || resource.loading} onPage={setToken} />
+  // This page reads the server; Save buttons elsewhere start from a fresh list afterwards.
+  useEffect(() => forgetSavedIds(), []);
+  const saved = resource.data?.savedJobs ?? [];
+  const total = Number(resource.data?.pagination?.totalCount ?? saved.length);
+  return <Stack spacing={4}>
+    <PageHeader title="Saved jobs" description="Jobs you bookmarked. A job leaves this list shortly after it closes."
+      action={<Button component={Link} to="/applicant/jobs" variant="contained">Find jobs</Button>} />
+    <Stack component="section" aria-label="Saved jobs" spacing={2}>
+      {resource.data && !!saved.length && <ResultsHeader title={`${total.toLocaleString()} saved ${total === 1 ? 'job' : 'jobs'}`} note="Newest first" />}
+      {resource.loading && <LoadingRows rows={3} height={140} label="Loading saved jobs" />}
+      {resource.error && <ErrorState message={resource.error} onRetry={resource.refresh} />}
+      {resource.data && !saved.length && <EmptyState title="No saved jobs" description="Save a job from Find jobs to keep it here."
+        action={<Button component={Link} to="/applicant/jobs" variant="outlined">Find jobs</Button>} />}
+      {!!saved.length && <CardGrid label="Saved jobs">{saved.map(s => <SavedCard key={s.jobId} saved={s} />)}</CardGrid>}
+      {resource.data && <Pager token={token} nextToken={resource.data.pagination?.nextPageToken} totalCount={resource.data.pagination?.totalCount}
+        count={saved.length} busy={resource.loading} onPage={setToken} />}
+    </Stack>
   </Stack>;
 }

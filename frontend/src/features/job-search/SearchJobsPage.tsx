@@ -1,57 +1,89 @@
-import { EmptyState } from '../../components/EmptyState';
 import { useState } from 'react';
-import { Alert, Autocomplete, Box, Button, Card, CardContent, Chip, MenuItem, Stack, TextField, Typography } from '@mui/material';
-import { Link } from 'react-router';
-import { Pager, ResourceState } from '../application/shared';
-import { formatTime, length } from '../application-status/shared';
+import { Alert, Box, Button, Chip, Stack } from '@mui/material';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorState } from '../../components/ErrorState';
+import { JobCard } from '../../components/JobCard';
+import { CardGrid, ResultsHeader } from '../../components/Lists';
+import { LoadingRows } from '../../components/LoadingRows';
+import { PageHeader } from '../../components/PageHeader';
+import { Pager } from '../../components/Pager';
+import { SearchBar, SearchField, SearchMultiSelect, SearchSelect } from '../../components/SearchBar';
+import { tokens } from '../../theme';
+import { length } from '../application-status/shared';
 import { useLoad } from '../application-status/useLoad';
 import { alertReferences } from '../job-alert/api';
-import { SaveJobButton } from '../saved-jobs/SaveJobButton';
-import { emptyFilters, searchJobs } from './api';
-import { PageHeader } from '../../components/PageHeader';
-import { JobCompany } from '../employer/JobCompany';
+import type { Job } from '../job-posting/api';
+import { SaveJobButton, useSaveJob } from '../saved-jobs/SaveJobButton';
+import { emptyFilters, searchJobs, type SearchFilters } from './api';
 
 const messages = { 3: 'The search filters were not accepted. Check your filters and try again.' };
+type Result = Omit<Job, 'description' | 'status'>;
+
+function ResultCard({ job, tags }: { job: Result; tags: string[] }) {
+  const save = useSaveJob(job.jobId);
+  return <JobCard job={job} tags={tags} viewTo={`/applicant/jobs/${encodeURIComponent(job.jobId)}`}
+    secondary={<SaveJobButton state={save} title={job.title} />}
+    footer={save.error && <Alert severity="error">{save.error}</Alert>} />;
+}
+
+// Find jobs (redesign doc Section 5): search bar with Title, Category, Location and Skills,
+// the chosen skills as chips under it, then job cards with Save, soonest deadline first.
 export function SearchJobsPage() {
-  const [filters, setFilters] = useState(emptyFilters);
-  const [draft, setDraft] = useState(emptyFilters);
+  const [filters, setFilters] = useState<SearchFilters>(emptyFilters);
+  const [draft, setDraft] = useState<SearchFilters>(emptyFilters);
   const [token, setToken] = useState('');
   const resource = useLoad(() => searchJobs(token, filters), [token, filters], messages);
   const refs = useLoad(alertReferences, [], messages);
   const invalid = length(draft.query) > 150 ? 'Search title must contain at most 150 characters.'
     : length(draft.location) > 100 ? 'Location must contain at most 100 characters.' : '';
-  return <Stack spacing={2}>
-    <PageHeader title="Search jobs" description="Open jobs, soonest deadline first. Filters combine with AND; tags match any selected tag."
-      actions={<Button disabled={resource.loading} onClick={resource.refresh}>Refresh search</Button>} />
-    <ResourceState {...refs} />{refs.error && <Button onClick={refs.refresh}>Retry search options</Button>}
-    <Stack component="form" spacing={2} sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' }, '& .MuiAlert-root': { gridColumn: '1 / -1' } }} onSubmit={e => { e.preventDefault(); if (!invalid) { setToken(''); setFilters({ ...draft, query: draft.query.trim(), location: draft.location.trim() }); } }}>
-      <TextField label="Search title" value={draft.query} onChange={e => setDraft({ ...draft, query: e.target.value })} />
-      <TextField select label="Category" value={draft.categoryId} disabled={!refs.data} onChange={e => setDraft({ ...draft, categoryId: e.target.value })}>
-        <MenuItem value="">Any</MenuItem>{refs.data?.categories.map(c => <MenuItem key={c.categoryId} value={c.categoryId}>{c.name}</MenuItem>)}
-      </TextField>
-      <Autocomplete multiple options={refs.data?.tags ?? []} value={refs.data?.tags.filter(t => draft.tagIds.includes(t.tagId)) ?? []}
-        getOptionLabel={t => t.name} isOptionEqualToValue={(a, b) => a.tagId === b.tagId} disabled={!refs.data}
-        onChange={(_, tags) => setDraft({ ...draft, tagIds: tags.map(t => t.tagId) })} renderInput={params => <TextField {...params} label="Tags" />} />
-      <Autocomplete freeSolo options={refs.data?.locations.map(l => l.name) ?? []} inputValue={draft.location}
-        onInputChange={(_, location) => setDraft({ ...draft, location })} renderInput={params => <TextField {...params} label="Location" />} />
+  const apply = (next: SearchFilters) => { setToken(''); setFilters({ ...next, query: next.query.trim(), location: next.location.trim() }); };
+  const setTags = (tagIds: string[]) => setDraft(current => ({ ...current, tagIds }));
+  function clear() { setDraft(emptyFilters); apply(emptyFilters); }
+  const tagName = (id: string) => refs.data?.tags.find(t => t.tagId === id)?.name;
+  const category = refs.data?.categories.find(c => c.categoryId === filters.categoryId)?.name;
+  const filtered = !!(filters.query || filters.categoryId || filters.location || filters.tagIds.length);
+  const jobs = resource.data?.jobs ?? [];
+  const total = Number(resource.data?.pagination?.totalCount ?? jobs.length);
+  return <Stack spacing={4}>
+    <PageHeader title="Find jobs" description="Open jobs and internships, soonest deadline first." />
+    <Stack spacing={2}>
+      <SearchBar label="Search jobs" submitDisabled={!!invalid} onSubmit={() => { if (!invalid) apply(draft); }}>
+        <SearchField label="Job title" value={draft.query} placeholder="Any title" grow={2} onChange={query => setDraft({ ...draft, query })} />
+        <SearchSelect label="Category" value={draft.categoryId} disabled={!refs.data}
+          options={refs.data?.categories.map(c => [c.categoryId, c.name]) ?? []} onChange={categoryId => setDraft({ ...draft, categoryId })} />
+        <SearchField label="Location" value={draft.location} placeholder="Anywhere" suggestions={refs.data?.locations.map(l => l.name)}
+          onChange={location => setDraft({ ...draft, location })} />
+        {/* Skills are the category-tag tags; like the other fields they apply on Search. */}
+        <SearchMultiSelect label="Skills" disabled={!refs.data} options={refs.data?.tags ?? []} optionLabel={t => t.name} optionKey={t => t.tagId}
+          value={refs.data?.tags.filter(t => draft.tagIds.includes(t.tagId)) ?? []} onChange={tags => setTags(tags.map(t => t.tagId))} />
+      </SearchBar>
       {invalid && <Alert severity="info">{invalid}</Alert>}
-      <Button type="submit" variant="contained" disabled={resource.loading || !!invalid}>Search</Button>
-      <Button onClick={() => { setDraft(emptyFilters); setFilters({ ...emptyFilters }); setToken(''); }}>Clear filters</Button>
+      {refs.error && <ErrorState message={refs.error} onRetry={refs.refresh} />}
+      {!!draft.tagIds.length && <Stack direction="row" component="ul" aria-label="Selected skills" sx={{ listStyle: 'none', m: 0, p: 0, gap: 1, flexWrap: 'wrap' }}>
+        {draft.tagIds.map(id => { const name = tagName(id) ?? 'Skill'; return <Box component="li" key={id}>
+          <Chip label={name} onDelete={() => setTags(draft.tagIds.filter(t => t !== id))} aria-label={`${name}, press Delete to remove`}
+            sx={{ borderRadius: '8px', fontSize: '0.8125rem', fontWeight: 600, bgcolor: tokens.chipBg, color: tokens.chipText,
+              '& .MuiChip-deleteIcon': { color: tokens.chipText, '&:hover': { color: tokens.text } } }} />
+        </Box>; })}
+      </Stack>}
     </Stack>
-    <ResourceState {...resource} />
-    {resource.data && <Typography variant="subtitle2" color="text.secondary">Matching jobs: {resource.data.pagination?.totalCount ?? 0}</Typography>}
-    {resource.data && !resource.data.jobs?.length && <EmptyState>No open jobs match these filters.</EmptyState>}
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
-      {resource.data?.jobs?.map(job => <Card key={job.jobId} sx={{ borderTop: '3px solid', borderTopColor: 'primary.main' }}><CardContent><Stack spacing={1.5}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Typography variant="overline" color="text.secondary">Opportunity</Typography>{job.location && <Chip label={job.location} variant="outlined" color="secondary" />}
-        </Stack>
-        <Typography variant="h6" component="h2">{job.title}</Typography>
-        <JobCompany employerId={job.employerId} />
-        <Typography variant="body2" color="text.secondary">Deadline: {formatTime(job.deadline)}</Typography>
-        <Stack className="record-actions"><Button variant="outlined" component={Link} to={`/applicant/jobs/${job.jobId}`}>View job</Button><SaveJobButton jobId={job.jobId} /></Stack>
-      </Stack></CardContent></Card>)}
-    </Box>
-    <Pager token={token} next={resource.data?.pagination?.nextPageToken} busy={resource.loading} onPage={setToken} />
+    <Stack component="section" aria-label="Results" spacing={2}>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <ResultsHeader title={resource.data ? `${total.toLocaleString()} open ${total === 1 ? 'role' : 'roles'}${category ? ` in ${category}` : ''}` : 'Open roles'}
+            note="Soonest deadline first" />
+        </Box>
+        {filtered && <Button onClick={clear}>Clear filters</Button>}
+      </Stack>
+      {resource.loading && <LoadingRows rows={3} height={140} label="Loading jobs" />}
+      {resource.error && <ErrorState message={resource.error} onRetry={resource.refresh} />}
+      {resource.data && !jobs.length && <EmptyState title="No open roles match" description="Try other words or fewer filters."
+        action={filtered ? <Button variant="outlined" onClick={clear}>Clear filters</Button> : undefined} />}
+      {!!jobs.length && <CardGrid label="Jobs">
+        {jobs.map(job => <ResultCard key={job.jobId} job={job} tags={(job.tagIds ?? []).map(tagName).filter((n): n is string => !!n)} />)}
+      </CardGrid>}
+      {resource.data && <Pager token={token} nextToken={resource.data.pagination?.nextPageToken} totalCount={resource.data.pagination?.totalCount}
+        count={jobs.length} busy={resource.loading} onPage={setToken} />}
+    </Stack>
   </Stack>;
 }

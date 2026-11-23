@@ -10,12 +10,12 @@ import { JobCard } from '../../components/JobCard';
 import { CardGrid } from '../../components/Lists';
 import { LoadingRows } from '../../components/LoadingRows';
 import { PageHeader } from '../../components/PageHeader';
-import { isFinalStatus, StatusRail } from '../../components/StatusRail';
+import { StatusRail } from '../../components/StatusRail';
 import { jobName, loadJob, useJob } from '../../components/useJob';
 import { tokens } from '../../theme';
 import { getMyProfile } from '../applicant-profile/api';
-import { listApplications, type Application } from '../application/api';
-import { getStatus } from '../application-status/api';
+import type { Application } from '../application/api';
+import { loadMyApplications } from '../application/applicant';
 import { isNotFound } from '../application-status/shared';
 import { useLoad } from '../application-status/useLoad';
 import { useAuth } from '../auth/AuthProvider';
@@ -25,20 +25,10 @@ import { listSavedJobs } from '../saved-jobs/api';
 import { Section } from './Section';
 
 const shown = 5;
-// A missing status record is expected right after submitting; the event arrives shortly.
-const statusOrSubmitted = (applicationId: string) => getStatus(applicationId).then(
-  r => r.statusRecord?.status ?? 'APPLICATION_STATUS_SUBMITTED',
-  (error: unknown) => { if (isNotFound(error)) return 'APPLICATION_STATUS_SUBMITTED'; throw error; });
 const orNullIfMissing = <T,>(request: Promise<T>) => request.then(v => v, (error: unknown) => { if (isNotFound(error)) return null; throw error; });
 
-// The newest application per job (the list is newest first), still in progress.
-async function loadActiveApplications() {
-  const { applications = [] } = await listApplications('');
-  const seen = new Set<string>();
-  const newest = applications.filter(a => !seen.has(a.jobId) && !!seen.add(a.jobId)).filter(a => !a.withdrawn);
-  const withStatus = await Promise.all(newest.map(async app => ({ app, status: await statusOrSubmitted(app.applicationId) })));
-  return withStatus.filter(x => !isFinalStatus(x.status));
-}
+// The newest application per job, still in progress (same rule as My applications).
+const loadActiveApplications = async () => (await loadMyApplications()).filter(x => x.active);
 
 async function loadClosingSoon() {
   const { savedJobs = [] } = await listSavedJobs('');
@@ -57,7 +47,7 @@ function ApplicationCard({ app, status }: { app: Application; status: string }) 
   const job = useJob(app.jobId);
   const { company } = useCompany(app.employerId);
   const applied = shortDate(app.timestamps?.createdAt);
-  return <Card to={`/applicant/applications/${encodeURIComponent(app.applicationId)}/status`} component="li">
+  return <Card to={`/applicant/applications/${encodeURIComponent(app.applicationId)}`} component="li">
     <Stack spacing={2}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}>
         <CompanyAvatar employerId={app.employerId} size={48} />
@@ -79,7 +69,7 @@ function ReadinessHint() {
   if (!r || (r.hasProfile && r.hasValidatedResume)) return null;
   const [title, line, to, label] = !r.hasProfile
     ? ['Create your profile', 'Employers read your summary, education and skills when you apply.', '/applicant/profile', 'Create profile']
-    : ['Upload a resume', 'You need a validated PDF resume before you can apply for a job.', '/applicant/resumes', 'Upload resume'];
+    : ['Upload a resume', 'You need a validated PDF resume before you can apply for a job.', '/applicant/profile?tab=resumes', 'Upload resume'];
   return <Card sx={{ borderLeft: `4px solid ${tokens.accent}` }}>
     <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
       <Typography variant="h3" component="h2">{title}</Typography>
@@ -108,7 +98,7 @@ export function ApplicantHome() {
           {active.data.slice(0, shown).map(x => <ApplicationCard key={x.app.applicationId} app={x.app} status={x.status} />)}
         </CardGrid>}
     </Section>
-    <Section title="Saved jobs closing soon" seeAll={['/applicant/saved-jobs', 'All saved jobs']}>
+    <Section title="Saved jobs closing soon" seeAll={['/applicant/saved', 'All saved jobs']}>
         {closing.loading && <LoadingRows rows={2} label="Loading saved jobs" />}
         {closing.error && <ErrorState message={closing.error} onRetry={closing.refresh} />}
         {closing.data && !closing.data.length && <EmptyState description="None of your saved jobs closes in the next 7 days." />}

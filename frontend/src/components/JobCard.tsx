@@ -21,10 +21,12 @@ interface Props {
   extra?: ReactNode;
   // Next to View job, for example Save.
   secondary?: ReactNode;
+  // Under the actions, for example a Save error.
+  footer?: ReactNode;
 }
 
 // Job card for browse pages (redesign doc Section 4).
-export function JobCard({ job, viewTo, viewLabel = 'View job', tags = [], extra, secondary }: Props) {
+export function JobCard({ job, viewTo, viewLabel = 'View job', tags = [], extra, secondary, footer }: Props) {
   const { company } = useCompany(job.employerId);
   const meta = [company?.name, job.location].filter(Boolean).join(', ');
   return <Box component="li" sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, p: 3, bgcolor: tokens.surface,
@@ -43,5 +45,6 @@ export function JobCard({ job, viewTo, viewLabel = 'View job', tags = [], extra,
       <Button component={Link} to={viewTo} variant="contained" sx={{ flex: 1, minHeight: 44, borderRadius: '12px' }}>{viewLabel}</Button>
       {secondary}
     </Stack>
+    {footer}
   </Box>;
 }

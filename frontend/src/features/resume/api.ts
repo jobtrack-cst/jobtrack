@@ -1,5 +1,5 @@
 import { api } from '../../api/client';
-import { pageQuery, type Pagination } from '../application/shared';
+import { idPath, pageQuery, type Pagination } from '../application/shared';
 
 export type ValidationStatus = 'RESUME_VALIDATION_STATUS_UNSPECIFIED' | 'RESUME_VALIDATION_STATUS_PENDING' | 'RESUME_VALIDATION_STATUS_VALIDATED' | 'RESUME_VALIDATION_STATUS_REJECTED';
 export interface Resume {
@@ -10,3 +10,6 @@ export const listMyResumes = (token: string) => api<{ resumes?: Resume[]; pagina
 // content is the file as base64, which is how grpc-gateway carries proto bytes in JSON.
 export const uploadResume = (fileName: string, content: string) =>
   api<{ resume: Resume }>('/v1/resumes', { method: 'POST', body: { fileName, contentType: 'application/pdf', content } });
+// JT-112: the owned file for View PDF; content is base64 like the upload.
+export interface ResumeFile { fileName?: string; contentType?: string; content?: string }
+export const downloadResume = (resumeId: string) => api<ResumeFile>(`/v1/resumes/${idPath(resumeId)}/content`);

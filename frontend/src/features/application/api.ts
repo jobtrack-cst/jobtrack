@@ -10,3 +10,5 @@ export const listResumes = (token: string) => api<{ resumes?: Resume[]; paginati
 export const getJob = (id: string) => api<{ job: Job }>(`/v1/jobs/${idPath(id)}`);
 export const submitApplication = (jobId: string, resumeId: string) => api<{ application: Application }>('/v1/applications', { method: 'POST', body: { jobId, resumeId } });
 export const withdrawApplication = (id: string) => api<{ application: Application }>(`/v1/applications/${idPath(id)}/withdraw`, { method: 'POST', body: {} });
+// JT-112: one application by ID, for the applicant's application page.
+export const getApplication = (id: string) => api<{ application: Application }>(`/v1/applications/${idPath(id)}`);

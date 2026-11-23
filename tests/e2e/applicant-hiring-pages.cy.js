@@ -223,6 +223,7 @@ describe('JT-83 applicant profile', () => {
   });
 });
 
+// JT-112 moved the resumes into the Resumes tab of Profile; /applicant/resumes opens it.
 describe('JT-83 resume upload', () => {
   const resumeId = '33333333-3333-4333-8333-333333333333';
   const pending = { resumeId, fileName: 'cv.pdf', contentType: 'application/pdf', sizeBytes: '9', validationStatus: 'RESUME_VALIDATION_STATUS_PENDING', timestamps: { createdAt: '2026-11-15T10:00:00Z' } };
@@ -239,7 +240,7 @@ describe('JT-83 resume upload', () => {
 
   it('uploads a PDF as base64 and lists it as pending', () => {
     openResumes();
-    cy.contains('No resumes on this page.').should('be.visible');
+    cy.contains('No resumes yet').should('be.visible');
     cy.intercept('POST', `${gateway}/v1/resumes`, req => {
       expect(req.body).to.deep.eq({ fileName: 'cv.pdf', contentType: 'application/pdf', content: pdf().toString('base64') });
       req.reply({ resume: pending });
@@ -252,7 +253,7 @@ describe('JT-83 resume upload', () => {
     cy.wait('@upload');
     cy.wait('@relist');
     cy.contains('cv.pdf uploaded').should('be.visible');
-    cy.contains('Pending validation').should('be.visible');
+    cy.contains('.MuiChip-label', /^Checking$/).should('be.visible');
   });
 
   it('accepts a file name of exactly 255 characters', () => {
@@ -295,7 +296,7 @@ describe('JT-83 resume upload', () => {
       choose(contents(), fileName, mimeType);
       cy.get('[role=alert]').should('contain', message);
       cy.then(() => expect(posted, 'upload request sent').to.eq(false));
-      cy.contains('label', 'Upload PDF resume').should('not.have.attr', 'aria-disabled');
+      cy.contains('label', /^Upload PDF$/).should('not.have.attr', 'aria-disabled');
     });
   }
 
@@ -322,24 +323,25 @@ describe('JT-83 resume upload', () => {
     });
     login();
     navigate('/applicant/resumes');
-    cy.contains('Pending validation').should('be.visible');
-    cy.contains('Validated').should('be.visible');
-    cy.contains('button', 'Next page').click();
+    cy.contains('.MuiChip-label', /^Checking$/).should('be.visible');
+    cy.contains('.MuiChip-label', /^Validated$/).should('be.visible');
+    cy.contains('button', /^Next$/).click();
     cy.contains('bad.pdf').should('be.visible');
     cy.contains('Reason: File signature is not a PDF').should('be.visible');
-    cy.contains('button', 'First page').click();
+    cy.contains('button', /^Previous$/).click();
     cy.contains('good.pdf').should('be.visible');
   });
 
   it('refreshes to show a resume that was validated after upload', () => {
     openResumes([pending]);
     cy.intercept('GET', `${gateway}/v1/resumes?*`, { resumes: [{ ...pending, validationStatus: 'RESUME_VALIDATION_STATUS_VALIDATED' }], pagination: {} }).as('again');
-    cy.contains('button', 'Refresh resumes').click();
+    cy.contains('button', /^Refresh$/).click();
     cy.wait('@again');
-    cy.contains('Validated').should('be.visible');
+    cy.contains('.MuiChip-label', /^Validated$/).should('be.visible');
   });
 });
 
+// The applicant's status, history and interviews are on the JT-112 application page (applicant-pages.cy.js).
 describe('JT-83 application status, review and interviews', () => {
   const applicationId = '44444444-4444-4444-8444-444444444444';
   const application = { applicationId, jobId: '22222222-2222-4222-8222-222222222222', resumeId: '33333333-3333-4333-8333-333333333333', applicantId: userId, employerId: '66666666-6666-4666-8666-666666666666', withdrawn: false };
@@ -375,8 +377,8 @@ describe('JT-83 application status, review and interviews', () => {
             { previousStatus: 'APPLICATION_STATUS_SUBMITTED', newStatus: 'APPLICATION_STATUS_UNDER_REVIEW', occurredAt: '2026-11-15T09:00:00Z' },
           ], pagination: { nextPageToken: '20' } });
       });
-      openCard('ROLE_APPLICANT', 'Status');
-      cy.location('pathname').should('eq', `/applicant/applications/${applicationId}/status`);
+      openCard('ROLE_EMPLOYER', 'Status');
+      cy.location('pathname').should('eq', `/employer/applications/${applicationId}/status`);
       cy.contains('Current status:').parent().should('contain', 'Shortlisted');
       cy.get('table[aria-label="Status history"] tbody tr').should('have.length', 2).first().should('contain', 'None').and('contain', 'Submitted');
       cy.contains('button', 'Next page').click();
@@ -395,8 +397,8 @@ describe('JT-83 application status, review and interviews', () => {
     it('rejects an application ID in the address that is not a UUID without calling the gateway', () => {
       let called = false;
       cy.intercept('GET', `${gateway}/v1/applications/not-a-uuid/**`, () => { called = true; });
-      login();
-      cy.window().then(win => { win.history.pushState({}, '', '/applicant/applications/not-a-uuid/status'); win.dispatchEvent(new PopStateEvent('popstate')); });
+      login('ROLE_EMPLOYER');
+      cy.window().then(win => { win.history.pushState({}, '', '/employer/applications/not-a-uuid/status'); win.dispatchEvent(new PopStateEvent('popstate')); });
       cy.contains('The application ID in the address is not valid.').should('be.visible');
       cy.then(() => expect(called).to.eq(false));
     });
@@ -450,7 +452,7 @@ describe('JT-83 application status, review and interviews', () => {
 
     it('gives applicants no review link or route', () => {
       openCard('ROLE_APPLICANT');
-      cy.contains('a', 'Status').should('be.visible');
+      cy.contains('[role=tab]', /^Active/).should('be.visible');
       cy.contains('a', /^Review$/).should('not.exist');
       cy.window().then(win => { win.history.pushState({}, '', `/applicant/applications/${applicationId}/review`); win.dispatchEvent(new PopStateEvent('popstate')); });
       cy.location('pathname').should('eq', '/applicant');
@@ -459,13 +461,6 @@ describe('JT-83 application status, review and interviews', () => {
 
   describe('interviews', () => {
     const interview = { interviewId: '88888888-8888-4888-8888-888888888888', applicationId, scheduledAt: '2026-11-20T04:00:00Z', details: 'Room 2\nBring your ID' };
-
-    it('lists interviews for the applicant without a schedule form', () => {
-      cy.intercept('GET', `${interviewsUrl}?*`, { interviews: [interview], pagination: {} });
-      openCard('ROLE_APPLICANT', 'Interviews');
-      cy.contains('Room 2').should('be.visible');
-      cy.contains('Schedule an interview').should('not.exist');
-    });
 
     it('schedules an interview in UTC from the employer local time and refreshes the list', () => {
       const when = localInput(3);
