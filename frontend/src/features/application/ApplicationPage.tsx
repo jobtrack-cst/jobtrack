@@ -18,11 +18,11 @@ import { jobName, useJob } from '../../components/useJob';
 import { tokens } from '../../theme';
 import { listHistory, type HistoryEntry } from '../application-status/api';
 import { formatTime, grpcCode, isNotFound, statusLabel } from '../application-status/shared';
-import { readMessages } from '../application-status/StatusPage';
+import { readMessages } from '../application-status/messages';
 import { useLoad } from '../application-status/useLoad';
 import { useAuth } from '../auth/AuthProvider';
 import { listInterviews } from '../interview/api';
-import { listMessages as interviewMessages } from '../interview/InterviewsPage';
+import { listMessages as interviewMessages } from '../interview/messages';
 import { Conversation } from '../messaging/Conversation';
 import { getOfferByApplication, respondOffer, type Offer } from '../offer/api';
 import { getApplication, withdrawApplication, type Application } from './api';
@@ -92,6 +92,7 @@ function ApplicationView({ initial }: { initial: Application }) {
   const job = useJob(app.jobId);
   const { company } = useCompany(app.employerId);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [messagesTick, setMessagesTick] = useState(0);
   const [notice, setNotice] = useState('');
   const current = status.data;
   const final = current ? isFinalStatus(current) : false;
@@ -148,8 +149,8 @@ function ApplicationView({ initial }: { initial: Application }) {
     <OfferSection offer={offer.data} loading={offer.loading} error={offer.error} onRetry={offer.refresh} withdrawn={!!app.withdrawn}
       onAnswered={decision => { setNotice(decision === 'accept' ? 'Offer accepted.' : 'Offer declined.'); refreshSoon(); }} />
 
-    <Section title="Conversation">
-      {session && <Conversation applicationId={id} selfId={session.user.userId} otherName={companyName} readOnly={final}
+    <Section title="Conversation" action={<Button onClick={() => setMessagesTick(n => n + 1)}>Refresh messages</Button>}>
+      {session && <Conversation applicationId={id} selfId={session.user.userId} otherName={companyName} readOnly={final} refreshSignal={messagesTick}
         otherAvatar={<LogoSquare src={company?.url} name={company?.name} size={32} />} />}
     </Section>
 

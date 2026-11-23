@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Alert, Autocomplete, Box, Button, Chip, Stack, TextField, Typography } from '@mui/material';
 import { Card } from '../../components/Card';
 import { ErrorState } from '../../components/ErrorState';
-import { TagChip } from '../../components/JobCard';
 import { FormPanel } from '../../components/Lists';
 import { LoadingRows } from '../../components/LoadingRows';
 import { PageHeader } from '../../components/PageHeader';
@@ -12,13 +11,13 @@ import { tokens } from '../../theme';
 import { gatewayMessage, grpcCode, isNotFound, length } from '../application-status/shared';
 import { useAuth } from '../auth/AuthProvider';
 import { ResumesPanel } from '../resume/ResumesPanel';
-import { createMyProfile, getMyProfile, updateMyProfile, type ApplicantProfile, type Education, type ProfileInput } from './api';
+import { createMyProfile, getMyProfile, updateMyProfile, type ApplicantProfile, type ProfileInput } from './api';
 import { ProfilePhoto } from './ProfilePhoto';
 import { ProfilePhotoUpload } from './ProfilePhotoUpload';
+import { profileValues, ProfileView, type EducationRow, type ProfileValues } from './ProfileView';
 
 // JT-50 limits, checked here so the user sees the problem before saving.
 const limits = { summary: 2000, education: 20, text: 150, skills: 50, skill: 50, firstYear: 1950 };
-interface EducationRow { institution: string; qualification: string; startYear: string; endYear: string }
 const emptyRow: EducationRow = { institution: '', qualification: '', startYear: '', endYear: '' };
 const oneLine = (value: string) => !/[\r\n\t]/.test(value);
 
@@ -46,42 +45,15 @@ export function validateProfile(summary: string, rows: EducationRow[], skills: s
   return '';
 }
 
-const toRow = (e: Education): EducationRow => ({ institution: e.institution, qualification: e.qualification, startYear: String(e.startYear), endYear: e.endYear ? String(e.endYear) : '' });
 const toInput = (summary: string, rows: EducationRow[], skills: string[]): ProfileInput => ({
   summary: summary.trim(),
   education: rows.map(r => ({ institution: r.institution.trim(), qualification: r.qualification.trim(), startYear: Number(r.startYear), endYear: r.endYear.trim() === '' ? 0 : Number(r.endYear) })),
   skills: skills.map(s => s.trim()),
 });
 // The saved values, kept so Cancel can restore them and Save can tell whether anything changed (JT-109).
-interface Saved { summary: string; rows: EducationRow[]; skills: string[] }
+type Saved = ProfileValues;
 const emptySaved: Saved = { summary: '', rows: [], skills: [] };
 const sameInput = (a: ProfileInput, b: ProfileInput) => JSON.stringify(a) === JSON.stringify(b);
-
-// Read-only view of the saved profile; Edit switches to the form (JT-109).
-function ProfileView({ saved }: { saved: Saved }) {
-  return <Stack spacing={3}>
-    <Box>
-      <Typography variant="h2" component="h2" sx={{ mb: 1 }}>Summary</Typography>
-      <Typography color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{saved.summary.trim() || 'No summary.'}</Typography>
-    </Box>
-    <Box>
-      <Typography variant="h2" component="h2" sx={{ mb: 1 }}>Education</Typography>
-      {saved.rows.length === 0 ? <Typography color="text.secondary">No education entries.</Typography>
-        : <Stack component="ul" spacing={1} sx={{ m: 0, pl: 3, color: tokens.textSecondary }}>
-          {saved.rows.map((row, index) => <Typography component="li" key={index}>
-            <Box component="strong" sx={{ color: tokens.text }}>{row.institution}</Box>, {row.qualification}, {row.startYear} to {row.endYear || 'ongoing'}
-          </Typography>)}
-        </Stack>}
-    </Box>
-    <Box>
-      <Typography variant="h2" component="h2" sx={{ mb: 1 }}>Skills</Typography>
-      {saved.skills.length === 0 ? <Typography color="text.secondary">No skills.</Typography>
-        : <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-          {saved.skills.map(skill => <TagChip key={skill} label={skill} />)}
-        </Stack>}
-    </Box>
-  </Stack>;
-}
 
 const saveMessages = {
   [grpcCode.invalidArgument]: 'The profile was not saved. Check the summary, education entries and skills against the limits shown and try again.',
@@ -123,8 +95,7 @@ function ProfileTab() {
   function show(next: Saved) {
     setSaved(next); setSummary(next.summary); setRows(next.rows); setSkills(next.skills);
   }
-  const fromProfile = (profile: ApplicantProfile): Saved =>
-    ({ summary: profile.summary ?? '', rows: (profile.education ?? []).map(toRow), skills: profile.skills ?? [] });
+  const fromProfile = (profile: ApplicantProfile): Saved => profileValues(profile);
   useEffect(() => {
     let active = true;
     setLoading(true); setLoadError(''); setNotice(''); setError(''); setEditing(false);

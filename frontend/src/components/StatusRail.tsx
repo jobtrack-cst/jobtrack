@@ -2,8 +2,9 @@ import { Box, Stack, Typography } from '@mui/material';
 import { tokens } from '../theme';
 import { StatusChip } from './StatusChip';
 
-// Read by screen readers, not shown.
-const visuallyHidden = { position: 'absolute', width: 1, height: 1, p: 0, m: '-1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 } as const;
+// Read by screen readers, not shown. Sizes are strings: in sx a bare 1 means 100%, which made
+// each hidden label as wide as the page and caused horizontal scrolling (JT-115 item 1).
+const visuallyHidden = { position: 'absolute', width: '1px', height: '1px', p: 0, m: '-1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 } as const;
 
 const steps = ['Submitted', 'Under review', 'Shortlisted', 'Interview', 'Offer'] as const;
 const stepOf: Record<string, number> = {

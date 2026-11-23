@@ -11,13 +11,16 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatusChip, ToneChip } from '../../components/StatusChip';
 import { jobName, rememberJob, useJob } from '../../components/useJob';
 import { tokens } from '../../theme';
+import { ApplicantAvatar } from '../applicant-profile/ApplicantAvatar';
 import { listApplications, type Application } from '../application/api';
-import { getStatus } from '../application-status/api';
+import { statusOf } from '../application/applicant';
+import { applicantLabel } from '../application/employer';
 import { isNotFound } from '../application-status/shared';
 import { useLoad } from '../application-status/useLoad';
 import { listMyVerificationRequests } from '../company-verification/api';
 import { getMyCompanyProfile } from '../employer/api';
 import { listJobs, type Job } from '../job-posting/api';
+import { ApplicationCount } from '../job-posting/ApplicationCount';
 import { Section } from './Section';
 
 const shown = 5;
@@ -39,9 +42,9 @@ function VerificationCard() {
   const [title, line, next] = !profile
     ? ['Create your company profile', 'Applicants see it on your jobs, and you need it before verification.', ['/employer/company', 'Create profile']]
     : status === 'VERIFICATION_STATUS_VERIFIED' ? ['Your company is verified', 'You can publish jobs.', undefined]
-    : pending ? ['Verification pending', 'An admin is checking your registration. You can prepare draft jobs meanwhile.', ['/employer/verification', 'View request']]
-    : status === 'VERIFICATION_STATUS_REJECTED' ? ['Verification was not approved', 'Read the reason, then send a new request.', ['/employer/verification', 'Send a new request']]
-    : ['Verify your company', 'An admin checks your registration before you can publish jobs.', ['/employer/verification', 'Request verification']];
+    : pending ? ['Verification pending', 'An admin is checking your registration. You can prepare draft jobs meanwhile.', ['/employer/company', 'View request']]
+    : status === 'VERIFICATION_STATUS_REJECTED' ? ['Verification was not approved', 'Read the reason, then send a new request.', ['/employer/company', 'Send a new request']]
+    : ['Verify your company', 'An admin checks your registration before you can publish jobs.', ['/employer/company', 'Request verification']];
   const verified = status === 'VERIFICATION_STATUS_VERIFIED';
   return <Card sx={{ borderLeft: `4px solid ${verified ? tokens.success : tokens.accent}` }}>
     <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
@@ -57,32 +60,26 @@ function VerificationCard() {
   </Card>;
 }
 
-function ApplicationCount({ jobId }: { jobId: string }) {
-  const count = useLoad(() => listApplications('', jobId), [jobId], {});
-  if (count.loading) return <Typography variant="body2" color="text.secondary">Counting applications…</Typography>;
-  if (count.error) return <Typography variant="body2" color="text.secondary">Applications could not be counted</Typography>;
-  const n = Number(count.data?.pagination?.totalCount ?? 0);
-  return <Typography variant="body2" color="text.secondary">{n === 1 ? '1 application' : `${n.toLocaleString()} applications`}</Typography>;
-}
-
 function OpenJobCard({ job }: { job: Job }) {
   return <JobCard job={job} viewTo={`/employer/jobs/${encodeURIComponent(job.jobId)}`} extra={<ApplicationCount jobId={job.jobId} />} />;
 }
 
+// A compact row: photo or initials, the applicant's name ("Applicant" before JT-114), the job
+// and applied date, and the status; the whole row opens the application page.
 function ApplicantRow({ app }: { app: Application }) {
   const job = useJob(app.jobId);
-  const status = useLoad(() => getStatus(app.applicationId), [app.applicationId], {});
+  // Same rule as the Applicants cards: withdrawn counts at once, no record yet is Submitted.
+  const status = useLoad(() => statusOf(app), [app.applicationId, app.withdrawn], {});
+  const name = applicantLabel(app);
   const applied = shortDate(app.timestamps?.createdAt);
-  // A status record appears shortly after submitting.
-  const current = status.data?.statusRecord?.status ?? (isNotFound(status.failure) ? 'APPLICATION_STATUS_SUBMITTED' : undefined);
-  return <ListRow to={`/employer/applications/${encodeURIComponent(app.applicationId)}/status`}>
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography variant="subtitle1" component="h3">{jobName(job)}</Typography>
-        {/* Names arrive with JT-114; until then the UI says "Applicant". */}
-        <Typography variant="body2" color="text.secondary">{applied ? `Applicant, applied ${applied}` : 'Applicant'}</Typography>
+  return <ListRow to={`/employer/applicants/${encodeURIComponent(app.applicationId)}`}>
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+      <ApplicantAvatar applicationId={app.applicationId} name={name} size={44} />
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography variant="subtitle1" component="h3">{name}</Typography>
+        <Typography variant="body2" color="text.secondary">{applied ? `${jobName(job)}, applied ${applied}` : jobName(job)}</Typography>
       </Box>
-      {current && <Box sx={{ flexShrink: 0 }}><StatusChip kind="application" status={current} /></Box>}
+      {status.data && <Box sx={{ flexShrink: 0 }}><StatusChip kind="application" status={status.data} /></Box>}
     </Stack>
   </ListRow>;
 }
@@ -106,7 +103,7 @@ export function EmployerHome() {
         {jobs.data && !openJobs.length && <EmptyState title="No open jobs" description="Published jobs that accept applications show here." />}
         {!!openJobs.length && <CardGrid>{openJobs.slice(0, shown).map(job => <OpenJobCard key={job.jobId} job={job} />)}</CardGrid>}
     </Section>
-    <Section title="Newest applicants" seeAll={['/employer/applications', 'All applicants']}>
+    <Section title="Newest applicants" seeAll={['/employer/applicants', 'All applicants']}>
         {applicants.loading && <LoadingRows rows={2} label="Loading applicants" />}
         {applicants.error && <ErrorState message={applicants.error} onRetry={applicants.refresh} />}
         {applicants.data && !newest.length && <EmptyState title="No applicants yet" description="Applications to your jobs show here, newest first." />}

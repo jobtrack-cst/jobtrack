@@ -20,12 +20,14 @@ interface Props {
   otherAvatar: ReactNode;
   // Final applications are view only (redesign doc Section 8).
   readOnly?: boolean;
+  // Bumped by the page's "Refresh messages" button in the section header to read the thread again.
+  refreshSignal?: number;
 }
 
 // The thread and composer for one application (redesign doc Section 6). Messages are
 // stored oldest first, so the newest page is read using totalCount, and earlier
 // pages load on request above it.
-export function Conversation({ applicationId, selfId, otherName, otherAvatar, readOnly }: Props) {
+export function Conversation({ applicationId, selfId, otherName, otherAvatar, readOnly, refreshSignal = 0 }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [start, setStart] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -51,7 +53,7 @@ export function Conversation({ applicationId, selfId, otherName, otherAvatar, re
       reason => { if (active) setError(errorMessage(reason)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [applicationId, revision]);
+  }, [applicationId, revision, refreshSignal]);
   // Newest visible without scrolling, unless earlier messages were just added above.
   useLayoutEffect(() => {
     if (stickToBottom.current && thread.current) thread.current.scrollTop = thread.current.scrollHeight;
@@ -86,10 +88,8 @@ export function Conversation({ applicationId, selfId, otherName, otherAvatar, re
   }
   const length = chars(draft);
   return <Stack spacing={2}>
-    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-      {start > 0 ? <Button disabled={loadingEarlier} onClick={() => void earlier()}>{loadingEarlier ? 'Loading…' : 'Show earlier messages'}</Button> : <span />}
-      <Button disabled={loading} onClick={() => setRevision(n => n + 1)}>Refresh messages</Button>
-    </Stack>
+    {start > 0 && <Button disabled={loadingEarlier} onClick={() => void earlier()} sx={{ alignSelf: 'flex-start' }}>
+      {loadingEarlier ? 'Loading…' : 'Show earlier messages'}</Button>}
     {loading && <LoadingRows rows={2} label="Loading messages" />}
     {error && <ErrorState message={error} onRetry={() => setRevision(n => n + 1)} />}
     {!loading && !error && !messages.length && <Typography color="text.secondary">No messages yet.{readOnly ? '' : ` Write to ${otherName} below.`}</Typography>}

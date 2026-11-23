@@ -39,9 +39,9 @@ describe('JT-106 session persistence', () => {
       cy.reload();
       cy.wait('@me');
       cy.location('pathname').should('eq', base);
-      // Pages without background reads: the report form (employer, admin) and, for applicants,
-      // a job address that is not a job ID, which never calls the gateway (JT-112).
-      const deepLink = role === 'ROLE_APPLICANT' ? '/applicant/jobs/not-a-job' : `${base}/report-job`;
+      // Pages without background reads: the admin report form and, for applicants and employers,
+      // an address that is not an ID, which never calls the gateway (JT-112, JT-111).
+      const deepLink = { ROLE_APPLICANT: '/applicant/jobs/not-a-job', ROLE_EMPLOYER: '/employer/applicants/not-an-application', ROLE_ADMIN: '/admin/report-job' }[role];
       cy.visit(`${deepLink}?from=reload`);
       cy.wait('@me');
       cy.location('pathname').should('eq', deepLink);
@@ -59,15 +59,18 @@ describe('JT-106 session persistence', () => {
     cy.intercept('GET', `${gateway}/v1/auth/me`, req => new Promise(resolve => {
       release = () => { req.reply({ user: user('ROLE_EMPLOYER') }); resolve(); };
     })).as('me');
-    visitStored(credentials(), '/employer/report-job');
+    // JT-111: employers have no report form; an application address that is not an ID never calls the gateway.
+    const deepLink = '/employer/applicants/not-an-application';
+    visitStored(credentials(), deepLink);
     cy.contains('[role=status]', 'Restoring session').should('be.visible');
-    cy.location('pathname').should('eq', '/employer/report-job');
+    cy.location('pathname').should('eq', deepLink);
     cy.get('input[name=email]').should('not.exist');
     cy.get('nav').should('not.exist');
     cy.then(() => release());
     cy.wait('@me');
     cy.get('nav').should('be.visible');
-    cy.location('pathname').should('eq', '/employer/report-job');
+    cy.location('pathname').should('eq', deepLink);
+    cy.contains('This application does not exist').should('be.visible');
   });
   for (const [name, value] of [
     ['invalid JSON', '{'], ['null', 'null'], ['array', '[]'], ['missing token', { expiresAt: Date.now() + 3600000 }],

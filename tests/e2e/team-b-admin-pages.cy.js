@@ -62,177 +62,8 @@ function visit(path) {
 }
 const card = text => cy.contains('.MuiCard-root, .workspace-content li', text);
 
-describe('JT-88 company profile', () => {
-  const fields = { companyName: 'Druk Tech', description: 'Synthetic company', website: 'https://druktech.example', location: 'Thimphu' };
-  const profile = { employerId, ...fields, verificationStatus: 'VERIFICATION_STATUS_UNVERIFIED', timestamps };
-  function openCompany(response) {
-    login('ROLE_EMPLOYER');
-    cy.intercept('GET', `${gateway}/v1/employer/profile`, response).as('load');
-    open('Company');
-    cy.wait('@load');
-  }
-
-  it('creates a profile when the employer has none, sending trimmed fields', () => {
-    openCompany({ statusCode: 404, body: { code: 5, message: 'private' } });
-    cy.contains('You do not have a company profile yet').should('be.visible');
-    cy.contains('button', 'Create profile').should('be.disabled');
-    field('Company name').type('  Druk Tech  ');
-    field('Description').type('Synthetic company');
-    field('Website').type('https://druktech.example');
-    field('Location').type('Thimphu ');
-    cy.intercept('POST', `${gateway}/v1/employer/profile`, req => {
-      expect(req.body).to.deep.eq(fields);
-      req.reply({ profile });
-    }).as('create');
-    cy.contains('button', 'Create profile').click();
-    cy.wait('@create');
-    cy.contains('Company profile created').should('be.visible');
-    cy.contains('.MuiChip-root', 'Not verified').should('be.visible');
-    cy.contains('a', 'Request verification').should('be.visible');
-    cy.contains('button', 'Save profile').should('be.enabled');
-  });
-
-  it('shows a rejected profile with its reason and saves changes with PUT', () => {
-    const rejected = { ...profile, verificationStatus: 'VERIFICATION_STATUS_REJECTED', rejectionReason: 'Licence number not found' };
-    openCompany({ profile: rejected });
-    cy.contains('.MuiChip-root', 'Rejected').should('be.visible');
-    cy.contains('Reason: Licence number not found').should('be.visible');
-    field('Company name').should('have.value', 'Druk Tech');
-    field('Location').clear().type('Phuentsholing');
-    cy.intercept('PUT', `${gateway}/v1/employer/profile`, req => {
-      expect(req.body).to.deep.eq({ ...fields, location: 'Phuentsholing' });
-      req.reply({ profile: { ...rejected, location: 'Phuentsholing' } });
-    }).as('update');
-    cy.contains('button', 'Save profile').click();
-    cy.wait('@update');
-    cy.contains('Company profile saved.').should('be.visible');
-    field('Location').should('have.value', 'Phuentsholing');
-  });
-
-  it('shows a verified profile without the verification link', () => {
-    openCompany({ profile: { ...profile, verificationStatus: 'VERIFICATION_STATUS_VERIFIED' } });
-    cy.contains('.MuiChip-root', exact('Verified')).should('be.visible');
-    cy.contains('a', 'Request verification').should('not.exist');
-  });
-
-  for (const [name, change, message] of [
-    ['a 151 character name', () => fill('Company name', 'x'.repeat(151)), 'at most 150'],
-    ['a name of only spaces', () => fill('Company name', '   '), ''],
-    ['a 2001 character description', () => fill('Description', 'x'.repeat(2001)), 'at most 2000'],
-    ['a website without http or https', () => fill('Website', 'druktech.example'), 'full address'],
-    ['an ftp website', () => fill('Website', 'ftp://druktech.example'), 'full address'],
-    ['a 256 character website', () => fill('Website', `https://${'a'.repeat(245)}.bt`), 'at most 255'],
-    ['a 101 character location', () => fill('Location', 'x'.repeat(101)), 'at most 100'],
-  ]) {
-    it(`blocks saving with ${name}`, () => {
-      openCompany({ profile });
-      field('Company name').should('have.value', 'Druk Tech');
-      change();
-      if (message) cy.get('[role=alert]').should('contain', message);
-      cy.contains('button', 'Save profile').should('be.disabled');
-    });
-  }
-
-  it('accepts boundary values: 150 character name, 2000 description, 255 website, 100 location', () => {
-    openCompany({ profile });
-    fill('Company name', 'x'.repeat(150));
-    fill('Description', 'x'.repeat(2000));
-    fill('Website', `https://${'a'.repeat(244)}.bt`);
-    fill('Location', 'x'.repeat(100));
-    field('Company name').should('have.value', 'x'.repeat(150));
-    cy.get('[role=alert]').should('not.exist');
-    cy.contains('button', 'Save profile').should('be.enabled');
-  });
-
-  it('shows a fixed message for a rejected save and never the server text', () => {
-    cy.intercept('PUT', `${gateway}/v1/employer/profile`, { statusCode: 400, body: { code: 3, message: 'private-input' } });
-    openCompany({ profile });
-    cy.contains('button', 'Save profile').click();
-    cy.get('[role=alert]').should('contain', 'The profile was not saved').and('not.contain', 'private-input');
-    cy.contains('button', 'Save profile').should('be.enabled');
-  });
-
-  it('shows a load failure and retries', () => {
-    openCompany({ statusCode: 503, body: {} });
-    cy.contains('The request failed').should('be.visible');
-    cy.intercept('GET', `${gateway}/v1/employer/profile`, { profile });
-    cy.contains('button', 'Try again').click();
-    field('Company name').should('have.value', 'Druk Tech');
-  });
-});
-
-describe('JT-88 employer verification request', () => {
-  const pending = { requestId, employerId, registrationNumber: 'REG-123', notes: 'Trade licence', status: 'REQUEST_STATUS_PENDING', timestamps };
-  const listUrl = `${gateway}/v1/verification/my-requests?*`;
-  function openVerification(requests) {
-    login('ROLE_EMPLOYER');
-    cy.intercept('GET', listUrl, { requests, pagination: {} }).as('list');
-    visit('/employer/verification');
-    cy.wait('@list');
-  }
-
-  it('sends a trimmed request and then shows it as pending without the form', () => {
-    openVerification([]);
-    cy.contains('No requests on this page.').should('be.visible');
-    cy.contains('button', 'Send request').should('be.disabled');
-    field('Registration number').type('  REG-123  ');
-    field('Notes').type('Trade licence');
-    cy.intercept('POST', `${gateway}/v1/verification/requests`, req => {
-      expect(req.body).to.deep.eq({ registrationNumber: 'REG-123', notes: 'Trade licence' });
-      req.reply({ request: pending });
-    }).as('submit');
-    cy.intercept('GET', listUrl, req => {
-      expect(req.query['pagination.page_size']).to.eq('20');
-      req.reply({ requests: [pending], pagination: {} });
-    }).as('relist');
-    cy.contains('button', 'Send request').click();
-    cy.wait(['@submit', '@relist']);
-    cy.contains('Request sent').should('be.visible');
-    cy.contains('Your latest request is pending').should('be.visible');
-    card('REG-123').should('contain', 'Pending').and('not.contain', 'by admin');
-    cy.contains('button', 'Send request').should('not.exist');
-  });
-
-  it('offers a new request after a rejection and shows the reason', () => {
-    openVerification([{ ...pending, status: 'REQUEST_STATUS_REJECTED', rejectionReason: 'Licence number not found', reviewedBy: adminId }]);
-    card('REG-123').should('contain', 'Rejected').and('contain', 'Reason: Licence number not found').and('not.contain', adminId);
-    cy.contains('Send a new request').should('be.visible');
-    field('Registration number').should('have.value', '');
-  });
-
-  it('shows an approved company without the form', () => {
-    openVerification([{ ...pending, status: 'REQUEST_STATUS_APPROVED', reviewedBy: adminId }]);
-    cy.contains('Your company is verified').should('be.visible');
-    cy.contains('button', 'Send request').should('not.exist');
-  });
-
-  it('blocks a 51 character registration number and 1001 character notes, and allows 50 and 1000', () => {
-    openVerification([]);
-    fill('Registration number', 'x'.repeat(51));
-    cy.get('[role=alert]').should('contain', 'at most 50 characters');
-    cy.contains('button', 'Send request').should('be.disabled');
-    fill('Registration number', 'x'.repeat(50));
-    fill('Notes', 'x'.repeat(1001));
-    cy.get('[role=alert]').should('contain', 'at most 1000 characters');
-    cy.contains('button', 'Send request').should('be.disabled');
-    fill('Notes', 'x'.repeat(1000));
-    cy.get('[role=alert]').should('not.exist');
-    cy.contains('button', 'Send request').should('be.enabled');
-  });
-
-  for (const [statusCode, code, message] of [
-    [409, 6, 'already have a pending request'], [400, 9, 'already verified'], [400, 3, 'was not accepted'], [403, 7, 'Only employers'],
-  ]) {
-    it(`explains a ${statusCode} answer with code ${code} to Send request`, () => {
-      openVerification([]);
-      cy.intercept('POST', `${gateway}/v1/verification/requests`, { statusCode, body: { code, message: 'private-input' } });
-      field('Registration number').type('REG-123');
-      cy.contains('button', 'Send request').click();
-      cy.get('[role=alert]').should('contain', message).and('not.contain', 'private-input');
-      cy.contains('button', 'Send request').should('be.enabled');
-    });
-  }
-});
+// The employer company profile and verification request rules moved with the JT-111 Company
+// page to employer-pages.cy.js ("JT-111 company page").
 
 describe('JT-88 admin verification', () => {
   const pending = { requestId, employerId, registrationNumber: 'REG-123', notes: 'Trade licence', status: 'REQUEST_STATUS_PENDING', timestamps };
@@ -350,15 +181,16 @@ describe('JT-88 verification path', () => {
       req.reply({ request: requests[0] });
     }).as('approve');
 
+    // JT-111: verification is part of the Company page.
+    const verification = () => cy.get('main section[aria-label=Verification]');
     login('ROLE_EMPLOYER');
     open('Company');
-    cy.contains('.MuiChip-root', 'Not verified').should('be.visible');
-    cy.contains('a', 'Request verification').click();
-    cy.location('pathname').should('eq', '/employer/verification');
+    verification().contains('.MuiChip-root', 'Not verified').should('be.visible');
     field('Registration number').type('REG-123');
-    cy.contains('button', 'Send request').click();
+    verification().contains('button', 'Send request').click();
     cy.wait('@submit');
-    cy.contains('Your latest request is pending').should('be.visible');
+    verification().should('contain', 'An admin is checking your registration');
+    verification().contains('.MuiChip-root', exact('Pending')).should('be.visible');
 
     openAccountMenu();
     cy.contains('button', 'Log out').click();
@@ -373,22 +205,26 @@ describe('JT-88 verification path', () => {
     cy.contains('button', 'Log out').click();
     login('ROLE_EMPLOYER');
     open('Company');
-    cy.contains('.MuiChip-root', exact('Verified')).should('be.visible');
-    cy.contains('a', 'Request verification').should('not.exist');
+    verification().contains('.MuiChip-root', exact('Verified')).should('be.visible');
+    verification().should('contain', 'Your company is verified');
+    verification().contains('button', 'Send request').should('not.exist');
+    // The old Verification address leads to the same Company page.
     visit('/employer/verification');
-    cy.contains('Your company is verified').should('be.visible');
+    cy.location('pathname').should('eq', '/employer/company');
+    verification().should('contain', 'Your company is verified');
   });
 });
 
-// Applicants report from the job page since JT-112 (applicant-pages.cy.js); employers and admins keep this form until JT-111.
+// Applicants report from the job page since JT-112 (applicant-pages.cy.js). Employers have no
+// Report a job page since JT-111 (they only manage their own jobs; /employer/report-job goes to
+// Jobs, checked in employer-pages.cy.js); admins keep this form.
 describe('JT-88 report a job', () => {
-  const application = { applicationId: '44444444-4444-4444-8444-444444444444', jobId, resumeId: '33333333-3333-4333-8333-333333333333', applicantId: people.ROLE_APPLICANT.userId, employerId, withdrawn: false };
   const reportUrl = `${gateway}/v1/jobs/${jobId}/reports`;
   const report = { reportId, jobId, reason: 'Asks applicants for a fee', status: 'REPORT_STATUS_OPEN', timestamps };
 
-  it('lets an employer report by ID, blocking a bad ID and a reason over 1000 characters', () => {
-    login('ROLE_EMPLOYER');
-    visit('/employer/report-job');
+  it('lets an admin report by ID, blocking a bad ID and a reason over 1000 characters', () => {
+    login('ROLE_ADMIN');
+    visit('/admin/report-job');
     field('Job ID').type('not-a-uuid');
     field('Reason').type('Fake job');
     cy.get('[role=alert]').should('contain', 'must be a UUID');
@@ -418,8 +254,8 @@ describe('JT-88 report a job', () => {
   for (const [statusCode, code, message] of [[409, 6, 'already have an open report'], [400, 9, 'already been removed'], [400, 3, 'not accepted']]) {
     it(`explains a ${statusCode} answer with code ${code} to Send report`, () => {
       cy.intercept('POST', reportUrl, { statusCode, body: { code, message: 'private-input' } });
-      login('ROLE_EMPLOYER');
-      visit('/employer/report-job');
+      login('ROLE_ADMIN');
+      visit('/admin/report-job');
       field('Job ID').type(jobId);
       field('Reason').type('Fake job');
       cy.contains('button', 'Send report').click();
@@ -684,12 +520,14 @@ describe('JT-88 role-limited routes', () => {
     cy.location('pathname').should('eq', '/applicant');
   });
 
-  it('gives employers Company and Verification but no admin pages', () => {
+  it('gives employers Home, Jobs, Applicants and Company (with verification) but no admin pages', () => {
     login('ROLE_EMPLOYER');
-    for (const link of ['Jobs', 'Applicants', 'Company']) cy.contains('nav a', exact(link)).should('be.visible');
-    for (const link of ['Verification', 'Report a job', 'Messages', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
+    cy.get('nav[aria-label=Main] a').then($links => expect([...$links].map(a => a.textContent.trim())).to.deep.eq(['Home', 'Jobs', 'Applicants', 'Company']));
+    for (const link of ['Verification', 'Report a job', 'Messages', 'Offers', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
     visit('/admin/audit-log');
     cy.location('pathname').should('eq', '/employer');
+    visit('/employer/report-job');
+    cy.location('pathname').should('eq', '/employer/jobs');
   });
 
   it('gives admins the admin pages but no applicant or employer pages', () => {

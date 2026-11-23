@@ -13,17 +13,17 @@ Both need the frontend dev server: `npm run dev` in another terminal (http://loc
 
 The spec runs the workflow in order, each step logging in through the UI as the right user:
 
-1. Employer registers and creates a company profile.
-2. Employer requests verification.
+1. Employer registers and creates a company profile, which then shows read-only with Edit.
+2. Employer requests verification in the Verification section of the Company page.
 3. Admin approves the request.
-4. Employer sees Verified, then creates and publishes a job on the My jobs pages.
+4. Employer sees Verified on Company, then posts a job (it opens read-only as a draft) and publishes it; it is listed under Active on Jobs.
 5. Applicant registers and uploads a resume, which resume-validator validates.
 6. Applicant applies.
-7. Employer reviews and shortlists.
-8. Employer schedules an interview.
-9. Employer makes an offer.
+7. Employer opens Applicants, filters by this run's job, opens the card with the applicant's name, and reviews and shortlists on the application page.
+8. Employer schedules an interview on the same page.
+9. Employer makes an offer on the same page.
 10. Applicant accepts it.
-11. The status history shows None, Submitted, Under review, Shortlisted, Interview, Offered and Accepted.
+11. The status history shows Submitted, Under review, Shortlisted, Interview, Offered and Accepted on the applicant page (the first row still reads "from None" there until JT-115) and on the employer page (first row without a "from" part), where no actions are left and the conversation is view only.
 
 Services react to events, so the spec waits (refreshing the page, up to about 30 seconds per step) until each change is visible before the next step. All accounts and data are synthetic and unique per run (`jt95-*-<run>@jobtrack.test`), so the spec can run again on the same stack. Data from earlier runs stays in the database.
 

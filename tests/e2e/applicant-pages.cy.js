@@ -54,12 +54,14 @@ beforeEach(() => {
 
 function login(role = 'ROLE_APPLICANT') {
   const user = { userId, fullName: 'Pema Choden', email: 'pema@example.test', role };
-  cy.intercept('POST', `${gateway}/v1/auth/login`, { accessToken: 'jt112-token', expiresAt: new Date(Date.now() + 3600000).toISOString(), user });
+  cy.intercept('POST', `${gateway}/v1/auth/login`, { accessToken: 'jt112-token', expiresAt: new Date(Date.now() + 3600000).toISOString(), user }).as('login');
   cy.intercept('GET', `${gateway}/v1/auth/me`, { user });
   cy.visit('/login');
   cy.get('input[name=email]').type(user.email);
   cy.get('input[name=password]').type('password123', { log: false });
   cy.get('button[type=submit]').click();
+  // Wait for the login round trip first; the pathname check then covers only the navigation.
+  cy.wait('@login');
   cy.location('pathname').should('eq', `/${role.slice(5).toLowerCase()}`);
   settleHome();
 }
@@ -384,8 +386,14 @@ describe('JT-112 my applications', () => {
   it('pages through more than 20 cards', () => {
     login();
     const many = Array.from({ length: 21 }, (_, i) => app(`55555555-5555-4555-8555-${String(i).padStart(12, '0')}`, `22222222-2222-4222-8222-${String(i).padStart(12, '0')}`, inDays(-i)));
-    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: many, pagination: { totalCount: 21 } });
+    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: many, pagination: { totalCount: 21 } }).as('applications');
+    // Each card reads its job and status. Stub them all, so the list never waits on the
+    // stopped gateway refusing 42 requests.
+    cy.intercept('GET', `${gateway}/v1/jobs/*`, { job });
+    cy.intercept('GET', `${gateway}/v1/applications/*/status`, { statusRecord: { status: 'APPLICATION_STATUS_SUBMITTED' } });
     open('Applications');
+    cy.wait('@applications');
+    cy.get('[role=status][aria-label="Loading applications"]').should('not.exist');
     cy.get('ul[aria-label="Active applications"] > li').should('have.length', 20);
     cy.contains('Showing 1 to 20 of 21').should('be.visible');
     cy.contains('button', exact('Next')).click();
@@ -407,6 +415,39 @@ describe('JT-112 my applications', () => {
     cy.intercept('GET', `${gateway}/v1/applications?*`, { statusCode: 401, body: { code: 16 } });
     open('Applications');
     cy.location('pathname').should('eq', '/login');
+  });
+});
+
+describe('JT-115 item 2: an application opens at the top', () => {
+  it('opens the application page at scrollY 0 after scrolling Applications, with the back link below the top bar', () => {
+    // Eight applications for eight jobs (one card per job).
+    const apps = Array.from({ length: 8 }, (_, i) => ({ ...application, applicationId: `44444444-4444-4444-8444-${String(i).padStart(12, '0')}`,
+      jobId: `22222222-2222-4222-8222-${String(i).padStart(12, '0')}` }));
+    const target = apps[7];
+    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: apps, pagination: { totalCount: apps.length } }).as('applications');
+    cy.intercept('GET', `${gateway}/v1/applications/*/status`, { statusRecord: { status: 'APPLICATION_STATUS_SUBMITTED' } });
+    cy.intercept('GET', `${gateway}/v1/jobs/*`, { job });
+    cy.intercept('GET', `${gateway}/v1/applications/${target.applicationId}`, { application: target });
+    cy.intercept('GET', `${gateway}/v1/applications/${target.applicationId}/offer`, { statusCode: 404, body: { code: 5 } });
+    login();
+    // Open the list with the desktop links, then narrow the window (under 900px the links
+    // are replaced by the Menu button).
+    open('Applications');
+    cy.wait('@applications');
+    cy.get('ul[aria-label="Active applications"] > li').should('have.length', apps.length);
+    cy.viewport(390, 700);
+    cy.get('button[aria-label="Open navigation"]').should('be.visible');
+    cy.window().then(win => win.scrollTo(0, win.document.documentElement.scrollHeight));
+    cy.window().its('scrollY').should('be.greaterThan', 0);
+    cy.get('ul[aria-label="Active applications"] > li').last().contains('a', exact('View')).click();
+    cy.location('pathname').should('eq', `/applicant/applications/${target.applicationId}`);
+    cy.contains('main h1', job.title).should('be.visible');
+    cy.window().its('scrollY').should('eq', 0);
+    cy.get('header').then($bar => {
+      cy.contains('main a', 'Applications').then($back => {
+        expect($back[0].getBoundingClientRect().top).to.be.at.least($bar[0].getBoundingClientRect().bottom);
+      });
+    });
   });
 });
 
