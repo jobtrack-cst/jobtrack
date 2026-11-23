@@ -20,6 +20,32 @@ func TestApplication_ValidID(t *testing.T) {
 		})
 	}
 }
+func TestApplication_ValidApplicantName_Boundaries(t *testing.T) {
+	for _, tt := range []struct {
+		name, value string
+		want        bool
+	}{
+		{"empty", "", false},
+		{"blank", " \t\n", false},
+		{"one character", "A", true},
+		{"typical", "Pema Dorji", true},
+		{"199 characters", strings.Repeat("a", 199), true},
+		{"200 characters", strings.Repeat("a", 200), true},
+		{"201 characters", strings.Repeat("a", 201), false},
+		// Characters, not bytes: 200 three-byte runes are 600 bytes.
+		{"200 multibyte characters", strings.Repeat("ཀ", 200), true},
+		{"201 multibyte characters", strings.Repeat("ཀ", 201), false},
+		{"invalid UTF-8", "Pema\xffDorji", false},
+		{"NUL byte", "Pema\x00Dorji", false},
+		{"kept as given with spaces", " Pema ", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if ValidApplicantName(tt.value) != tt.want {
+				t.Fatalf("ValidApplicantName(%q) != %v", tt.value, tt.want)
+			}
+		})
+	}
+}
 func TestJob_Eligible_DeadlineBoundary(t *testing.T) {
 	now := time.Now()
 	for _, tt := range []struct {

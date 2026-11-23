@@ -26,8 +26,9 @@ func TestApplicationHandler_PublicRPCs(t *testing.T) {
 			r := mocks.NewMockRepository(c)
 			j := mocks.NewMockJobPosting(c)
 			v := mocks.NewMockResume(c)
-			h := NewApplicationHandler(app.NewService(r, j, v))
-			a := domain.Application{ID: id, ApplicantID: owner, EmployerID: id, JobID: id, ResumeID: id, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+			u := mocks.NewMockUsers(c)
+			h := NewApplicationHandler(app.NewService(r, j, v, u))
+			a := domain.Application{ID: id, ApplicantID: owner, ApplicantName: "Pema Dorji", EmployerID: id, JobID: id, ResumeID: id, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 			var result *applicationv1.Application
 			var err error
 			switch name {
@@ -35,6 +36,7 @@ func TestApplicationHandler_PublicRPCs(t *testing.T) {
 				r.EXPECT().List(ctx, ports.Filter{ApplicantID: owner, JobID: id, Limit: 1}).Return(nil, int64(0), nil)
 				j.EXPECT().GetJob(ctx, id).Return(domain.Job{ID: id, EmployerID: id, Published: true, Deadline: time.Now().Add(time.Hour)}, nil)
 				v.EXPECT().GetResume(ctx, id).Return(domain.Resume{ID: id, ApplicantID: owner, Validated: true}, nil)
+				u.EXPECT().GetUserName(ctx, owner).Return("Pema Dorji", nil)
 				r.EXPECT().Create(ctx, gomock.Any()).Return(a, nil)
 				response, e := h.SubmitApplication(ctx, &applicationv1.SubmitApplicationRequest{JobId: id, ResumeId: id})
 				err = e
@@ -65,14 +67,14 @@ func TestApplicationHandler_PublicRPCs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if result.ApplicationId != a.ID || result.ApplicantId != owner || result.EmployerId != a.EmployerID || result.JobId != a.JobID || result.ResumeId != a.ResumeID || result.Withdrawn != a.Withdrawn || !result.Timestamps.CreatedAt.AsTime().Equal(a.CreatedAt) || !result.Timestamps.UpdatedAt.AsTime().Equal(a.UpdatedAt) {
+			if result.ApplicationId != a.ID || result.ApplicantId != owner || result.ApplicantName != "Pema Dorji" || result.EmployerId != a.EmployerID || result.JobId != a.JobID || result.ResumeId != a.ResumeID || result.Withdrawn != a.Withdrawn || !result.Timestamps.CreatedAt.AsTime().Equal(a.CreatedAt) || !result.Timestamps.UpdatedAt.AsTime().Equal(a.UpdatedAt) {
 				t.Fatal("conversion mismatch")
 			}
 		})
 	}
 }
 func TestApplicationHandler_NilRequestsAndUseCaseErrors(t *testing.T) {
-	h := NewApplicationHandler(app.NewService(nil, nil, nil))
+	h := NewApplicationHandler(app.NewService(nil, nil, nil, nil))
 	ctx := context.Background()
 	for _, nilRequest := range []bool{true, false} {
 		var submit *applicationv1.SubmitApplicationRequest

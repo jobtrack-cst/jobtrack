@@ -58,7 +58,7 @@ func TestRepository_PostgresPersistenceIsolationAndConcurrency(t *testing.T) {
 	repo := postgres.NewRepository(pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	owner, employer, job := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	a := domain.Application{ID: uuid.NewString(), ApplicantID: owner, EmployerID: employer, JobID: job, ResumeID: uuid.NewString(), CreatedAt: now, UpdatedAt: now}
+	a := domain.Application{ID: uuid.NewString(), ApplicantID: owner, ApplicantName: "Pema Dorji", EmployerID: employer, JobID: job, ResumeID: uuid.NewString(), CreatedAt: now, UpdatedAt: now}
 	saved, err := repo.Create(ctx, a)
 	if err != nil || saved != a {
 		t.Fatalf("create mismatch: %v", err)
@@ -99,7 +99,7 @@ func TestRepository_PostgresPersistenceIsolationAndConcurrency(t *testing.T) {
 					if tt.want != codes.AlreadyExists {
 						jobs.EXPECT().GetJob(requestCtx, tt.jobID).Return(domain.Job{ID: tt.jobID, EmployerID: employer, Published: tt.published, Deadline: time.Now().Add(-time.Hour)}, nil)
 					}
-					service := app.NewService(repo, jobs, resumes)
+					service := app.NewService(repo, jobs, resumes, mocks.NewMockUsers(ctrl))
 					_, err := service.Submit(requestCtx, tt.jobID, a.ResumeID)
 					if status.Code(err) != tt.want {
 						t.Fatalf("code=%v want=%v", status.Code(err), tt.want)

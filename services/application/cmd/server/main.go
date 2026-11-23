@@ -16,6 +16,7 @@ import (
 	"time"
 
 	applicationv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/application/v1"
+	authv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/auth/v1"
 	jobv1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1"
 	resumev1 "github.com/jobtrack-cst/jobtrack/gen/go/jobtrack/resume/v1"
 	"github.com/jobtrack-cst/jobtrack/pkg/db"
@@ -40,6 +41,9 @@ type config struct {
 	databaseURL                             string
 	migrationsDir                           string
 	jobPostingAddr, resumeAddr, rabbitMQURL string
+	// authAddr and internalToken reach AuthInternalService.GetUser (JT-114).
+	// internalToken is a secret: never log it or the config holding it.
+	authAddr, internalToken string
 }
 
 func main() {
@@ -96,6 +100,21 @@ func loadConfig(getenv func(string) string) (config, error) {
 			return config{}, fmt.Errorf("%s is required", field.name)
 		}
 	}
+	// JT-114: auth allows GetUser only for caller "application", so any other
+	// name would make every submission fail; stop at startup instead.
+	if cfg.serviceName != "application" {
+		return config{}, errors.New("SERVICE_NAME must be application")
+	}
+	cfg.authAddr = getenv("AUTH_ADDR")
+	host, port, err := net.SplitHostPort(cfg.authAddr)
+	number, portErr := strconv.Atoi(port)
+	if err != nil || strings.TrimSpace(host) != host || host == "" || portErr != nil || number < 1 || number > 65535 {
+		return config{}, errors.New("AUTH_ADDR must be host:port")
+	}
+	cfg.internalToken = getenv("INTERNAL_TOKEN")
+	if _, err := grpcclient.InternalUnaryClientInterceptor(cfg.internalToken, cfg.serviceName); err != nil {
+		return config{}, errors.New("INTERNAL_TOKEN is invalid")
+	}
 	// Start from the repository root; tests can inject another migration directory.
 	cfg.migrationsDir = "services/application/migrations"
 
@@ -114,6 +133,17 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 			return errors.New("initialize resume client failed")
 		}
 		defer resumes.Close()
+		// GetUser is internal: send INTERNAL_TOKEN and caller "application",
+		// never the applicant's forwarded identity (JT-44, JT-114).
+		internal, err := grpcclient.InternalUnaryClientInterceptor(cfg.internalToken, cfg.serviceName)
+		if err != nil {
+			return errors.New("invalid internal client configuration")
+		}
+		users, err := grpc.NewClient(cfg.authAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithChainUnaryInterceptor(internal))
+		if err != nil {
+			return errors.New("initialize auth client failed")
+		}
+		defer users.Close()
 		publisher, err := rabbitmq.NewPublisher(cfg.rabbitMQURL)
 		if err != nil {
 			return errors.New("initialize RabbitMQ publisher failed")
@@ -122,7 +152,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		defer recovering.Close()
 		relay := app.NewOutboxRelay(outbox, recovering, wallClock{})
 		return runWithRelay(ctx, logger, relay, outboxRelayInterval, func(ctx context.Context) error {
-			return runServers(ctx, cfg, logger, checker, app.NewService(repo, clients.NewJobPosting(jobv1.NewJobPostingServiceClient(jobs)), clients.NewResume(resumev1.NewResumeServiceClient(resumes))))
+			return runServers(ctx, cfg, logger, checker, app.NewService(repo, clients.NewJobPosting(jobv1.NewJobPostingServiceClient(jobs)), clients.NewResume(resumev1.NewResumeServiceClient(resumes)), clients.NewUsers(authv1.NewAuthInternalServiceClient(users))))
 		})
 	})
 }

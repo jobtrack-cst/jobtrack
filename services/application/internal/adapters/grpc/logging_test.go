@@ -44,7 +44,7 @@ func TestUnexpectedErrors_AllRPCsLogExactlyOnce(t *testing.T) {
 			}
 			var output bytes.Buffer
 			logger := logging.New("application", &output)
-			h := adapter.NewApplicationHandler(app.NewService(repo, nil, nil), logger)
+			h := adapter.NewApplicationHandler(app.NewService(repo, nil, nil, nil), logger)
 			role := "applicant"
 			if method == "MakeOffer" {
 				role = "employer"
@@ -125,7 +125,7 @@ func TestUnexpectedErrors_EligibilityFailureRetainsSafeCause(t *testing.T) {
 	repo.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, int64(0), nil)
 	jobs.EXPECT().GetJob(gomock.Any(), logID).Return(domain.Job{}, status.Error(codes.Internal, secret))
 	var output bytes.Buffer
-	h := adapter.NewApplicationHandler(app.NewService(repo, jobs, resumes), logging.New("application", &output))
+	h := adapter.NewApplicationHandler(app.NewService(repo, jobs, resumes, mocks.NewMockUsers(ctrl)), logging.New("application", &output))
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", logID, "x-user-role", "applicant", "x-request-id", logID))
 	_, err := h.SubmitApplication(ctx, &pb.SubmitApplicationRequest{JobId: logID, ResumeId: logID})
 	require.Equal(t, codes.Internal, status.Code(err))
