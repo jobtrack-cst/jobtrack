@@ -51,6 +51,18 @@ service ApplicantProfileService {
   rpc GetMyProfilePhoto(GetMyProfilePhotoRequest) returns (GetMyProfilePhotoResponse) {
     option (google.api.http) = {get: "/v1/applicant/profile/photo"};
   }
+
+  // GetApplicantProfileForApplication returns the profile of the applicant of
+  // one application. Employer only, and only the owning employer.
+  rpc GetApplicantProfileForApplication(GetApplicantProfileForApplicationRequest) returns (GetApplicantProfileForApplicationResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/applicant-profile"};
+  }
+
+  // GetApplicantPhotoForApplication returns that applicant's photo.
+  // Same access rule.
+  rpc GetApplicantPhotoForApplication(GetApplicantPhotoForApplicationRequest) returns (GetApplicantPhotoForApplicationResponse) {
+    option (google.api.http) = {get: "/v1/applications/{application_id}/applicant-photo"};
+  }
 }
 
 message ApplicantProfile {
@@ -110,6 +122,23 @@ message PutMyProfilePhotoResponse {
 message GetMyProfilePhotoRequest {}
 
 message GetMyProfilePhotoResponse {
+  string content_type = 1;
+  bytes content = 2;
+}
+
+message GetApplicantProfileForApplicationRequest {
+  string application_id = 1;
+}
+
+message GetApplicantProfileForApplicationResponse {
+  ApplicantProfile profile = 1;
+}
+
+message GetApplicantPhotoForApplicationRequest {
+  string application_id = 1;
+}
+
+message GetApplicantPhotoForApplicationResponse {
   string content_type = 1;
   bytes content = 2;
 }

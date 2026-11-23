@@ -158,6 +158,84 @@ func local_request_ApplicantProfileService_GetMyProfilePhoto_0(ctx context.Conte
 	return msg, metadata, err
 }
 
+func request_ApplicantProfileService_GetApplicantProfileForApplication_0(ctx context.Context, marshaler runtime.Marshaler, client ApplicantProfileServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetApplicantProfileForApplicationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["application_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "application_id")
+	}
+	protoReq.ApplicationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "application_id", err)
+	}
+	msg, err := client.GetApplicantProfileForApplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_ApplicantProfileService_GetApplicantProfileForApplication_0(ctx context.Context, marshaler runtime.Marshaler, server ApplicantProfileServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetApplicantProfileForApplicationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["application_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "application_id")
+	}
+	protoReq.ApplicationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "application_id", err)
+	}
+	msg, err := server.GetApplicantProfileForApplication(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_ApplicantProfileService_GetApplicantPhotoForApplication_0(ctx context.Context, marshaler runtime.Marshaler, client ApplicantProfileServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetApplicantPhotoForApplicationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["application_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "application_id")
+	}
+	protoReq.ApplicationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "application_id", err)
+	}
+	msg, err := client.GetApplicantPhotoForApplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_ApplicantProfileService_GetApplicantPhotoForApplication_0(ctx context.Context, marshaler runtime.Marshaler, server ApplicantProfileServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetApplicantPhotoForApplicationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["application_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "application_id")
+	}
+	protoReq.ApplicationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "application_id", err)
+	}
+	msg, err := server.GetApplicantPhotoForApplication(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 // RegisterApplicantProfileServiceHandlerServer registers the http handlers for service ApplicantProfileService to "mux".
 // UnaryRPC     :call ApplicantProfileServiceServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -263,6 +341,46 @@ func RegisterApplicantProfileServiceHandlerServer(ctx context.Context, mux *runt
 			return
 		}
 		forward_ApplicantProfileService_GetMyProfilePhoto_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_ApplicantProfileService_GetApplicantProfileForApplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetApplicantProfileForApplication", runtime.WithHTTPPathPattern("/v1/applications/{application_id}/applicant-profile"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_ApplicantProfileService_GetApplicantProfileForApplication_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_ApplicantProfileService_GetApplicantProfileForApplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_ApplicantProfileService_GetApplicantPhotoForApplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetApplicantPhotoForApplication", runtime.WithHTTPPathPattern("/v1/applications/{application_id}/applicant-photo"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_ApplicantProfileService_GetApplicantPhotoForApplication_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_ApplicantProfileService_GetApplicantPhotoForApplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -389,21 +507,59 @@ func RegisterApplicantProfileServiceHandlerClient(ctx context.Context, mux *runt
 		}
 		forward_ApplicantProfileService_GetMyProfilePhoto_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_ApplicantProfileService_GetApplicantProfileForApplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetApplicantProfileForApplication", runtime.WithHTTPPathPattern("/v1/applications/{application_id}/applicant-profile"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_ApplicantProfileService_GetApplicantProfileForApplication_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_ApplicantProfileService_GetApplicantProfileForApplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_ApplicantProfileService_GetApplicantPhotoForApplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetApplicantPhotoForApplication", runtime.WithHTTPPathPattern("/v1/applications/{application_id}/applicant-photo"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_ApplicantProfileService_GetApplicantPhotoForApplication_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_ApplicantProfileService_GetApplicantPhotoForApplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
-	pattern_ApplicantProfileService_CreateMyProfile_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "applicant", "profile"}, ""))
-	pattern_ApplicantProfileService_GetMyProfile_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "applicant", "profile"}, ""))
-	pattern_ApplicantProfileService_UpdateMyProfile_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "applicant", "profile"}, ""))
-	pattern_ApplicantProfileService_PutMyProfilePhoto_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "applicant", "profile", "photo"}, ""))
-	pattern_ApplicantProfileService_GetMyProfilePhoto_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "applicant", "profile", "photo"}, ""))
+	pattern_ApplicantProfileService_CreateMyProfile_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "applicant", "profile"}, ""))
+	pattern_ApplicantProfileService_GetMyProfile_0                      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "applicant", "profile"}, ""))
+	pattern_ApplicantProfileService_UpdateMyProfile_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "applicant", "profile"}, ""))
+	pattern_ApplicantProfileService_PutMyProfilePhoto_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "applicant", "profile", "photo"}, ""))
+	pattern_ApplicantProfileService_GetMyProfilePhoto_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "applicant", "profile", "photo"}, ""))
+	pattern_ApplicantProfileService_GetApplicantProfileForApplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "applications", "application_id", "applicant-profile"}, ""))
+	pattern_ApplicantProfileService_GetApplicantPhotoForApplication_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "applications", "application_id", "applicant-photo"}, ""))
 )
 
 var (
-	forward_ApplicantProfileService_CreateMyProfile_0   = runtime.ForwardResponseMessage
-	forward_ApplicantProfileService_GetMyProfile_0      = runtime.ForwardResponseMessage
-	forward_ApplicantProfileService_UpdateMyProfile_0   = runtime.ForwardResponseMessage
-	forward_ApplicantProfileService_PutMyProfilePhoto_0 = runtime.ForwardResponseMessage
-	forward_ApplicantProfileService_GetMyProfilePhoto_0 = runtime.ForwardResponseMessage
+	forward_ApplicantProfileService_CreateMyProfile_0                   = runtime.ForwardResponseMessage
+	forward_ApplicantProfileService_GetMyProfile_0                      = runtime.ForwardResponseMessage
+	forward_ApplicantProfileService_UpdateMyProfile_0                   = runtime.ForwardResponseMessage
+	forward_ApplicantProfileService_PutMyProfilePhoto_0                 = runtime.ForwardResponseMessage
+	forward_ApplicantProfileService_GetMyProfilePhoto_0                 = runtime.ForwardResponseMessage
+	forward_ApplicantProfileService_GetApplicantProfileForApplication_0 = runtime.ForwardResponseMessage
+	forward_ApplicantProfileService_GetApplicantPhotoForApplication_0   = runtime.ForwardResponseMessage
 )

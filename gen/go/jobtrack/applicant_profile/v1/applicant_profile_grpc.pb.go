@@ -19,11 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ApplicantProfileService_CreateMyProfile_FullMethodName   = "/jobtrack.applicant_profile.v1.ApplicantProfileService/CreateMyProfile"
-	ApplicantProfileService_GetMyProfile_FullMethodName      = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetMyProfile"
-	ApplicantProfileService_UpdateMyProfile_FullMethodName   = "/jobtrack.applicant_profile.v1.ApplicantProfileService/UpdateMyProfile"
-	ApplicantProfileService_PutMyProfilePhoto_FullMethodName = "/jobtrack.applicant_profile.v1.ApplicantProfileService/PutMyProfilePhoto"
-	ApplicantProfileService_GetMyProfilePhoto_FullMethodName = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetMyProfilePhoto"
+	ApplicantProfileService_CreateMyProfile_FullMethodName                   = "/jobtrack.applicant_profile.v1.ApplicantProfileService/CreateMyProfile"
+	ApplicantProfileService_GetMyProfile_FullMethodName                      = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetMyProfile"
+	ApplicantProfileService_UpdateMyProfile_FullMethodName                   = "/jobtrack.applicant_profile.v1.ApplicantProfileService/UpdateMyProfile"
+	ApplicantProfileService_PutMyProfilePhoto_FullMethodName                 = "/jobtrack.applicant_profile.v1.ApplicantProfileService/PutMyProfilePhoto"
+	ApplicantProfileService_GetMyProfilePhoto_FullMethodName                 = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetMyProfilePhoto"
+	ApplicantProfileService_GetApplicantProfileForApplication_FullMethodName = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetApplicantProfileForApplication"
+	ApplicantProfileService_GetApplicantPhotoForApplication_FullMethodName   = "/jobtrack.applicant_profile.v1.ApplicantProfileService/GetApplicantPhotoForApplication"
 )
 
 // ApplicantProfileServiceClient is the client API for ApplicantProfileService service.
@@ -51,6 +53,12 @@ type ApplicantProfileServiceClient interface {
 	// NOT_FOUND if the caller has no profile or no photo.
 	// Protobuf JSON encodes bytes as base64.
 	GetMyProfilePhoto(ctx context.Context, in *GetMyProfilePhotoRequest, opts ...grpc.CallOption) (*GetMyProfilePhotoResponse, error)
+	// GetApplicantProfileForApplication returns the profile of the applicant of
+	// one application. Employer only, and only the owning employer.
+	GetApplicantProfileForApplication(ctx context.Context, in *GetApplicantProfileForApplicationRequest, opts ...grpc.CallOption) (*GetApplicantProfileForApplicationResponse, error)
+	// GetApplicantPhotoForApplication returns that applicant's photo.
+	// Same access rule.
+	GetApplicantPhotoForApplication(ctx context.Context, in *GetApplicantPhotoForApplicationRequest, opts ...grpc.CallOption) (*GetApplicantPhotoForApplicationResponse, error)
 }
 
 type applicantProfileServiceClient struct {
@@ -111,6 +119,26 @@ func (c *applicantProfileServiceClient) GetMyProfilePhoto(ctx context.Context, i
 	return out, nil
 }
 
+func (c *applicantProfileServiceClient) GetApplicantProfileForApplication(ctx context.Context, in *GetApplicantProfileForApplicationRequest, opts ...grpc.CallOption) (*GetApplicantProfileForApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetApplicantProfileForApplicationResponse)
+	err := c.cc.Invoke(ctx, ApplicantProfileService_GetApplicantProfileForApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *applicantProfileServiceClient) GetApplicantPhotoForApplication(ctx context.Context, in *GetApplicantPhotoForApplicationRequest, opts ...grpc.CallOption) (*GetApplicantPhotoForApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetApplicantPhotoForApplicationResponse)
+	err := c.cc.Invoke(ctx, ApplicantProfileService_GetApplicantPhotoForApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ApplicantProfileServiceServer is the server API for ApplicantProfileService service.
 // All implementations must embed UnimplementedApplicantProfileServiceServer
 // for forward compatibility.
@@ -136,6 +164,12 @@ type ApplicantProfileServiceServer interface {
 	// NOT_FOUND if the caller has no profile or no photo.
 	// Protobuf JSON encodes bytes as base64.
 	GetMyProfilePhoto(context.Context, *GetMyProfilePhotoRequest) (*GetMyProfilePhotoResponse, error)
+	// GetApplicantProfileForApplication returns the profile of the applicant of
+	// one application. Employer only, and only the owning employer.
+	GetApplicantProfileForApplication(context.Context, *GetApplicantProfileForApplicationRequest) (*GetApplicantProfileForApplicationResponse, error)
+	// GetApplicantPhotoForApplication returns that applicant's photo.
+	// Same access rule.
+	GetApplicantPhotoForApplication(context.Context, *GetApplicantPhotoForApplicationRequest) (*GetApplicantPhotoForApplicationResponse, error)
 	mustEmbedUnimplementedApplicantProfileServiceServer()
 }
 
@@ -160,6 +194,12 @@ func (UnimplementedApplicantProfileServiceServer) PutMyProfilePhoto(context.Cont
 }
 func (UnimplementedApplicantProfileServiceServer) GetMyProfilePhoto(context.Context, *GetMyProfilePhotoRequest) (*GetMyProfilePhotoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMyProfilePhoto not implemented")
+}
+func (UnimplementedApplicantProfileServiceServer) GetApplicantProfileForApplication(context.Context, *GetApplicantProfileForApplicationRequest) (*GetApplicantProfileForApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetApplicantProfileForApplication not implemented")
+}
+func (UnimplementedApplicantProfileServiceServer) GetApplicantPhotoForApplication(context.Context, *GetApplicantPhotoForApplicationRequest) (*GetApplicantPhotoForApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetApplicantPhotoForApplication not implemented")
 }
 func (UnimplementedApplicantProfileServiceServer) mustEmbedUnimplementedApplicantProfileServiceServer() {
 }
@@ -273,6 +313,42 @@ func _ApplicantProfileService_GetMyProfilePhoto_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ApplicantProfileService_GetApplicantProfileForApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetApplicantProfileForApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApplicantProfileServiceServer).GetApplicantProfileForApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ApplicantProfileService_GetApplicantProfileForApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApplicantProfileServiceServer).GetApplicantProfileForApplication(ctx, req.(*GetApplicantProfileForApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ApplicantProfileService_GetApplicantPhotoForApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetApplicantPhotoForApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApplicantProfileServiceServer).GetApplicantPhotoForApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ApplicantProfileService_GetApplicantPhotoForApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApplicantProfileServiceServer).GetApplicantPhotoForApplication(ctx, req.(*GetApplicantPhotoForApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ApplicantProfileService_ServiceDesc is the grpc.ServiceDesc for ApplicantProfileService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -299,6 +375,14 @@ var ApplicantProfileService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMyProfilePhoto",
 			Handler:    _ApplicantProfileService_GetMyProfilePhoto_Handler,
+		},
+		{
+			MethodName: "GetApplicantProfileForApplication",
+			Handler:    _ApplicantProfileService_GetApplicantProfileForApplication_Handler,
+		},
+		{
+			MethodName: "GetApplicantPhotoForApplication",
+			Handler:    _ApplicantProfileService_GetApplicantPhotoForApplication_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
