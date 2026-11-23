@@ -55,27 +55,39 @@ func InternalUnaryServerInterceptor(token string) (grpc.UnaryServerInterceptor, 
 			return nil, status.Error(codes.Unauthenticated, "invalid internal credentials")
 		}
 		callers := md.Get("x-caller-service")
-		if len(callers) != 1 || callers[0] != internalCaller(info.FullMethod) || callers[0] == "" {
+		if len(callers) != 1 || !internalCallerAllowed(info.FullMethod, callers[0]) {
 			return nil, status.Error(codes.PermissionDenied, "internal caller not allowed")
 		}
 		return handler(ctx, req)
 	}, nil
 }
 
-// Unknown internal methods are denied until their callers are agreed in AGENTS.md.
-func internalCaller(method string) string {
+// internalCallerAllowed applies the AGENTS.md Section 6 table. Unknown internal
+// methods are denied until their callers are agreed there.
+func internalCallerAllowed(method, caller string) bool {
+	for _, allowed := range internalCallers(method) {
+		if caller == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func internalCallers(method string) []string {
 	switch method {
-	case "/jobtrack.auth.v1.AuthInternalService/GetUser", "/jobtrack.notification_inbox.v1.NotificationInboxInternalService/CreateNotification":
-		return "notification-dispatcher"
+	case "/jobtrack.auth.v1.AuthInternalService/GetUser":
+		return []string{"notification-dispatcher", "application"}
+	case "/jobtrack.notification_inbox.v1.NotificationInboxInternalService/CreateNotification":
+		return []string{"notification-dispatcher"}
 	case "/jobtrack.auth.v1.AuthInternalService/ListUsersByRole", "/jobtrack.analytics.v1.AnalyticsInternalService/GetInternalSummary":
-		return "weekly-summary"
+		return []string{"weekly-summary"}
 	case "/jobtrack.category_tag.v1.CategoryTagInternalService/ResolveNames":
-		return "job-alert"
+		return []string{"job-alert"}
 	case "/jobtrack.job_posting.v1.JobPostingInternalService/ListJobsClosingBetween", "/jobtrack.saved_jobs.v1.SavedJobsInternalService/ListJobSavers":
-		return "deadline-reminder"
+		return []string{"deadline-reminder"}
 	case "/jobtrack.resume.v1.ResumeInternalService/GetResumeFile":
-		return "resume-validator"
+		return []string{"resume-validator"}
 	default:
-		return ""
+		return nil
 	}
 }

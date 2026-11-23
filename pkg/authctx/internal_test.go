@@ -2,6 +2,7 @@ package authctx_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/jobtrack-cst/jobtrack/pkg/authctx"
@@ -44,6 +45,10 @@ func TestInternalInterceptor_SecurityBoundaries(t *testing.T) {
 		{"public unchanged", "/jobtrack.auth.v1.AuthService/Login", nil, nil, codes.OK},
 		{"health unchanged", "/grpc.health.v1.Health/Check", []string{"wrong"}, []string{"bad"}, codes.OK},
 		{"allowed", getUser, []string{token}, []string{"notification-dispatcher"}, codes.OK},
+		{"second allowed caller", getUser, []string{token}, []string{"application"}, codes.OK},
+		{"two allowed callers at once", getUser, []string{token}, []string{"notification-dispatcher", "application"}, codes.PermissionDenied},
+		{"allowed caller prefix", getUser, []string{token}, []string{"applicatio"}, codes.PermissionDenied},
+		{"allowed caller with suffix", getUser, []string{token}, []string{"application-status"}, codes.PermissionDenied},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -70,23 +75,24 @@ func TestInternalInterceptor_SecurityBoundaries(t *testing.T) {
 
 func TestInternalInterceptor_ExactRPCAllowlist(t *testing.T) {
 	interceptor, _ := authctx.InternalUnaryServerInterceptor(token)
-	methods := map[string]string{
-		getUser: "notification-dispatcher",
-		"/jobtrack.auth.v1.AuthInternalService/ListUsersByRole":                               "weekly-summary",
-		"/jobtrack.analytics.v1.AnalyticsInternalService/GetInternalSummary":                  "weekly-summary",
-		"/jobtrack.category_tag.v1.CategoryTagInternalService/ResolveNames":                   "job-alert",
-		"/jobtrack.notification_inbox.v1.NotificationInboxInternalService/CreateNotification": "notification-dispatcher",
-		"/jobtrack.job_posting.v1.JobPostingInternalService/ListJobsClosingBetween":           "deadline-reminder",
-		"/jobtrack.saved_jobs.v1.SavedJobsInternalService/ListJobSavers":                      "deadline-reminder",
-		"/jobtrack.resume.v1.ResumeInternalService/GetResumeFile":                             "resume-validator",
+	// The AGENTS.md Section 6 table: every internal RPC and its allowed callers.
+	methods := map[string][]string{
+		getUser: {"notification-dispatcher", "application"},
+		"/jobtrack.auth.v1.AuthInternalService/ListUsersByRole":                               {"weekly-summary"},
+		"/jobtrack.analytics.v1.AnalyticsInternalService/GetInternalSummary":                  {"weekly-summary"},
+		"/jobtrack.category_tag.v1.CategoryTagInternalService/ResolveNames":                   {"job-alert"},
+		"/jobtrack.notification_inbox.v1.NotificationInboxInternalService/CreateNotification": {"notification-dispatcher"},
+		"/jobtrack.job_posting.v1.JobPostingInternalService/ListJobsClosingBetween":           {"deadline-reminder"},
+		"/jobtrack.saved_jobs.v1.SavedJobsInternalService/ListJobSavers":                      {"deadline-reminder"},
+		"/jobtrack.resume.v1.ResumeInternalService/GetResumeFile":                             {"resume-validator"},
 	}
 	for method, allowed := range methods {
-		for _, caller := range []string{"notification-dispatcher", "weekly-summary", "job-alert", "deadline-reminder", "resume-validator", "gateway", "frontend", "unknown"} {
+		for _, caller := range []string{"notification-dispatcher", "weekly-summary", "job-alert", "deadline-reminder", "resume-validator", "application", "gateway", "frontend", "unknown"} {
 			t.Run(method+"/"+caller, func(t *testing.T) {
 				ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-internal-token", token, "x-caller-service", caller))
 				_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: method}, func(context.Context, any) (any, error) { return nil, nil })
 				want := codes.PermissionDenied
-				if caller == allowed {
+				if slices.Contains(allowed, caller) {
 					want = codes.OK
 				}
 				if status.Code(err) != want {

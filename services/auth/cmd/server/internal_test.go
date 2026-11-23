@@ -55,7 +55,7 @@ func TestRun_InvalidInternalTokenStopsBeforeStartup(t *testing.T) {
 
 // Over a real gRPC server with the JT-44 interceptor, as run wires it:
 // ListUsersByRole is only for weekly-summary, GetUser only for
-// notification-dispatcher, and the public AuthService is not guarded.
+// notification-dispatcher and application, and the public AuthService is not guarded.
 func TestServe_InternalInterceptorGuardsAuthInternalService(t *testing.T) {
 	serverOpts, err := internalServerOptions(testInternalToken)
 	if err != nil {
@@ -125,13 +125,32 @@ func TestServe_InternalInterceptorGuardsAuthInternalService(t *testing.T) {
 		})
 	}
 
-	t.Run("GetUser: notification-dispatcher allowed, weekly-summary denied", func(t *testing.T) {
-		if _, err := authv1.NewAuthInternalServiceClient(internal(t, testInternalToken, "notification-dispatcher")).GetUser(rpcCtx(t), &authv1.GetUserRequest{}); err != nil {
-			t.Fatalf("notification-dispatcher: %v", err)
+	// JT-114: application reads the applicant's name at submission.
+	for _, tt := range []struct {
+		caller string
+		want   codes.Code
+	}{
+		{"notification-dispatcher", codes.OK},
+		{"application", codes.OK},
+		{"weekly-summary", codes.PermissionDenied},
+	} {
+		t.Run("GetUser: "+tt.caller, func(t *testing.T) {
+			_, err := authv1.NewAuthInternalServiceClient(internal(t, testInternalToken, tt.caller)).GetUser(rpcCtx(t), &authv1.GetUserRequest{})
+			if status.Code(err) != tt.want {
+				t.Fatalf("code=%v (%v), want %v", status.Code(err), err, tt.want)
+			}
+		})
+	}
+	t.Run("GetUser: application with a wrong token", func(t *testing.T) {
+		_, err := authv1.NewAuthInternalServiceClient(internal(t, "wrong-token", "application")).GetUser(rpcCtx(t), &authv1.GetUserRequest{})
+		if status.Code(err) != codes.Unauthenticated {
+			t.Fatalf("code=%v, want Unauthenticated", status.Code(err))
 		}
-		_, err := authv1.NewAuthInternalServiceClient(internal(t, testInternalToken, "weekly-summary")).GetUser(rpcCtx(t), &authv1.GetUserRequest{})
+	})
+	t.Run("ListUsersByRole: application denied", func(t *testing.T) {
+		_, err := authv1.NewAuthInternalServiceClient(internal(t, testInternalToken, "application")).ListUsersByRole(rpcCtx(t), listReq)
 		if status.Code(err) != codes.PermissionDenied {
-			t.Fatalf("weekly-summary: code=%v, want PermissionDenied", status.Code(err))
+			t.Fatalf("code=%v, want PermissionDenied", status.Code(err))
 		}
 	})
 
