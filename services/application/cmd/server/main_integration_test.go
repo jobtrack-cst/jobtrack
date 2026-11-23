@@ -67,7 +67,7 @@ func TestRun_RealDatabaseMigrationsAndHTTPHealth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config{rabbitMQURL: "amqp://guest:guest@" + net.JoinHostPort(brokerHost, brokerPort.Port()) + "/", jobPostingAddr: "job-posting:9090", resumeAddr: "resume:9090", serviceName: "application", databaseURL: url, migrationsDir: filepath.Join("..", "..", "migrations"), grpcPort: grpcPort, httpPort: httpPort}
+	cfg := config{rabbitMQURL: "amqp://guest:guest@" + net.JoinHostPort(brokerHost, brokerPort.Port()) + "/", jobPostingAddr: "job-posting:9090", resumeAddr: "resume:9090", authAddr: "auth:9090", internalToken: "synthetic-jt114-token", serviceName: "application", databaseURL: url, migrationsDir: filepath.Join("..", "..", "migrations"), grpcPort: grpcPort, httpPort: httpPort}
 	runCtx, stop := context.WithCancel(ctx)
 	defer stop()
 	done := make(chan error, 1)

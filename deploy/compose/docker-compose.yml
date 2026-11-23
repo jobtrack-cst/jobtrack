@@ -704,6 +704,10 @@ services:
       SERVICE_NAME: application
       JOB_POSTING_ADDR: job-posting:9090
       RESUME_ADDR: resume:9090
+      # JT-114: AuthInternalService.GetUser for the applicant's name. No
+      # depends_on: auth; an unavailable auth fails submissions with UNAVAILABLE.
+      AUTH_ADDR: auth:9090
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set in .env}
       # pgx reads PGPASSWORD separately; raw passwords are not URI components.
       DATABASE_URL: postgres://application@postgres:5432/application?sslmode=disable
       PGPASSWORD: ${SERVICE_DB_PASSWORD:?set in .env}

@@ -56,10 +56,10 @@ func TestInternalClient_ConfiguredMetadataWinsAcrossRetries(t *testing.T) {
 }
 
 func TestInternalClient_Configuration(t *testing.T) {
-	for _, caller := range []string{"job-alert", "notification-dispatcher", "weekly-summary", "deadline-reminder", "resume-validator", "gateway", "frontend", "", "weekly-summary "} {
+	for _, caller := range []string{"job-alert", "notification-dispatcher", "weekly-summary", "deadline-reminder", "resume-validator", "application", "application-status", "gateway", "frontend", "", "weekly-summary "} {
 		t.Run(caller, func(t *testing.T) {
 			_, err := grpcclient.InternalUnaryClientInterceptor("synthetic-token", caller)
-			valid := caller == "job-alert" || caller == "notification-dispatcher" || caller == "weekly-summary" || caller == "deadline-reminder" || caller == "resume-validator"
+			valid := caller == "job-alert" || caller == "notification-dispatcher" || caller == "weekly-summary" || caller == "deadline-reminder" || caller == "resume-validator" || caller == "application"
 			if (err == nil) != valid {
 				t.Error("unexpected caller validation result")
 			}

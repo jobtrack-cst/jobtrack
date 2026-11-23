@@ -1,6 +1,6 @@
 import { api } from '../../api/client';
 import { idPath, pageQuery, type Pagination } from './shared';
-export interface Application { applicationId: string; jobId: string; applicantId: string; employerId: string; resumeId: string; withdrawn?: boolean; timestamps?: { createdAt?: string; updatedAt?: string } }
+export interface Application { applicationId: string; jobId: string; applicantId: string; employerId: string; resumeId: string; withdrawn?: boolean; timestamps?: { createdAt?: string; updatedAt?: string }; /** Empty or absent for applications submitted before JT-114. */ applicantName?: string }
 export interface Resume { resumeId: string; fileName: string; validationStatus: string }
 export interface Job { jobId: string; title: string; description: string; status: string; deadline: string }
 // job_id is sent only when given, so calls without it are unchanged.

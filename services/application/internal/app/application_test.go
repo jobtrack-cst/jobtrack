@@ -21,6 +21,7 @@ const employer = "22222222-2222-4222-8222-222222222222"
 const jobID = "33333333-3333-4333-8333-333333333333"
 const resumeID = "44444444-4444-4444-8444-444444444444"
 const applicationID = "55555555-5555-4555-8555-555555555555"
+const applicantName = "Pema Dorji"
 
 func caller(role, id string) context.Context {
 	return metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", id, "x-user-role", role))
@@ -28,14 +29,15 @@ func caller(role, id string) context.Context {
 func record() domain.Application {
 	return domain.Application{ID: applicationID, ApplicantID: applicant, EmployerID: employer, JobID: jobID, ResumeID: resumeID}
 }
-func setup(t *testing.T) (*Service, *mocks.MockRepository, *mocks.MockJobPosting, *mocks.MockResume) {
+func setup(t *testing.T) (*Service, *mocks.MockRepository, *mocks.MockJobPosting, *mocks.MockResume, *mocks.MockUsers) {
 	c := gomock.NewController(t)
 	r := mocks.NewMockRepository(c)
 	j := mocks.NewMockJobPosting(c)
 	v := mocks.NewMockResume(c)
-	s := NewService(r, j, v)
+	u := mocks.NewMockUsers(c)
+	s := NewService(r, j, v, u)
 	s.now = func() time.Time { return time.Date(2026, 11, 7, 0, 0, 0, 0, time.UTC) }
-	return s, r, j, v
+	return s, r, j, v, u
 }
 func checkCode(t *testing.T, err error, want codes.Code) {
 	t.Helper()
@@ -56,7 +58,7 @@ func TestApplication_Authorization_AllOperations(t *testing.T) {
 		{"applicant", "applicant", applicant, codes.OK, codes.OK},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			s, r, _, _ := setup(t)
+			s, r, _, _, _ := setup(t)
 			ctx := caller(tt.role, tt.id)
 			if tt.read == codes.OK {
 				r.EXPECT().Get(ctx, applicationID).Return(record(), nil)
@@ -81,7 +83,7 @@ func TestApplication_Authorization_AllOperations(t *testing.T) {
 func TestApplication_Submit_EligibilityAndPersistence(t *testing.T) {
 	for _, name := range []string{"success", "closed", "deadline", "expired", "missing job", "job unavailable", "job unexpected error", "bad job response", "bad employer", "missing deadline", "missing resume", "resume unavailable", "bad resume response", "wrong resume owner", "pending resume", "duplicate", "storage failure"} {
 		t.Run(name, func(t *testing.T) {
-			s, r, j, v := setup(t)
+			s, r, j, v, u := setup(t)
 			ctx := caller("applicant", applicant)
 			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), nil)
 			job := domain.Job{ID: jobID, EmployerID: employer, Published: true, Deadline: s.now().Add(time.Hour)}
@@ -139,9 +141,12 @@ func TestApplication_Submit_EligibilityAndPersistence(t *testing.T) {
 			j.EXPECT().GetJob(ctx, jobID).Return(job, je)
 			if je == nil && job.ID == jobID && domain.ValidID(job.EmployerID) && !job.Deadline.IsZero() && job.Eligible(s.now()) {
 				v.EXPECT().GetResume(ctx, resumeID).Return(resume, re)
+				// The name is read only after every job and resume check passes;
+				// gomock fails the test on any other call.
 				if re == nil && resume.ID == resumeID && resume.ApplicantID == applicant && resume.Validated {
+					u.EXPECT().GetUserName(ctx, applicant).Return(applicantName, nil)
 					r.EXPECT().Create(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, a domain.Application) (domain.Application, error) {
-						if !domain.ValidID(a.ID) || a.ApplicantID != applicant || a.EmployerID != employer || a.JobID != jobID || a.ResumeID != resumeID || a.Withdrawn || !a.CreatedAt.Equal(s.now()) || !a.UpdatedAt.Equal(a.CreatedAt) {
+						if !domain.ValidID(a.ID) || a.ApplicantID != applicant || a.ApplicantName != applicantName || a.EmployerID != employer || a.JobID != jobID || a.ResumeID != resumeID || a.Withdrawn || !a.CreatedAt.Equal(s.now()) || !a.UpdatedAt.Equal(a.CreatedAt) {
 							t.Fatal("invalid persisted application")
 						}
 						switch name {
@@ -159,22 +164,82 @@ func TestApplication_Submit_EligibilityAndPersistence(t *testing.T) {
 			if e != nil && strings.Contains(e.Error(), "private") {
 				t.Fatal("private error leaked")
 			}
-			if e == nil && a.ApplicantID != applicant {
-				t.Fatal("owner mismatch")
+			if e == nil && (a.ApplicantID != applicant || a.ApplicantName != applicantName) {
+				t.Fatal("owner or name mismatch")
 			}
 		})
 	}
 }
+
+// JT-114: auth failures or an unusable name stop the submission with
+// UNAVAILABLE and nothing is stored.
+func TestApplication_Submit_ApplicantNameFailsClosed(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		user    string
+		err     error
+		want    codes.Code
+		created bool
+	}{
+		{"auth unavailable", "", status.Error(codes.Unavailable, "private"), codes.Unavailable, false},
+		{"user not found", "", status.Error(codes.NotFound, "private"), codes.Unavailable, false},
+		{"auth rejects caller", "", status.Error(codes.PermissionDenied, "private"), codes.Unavailable, false},
+		{"wrong internal token", "", status.Error(codes.Unauthenticated, "private"), codes.Unavailable, false},
+		{"invalid auth response", "", status.Error(codes.Internal, "private"), codes.Unavailable, false},
+		{"auth deadline", "", context.DeadlineExceeded, codes.Unavailable, false},
+		{"unexpected error", "", errors.New("private"), codes.Unavailable, false},
+		{"empty name", "", nil, codes.Unavailable, false},
+		{"blank name", "  ", nil, codes.Unavailable, false},
+		{"201 characters", strings.Repeat("a", 201), nil, codes.Unavailable, false},
+		{"invalid UTF-8", "private\xff", nil, codes.Unavailable, false},
+		{"one character", "A", nil, codes.OK, true},
+		{"200 characters", strings.Repeat("ཀ", 200), nil, codes.OK, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s, r, j, v, u := setup(t)
+			ctx := caller("applicant", applicant)
+			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), nil)
+			j.EXPECT().GetJob(ctx, jobID).Return(domain.Job{ID: jobID, EmployerID: employer, Published: true, Deadline: s.now().Add(time.Hour)}, nil)
+			v.EXPECT().GetResume(ctx, resumeID).Return(domain.Resume{ID: resumeID, ApplicantID: applicant, Validated: true}, nil)
+			// The caller's own user ID is looked up, never another user's.
+			u.EXPECT().GetUserName(ctx, applicant).Return(tt.user, tt.err)
+			if tt.created {
+				r.EXPECT().Create(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, a domain.Application) (domain.Application, error) {
+					return a, nil
+				})
+			}
+			a, err := s.Submit(ctx, jobID, resumeID)
+			checkCode(t, err, tt.want)
+			if err != nil && strings.Contains(err.Error(), "private") {
+				t.Fatal("auth details leaked")
+			}
+			if tt.created && a.ApplicantName != tt.user {
+				t.Fatalf("name %q not stored as given", a.ApplicantName)
+			}
+		})
+	}
+}
+
+func TestApplication_Submit_MissingUsersClientIsUnavailable(t *testing.T) {
+	c := gomock.NewController(t)
+	r := mocks.NewMockRepository(c)
+	ctx := caller("applicant", applicant)
+	r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), nil)
+	// No job or resume call happens: gomock fails on any unexpected call.
+	s := NewService(r, mocks.NewMockJobPosting(c), mocks.NewMockResume(c), nil)
+	_, err := s.Submit(ctx, jobID, resumeID)
+	checkCode(t, err, codes.Unavailable)
+}
 func TestApplication_Submit_InvalidInputsAndDeferredClients(t *testing.T) {
 	for _, ids := range [][2]string{{"", resumeID}, {jobID, ""}, {jobID, "invalid"}, {strings.Repeat("x", 1000), resumeID}} {
-		s, _, _, _ := setup(t)
+		s, _, _, _, _ := setup(t)
 		_, e := s.Submit(caller("applicant", applicant), ids[0], ids[1])
 		checkCode(t, e, codes.InvalidArgument)
 	}
-	_, r, _, _ := setup(t)
+	_, r, _, _, _ := setup(t)
 	ctx := caller("applicant", applicant)
 	r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), nil)
-	s := NewService(r, nil, nil)
+	s := NewService(r, nil, nil, nil)
 	_, e := s.Submit(ctx, jobID, resumeID)
 	checkCode(t, e, codes.Unavailable)
 }
@@ -189,21 +254,21 @@ func TestApplication_Get_OwnershipAndFailures(t *testing.T) {
 		{"applicant", applicant, domain.ErrNotFound, codes.NotFound}, {"applicant", applicant, errors.New("private"), codes.Internal},
 	} {
 		t.Run(tt.role+tt.id+tt.want.String(), func(t *testing.T) {
-			s, r, _, _ := setup(t)
+			s, r, _, _, _ := setup(t)
 			ctx := caller(tt.role, tt.id)
 			r.EXPECT().Get(ctx, applicationID).Return(record(), tt.err)
 			_, e := s.Get(ctx, applicationID)
 			checkCode(t, e, tt.want)
 		})
 	}
-	s, _, _, _ := setup(t)
+	s, _, _, _, _ := setup(t)
 	_, e := s.Get(caller("applicant", applicant), "bad")
 	checkCode(t, e, codes.InvalidArgument)
 }
 func TestApplication_Withdraw_StateAndOwnership(t *testing.T) {
 	for _, name := range []string{"success", "already withdrawn", "other owner", "missing", "race withdrawal", "storage failure"} {
 		t.Run(name, func(t *testing.T) {
-			s, r, _, _ := setup(t)
+			s, r, _, _, _ := setup(t)
 			ctx := caller("applicant", applicant)
 			a := record()
 			want := codes.OK
@@ -249,7 +314,7 @@ func TestApplication_List_FiltersPaginationBoundaries(t *testing.T) {
 		{"applicant", "", "bad", 1, codes.InvalidArgument}, {"applicant", "", "-1", 1, codes.InvalidArgument}, {"applicant", "", "01", 1, codes.InvalidArgument}, {"applicant", "", strings.Repeat("1", 11), 1, codes.InvalidArgument}, {"applicant", "", "2147483548", 1, codes.InvalidArgument},
 	} {
 		t.Run(tt.role+tt.job+tt.token+string(rune(tt.size+200)), func(t *testing.T) {
-			s, r, _, _ := setup(t)
+			s, r, _, _, _ := setup(t)
 			ctx := caller(tt.role, applicant)
 			if tt.want == codes.OK {
 				r.EXPECT().List(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, f ports.Filter) ([]domain.Application, int64, error) {
@@ -266,7 +331,7 @@ func TestApplication_List_FiltersPaginationBoundaries(t *testing.T) {
 			}
 		})
 	}
-	s, r, _, _ := setup(t)
+	s, r, _, _, _ := setup(t)
 	ctx := caller("applicant", applicant)
 	r.EXPECT().List(ctx, gomock.Any()).Return(nil, int64(0), errors.New("private"))
 	_, _, _, e := s.List(ctx, "", 1, "")
@@ -288,7 +353,7 @@ func TestApplication_ErrorMapping(t *testing.T) {
 func TestApplication_Submit_DuplicateAfterJobBecomesIneligible(t *testing.T) {
 	for _, name := range []string{"closed", "expired"} {
 		t.Run(name, func(t *testing.T) {
-			s, r, j, v := setup(t)
+			s, r, j, v, u := setup(t)
 			ctx := caller("applicant", applicant)
 			job := domain.Job{ID: jobID, EmployerID: employer, Published: true, Deadline: s.now().Add(time.Hour)}
 			created := false
@@ -301,6 +366,7 @@ func TestApplication_Submit_DuplicateAfterJobBecomesIneligible(t *testing.T) {
 			}).Times(2)
 			j.EXPECT().GetJob(ctx, jobID).DoAndReturn(func(context.Context, string) (domain.Job, error) { return job, nil }).Times(1)
 			v.EXPECT().GetResume(ctx, resumeID).Return(domain.Resume{ID: resumeID, ApplicantID: applicant, Validated: true}, nil)
+			u.EXPECT().GetUserName(ctx, applicant).Return(applicantName, nil)
 			r.EXPECT().Create(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, a domain.Application) (domain.Application, error) {
 				created = true
 				return a, nil
@@ -328,7 +394,7 @@ func TestApplication_Submit_DuplicateLookupFailure(t *testing.T) {
 		{"canceled", context.Canceled, codes.Canceled},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			s, r, _, _ := setup(t)
+			s, r, _, _, _ := setup(t)
 			ctx := caller("applicant", applicant)
 			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return(nil, int64(0), tt.err)
 			_, err := s.Submit(ctx, jobID, resumeID)
@@ -343,12 +409,12 @@ func TestApplication_Submit_DuplicateLookupFailure(t *testing.T) {
 func TestApplication_Submit_ExistingApplicationSkipsEligibility(t *testing.T) {
 	for _, withdrawn := range []bool{false, true} {
 		t.Run(map[bool]string{false: "submitted", true: "withdrawn"}[withdrawn], func(t *testing.T) {
-			_, r, _, _ := setup(t)
+			_, r, _, _, _ := setup(t)
 			ctx := caller("applicant", applicant)
 			a := record()
 			a.Withdrawn = withdrawn
 			r.EXPECT().List(ctx, ports.Filter{ApplicantID: applicant, JobID: jobID, Limit: 1}).Return([]domain.Application{a}, int64(1), nil)
-			s := NewService(r, nil, nil)
+			s := NewService(r, nil, nil, nil)
 			_, err := s.Submit(ctx, jobID, resumeID)
 			checkCode(t, err, codes.AlreadyExists)
 		})

@@ -19,11 +19,14 @@ type Service struct {
 	repo    ports.Repository
 	jobs    ports.JobPosting
 	resumes ports.Resume
+	users   ports.Users
 	now     func() time.Time
 }
 
-func NewService(repo ports.Repository, jobs ports.JobPosting, resumes ports.Resume) *Service {
-	return &Service{repo: repo, jobs: jobs, resumes: resumes, now: time.Now}
+// NewService takes the job-posting, resume and auth clients that Submit needs;
+// nil clients make Submit return UNAVAILABLE.
+func NewService(repo ports.Repository, jobs ports.JobPosting, resumes ports.Resume, users ports.Users) *Service {
+	return &Service{repo: repo, jobs: jobs, resumes: resumes, users: users, now: time.Now}
 }
 func identity(ctx context.Context, write bool) (authctx.Identity, error) {
 	i, ok := authctx.FromContext(ctx)
@@ -89,7 +92,7 @@ func (s *Service) Submit(ctx context.Context, jobID, resumeID string) (domain.Ap
 	if len(existing) != 0 {
 		return zero, mapped(domain.ErrDuplicate)
 	}
-	if s.jobs == nil || s.resumes == nil {
+	if s.jobs == nil || s.resumes == nil || s.users == nil {
 		return zero, status.Error(codes.Unavailable, "eligibility clients unavailable")
 	}
 	job, err := s.jobs.GetJob(ctx, jobID)
@@ -115,8 +118,13 @@ func (s *Service) Submit(ctx context.Context, jobID, resumeID string) (domain.Ap
 	if !resume.Validated {
 		return zero, status.Error(codes.FailedPrecondition, "resume must be validated")
 	}
+	// JT-114 fails closed: no application is stored without the applicant's name.
+	name, err := s.users.GetUserName(ctx, i.UserID)
+	if err != nil || !domain.ValidApplicantName(name) {
+		return zero, status.Error(codes.Unavailable, "applicant name could not be read")
+	}
 	now := s.now().UTC()
-	a, err := s.repo.Create(ctx, domain.Application{ID: uuid.NewString(), ApplicantID: i.UserID, JobID: jobID, ResumeID: resumeID, EmployerID: job.EmployerID, CreatedAt: now, UpdatedAt: now})
+	a, err := s.repo.Create(ctx, domain.Application{ID: uuid.NewString(), ApplicantID: i.UserID, ApplicantName: name, JobID: jobID, ResumeID: resumeID, EmployerID: job.EmployerID, CreatedAt: now, UpdatedAt: now})
 	return a, mapped(err)
 }
 func (s *Service) Get(ctx context.Context, id string) (domain.Application, error) {

@@ -15,11 +15,11 @@ type Repository struct{ pool *pgxpool.Pool }
 
 func NewRepository(pool *pgxpool.Pool) *Repository { return &Repository{pool: pool} }
 
-const columns = "application_id, applicant_id, job_id, resume_id, employer_id, withdrawn, created_at, updated_at"
+const columns = "application_id, applicant_id, job_id, resume_id, employer_id, withdrawn, created_at, updated_at, applicant_name"
 
 func scan(row pgx.Row) (domain.Application, error) {
 	var a domain.Application
-	err := row.Scan(&a.ID, &a.ApplicantID, &a.JobID, &a.ResumeID, &a.EmployerID, &a.Withdrawn, &a.CreatedAt, &a.UpdatedAt)
+	err := row.Scan(&a.ID, &a.ApplicantID, &a.JobID, &a.ResumeID, &a.EmployerID, &a.Withdrawn, &a.CreatedAt, &a.UpdatedAt, &a.ApplicantName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, domain.ErrNotFound
 	}
@@ -35,7 +35,7 @@ func scan(row pgx.Row) (domain.Application, error) {
 }
 func (r *Repository) Create(ctx context.Context, a domain.Application) (domain.Application, error) {
 	return r.write(ctx, false, func(tx pgx.Tx) (domain.Application, error) {
-		return scan(tx.QueryRow(ctx, "INSERT INTO applications ("+columns+") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "+columns, a.ID, a.ApplicantID, a.JobID, a.ResumeID, a.EmployerID, a.Withdrawn, a.CreatedAt, a.UpdatedAt))
+		return scan(tx.QueryRow(ctx, "INSERT INTO applications ("+columns+") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING "+columns, a.ID, a.ApplicantID, a.JobID, a.ResumeID, a.EmployerID, a.Withdrawn, a.CreatedAt, a.UpdatedAt, a.ApplicantName))
 	})
 }
 func (r *Repository) Get(ctx context.Context, id string) (domain.Application, error) {

@@ -5,7 +5,7 @@ import (
 	"github.com/jobtrack-cst/jobtrack/services/application/internal/domain"
 )
 
-//go:generate go tool mockgen -destination=mocks/application.go -package=mocks . Repository,JobPosting,Resume
+//go:generate go tool mockgen -destination=mocks/application.go -package=mocks . Repository,JobPosting,Resume,Users
 
 // Repository atomically stores each successful write and its event in the outbox.
 type Repository interface {
@@ -26,4 +26,9 @@ type JobPosting interface {
 
 type Resume interface {
 	GetResume(context.Context, string) (domain.Resume, error)
+}
+
+// Users reads a user's full name from auth (AuthInternalService.GetUser, JT-114).
+type Users interface {
+	GetUserName(ctx context.Context, userID string) (string, error)
 }

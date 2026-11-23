@@ -29,7 +29,7 @@ func NewApplicationHandler(service *app.Service, loggers ...*slog.Logger) *Appli
 	return &ApplicationHandler{service: service, logger: logger}
 }
 func message(a domain.Application) *applicationv1.Application {
-	return &applicationv1.Application{ApplicationId: a.ID, ApplicantId: a.ApplicantID, JobId: a.JobID, ResumeId: a.ResumeID, EmployerId: a.EmployerID, Withdrawn: a.Withdrawn, Timestamps: &commonv1.ResourceTimestamps{CreatedAt: timestamppb.New(a.CreatedAt), UpdatedAt: timestamppb.New(a.UpdatedAt)}}
+	return &applicationv1.Application{ApplicationId: a.ID, ApplicantId: a.ApplicantID, ApplicantName: a.ApplicantName, JobId: a.JobID, ResumeId: a.ResumeID, EmployerId: a.EmployerID, Withdrawn: a.Withdrawn, Timestamps: &commonv1.ResourceTimestamps{CreatedAt: timestamppb.New(a.CreatedAt), UpdatedAt: timestamppb.New(a.UpdatedAt)}}
 }
 func (h *ApplicationHandler) SubmitApplication(ctx context.Context, r *applicationv1.SubmitApplicationRequest) (*applicationv1.SubmitApplicationResponse, error) {
 	if r == nil {

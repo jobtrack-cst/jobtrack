@@ -100,7 +100,7 @@ func (a *Auth) GetCurrentUser(ctx context.Context, callerID string) (domain.User
 	return a.users.GetByID(ctx, callerID)
 }
 
-// GetUser is internal (notification-dispatcher), so it has no role check.
+// GetUser is internal (notification-dispatcher and application), so it has no role check.
 func (a *Auth) GetUser(ctx context.Context, userID string) (domain.User, error) {
 	if err := domain.ValidateUserID(userID); err != nil {
 		return domain.User{}, err

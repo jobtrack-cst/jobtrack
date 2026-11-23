@@ -36,6 +36,9 @@ type Application struct {
 	EmployerId    string                 `protobuf:"bytes,5,opt,name=employer_id,json=employerId,proto3" json:"employer_id,omitempty"`
 	Withdrawn     bool                   `protobuf:"varint,6,opt,name=withdrawn,proto3" json:"withdrawn,omitempty"`
 	Timestamps    *v1.ResourceTimestamps `protobuf:"bytes,7,opt,name=timestamps,proto3" json:"timestamps,omitempty"`
+	// The applicant's full name from auth at submission time. Empty for
+	// applications submitted before JT-114.
+	ApplicantName string `protobuf:"bytes,8,opt,name=applicant_name,json=applicantName,proto3" json:"applicant_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -117,6 +120,13 @@ func (x *Application) GetTimestamps() *v1.ResourceTimestamps {
 		return x.Timestamps
 	}
 	return nil
+}
+
+func (x *Application) GetApplicantName() string {
+	if x != nil {
+		return x.ApplicantName
+	}
+	return ""
 }
 
 type SubmitApplicationRequest struct {
@@ -500,7 +510,7 @@ var File_jobtrack_application_v1_application_proto protoreflect.FileDescriptor
 
 const file_jobtrack_application_v1_application_proto_rawDesc = "" +
 	"\n" +
-	")jobtrack/application/v1/application.proto\x12\x17jobtrack.application.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fjobtrack/common/v1/common.proto\"\x92\x02\n" +
+	")jobtrack/application/v1/application.proto\x12\x17jobtrack.application.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fjobtrack/common/v1/common.proto\"\xb9\x02\n" +
 	"\vApplication\x12%\n" +
 	"\x0eapplication_id\x18\x01 \x01(\tR\rapplicationId\x12!\n" +
 	"\fapplicant_id\x18\x02 \x01(\tR\vapplicantId\x12\x15\n" +
@@ -511,7 +521,8 @@ const file_jobtrack_application_v1_application_proto_rawDesc = "" +
 	"\twithdrawn\x18\x06 \x01(\bR\twithdrawn\x12F\n" +
 	"\n" +
 	"timestamps\x18\a \x01(\v2&.jobtrack.common.v1.ResourceTimestampsR\n" +
-	"timestamps\"N\n" +
+	"timestamps\x12%\n" +
+	"\x0eapplicant_name\x18\b \x01(\tR\rapplicantName\"N\n" +
 	"\x18SubmitApplicationRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1b\n" +
 	"\tresume_id\x18\x02 \x01(\tR\bresumeId\"c\n" +

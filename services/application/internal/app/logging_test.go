@@ -21,7 +21,7 @@ func TestApplication_StorageFailureRetainsCauseUntilAdapter(t *testing.T) {
 	repo := mocks.NewMockRepository(gomock.NewController(t))
 	repo.EXPECT().Get(gomock.Any(), id).Return(domain.Application{}, failure)
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", id, "x-user-role", "applicant"))
-	_, err := app.NewService(repo, nil, nil).Get(ctx, id)
+	_, err := app.NewService(repo, nil, nil, nil).Get(ctx, id)
 	require.ErrorIs(t, err, failure)
 	require.Equal(t, codes.Internal, status.Code(err))
 	require.Equal(t, "application storage failed", err.Error())

@@ -17,7 +17,7 @@ func InternalUnaryClientInterceptor(token, caller string) (grpc.UnaryClientInter
 		return nil, errors.New("invalid INTERNAL_TOKEN configuration")
 	}
 	switch caller {
-	case "job-alert", "notification-dispatcher", "weekly-summary", "deadline-reminder", "resume-validator":
+	case "job-alert", "notification-dispatcher", "weekly-summary", "deadline-reminder", "resume-validator", "application":
 	default:
 		return nil, errors.New("SERVICE_NAME is not an approved internal caller")
 	}

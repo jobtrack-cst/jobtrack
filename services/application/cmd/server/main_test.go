@@ -76,8 +76,21 @@ func TestLoadConfig(t *testing.T) {
 		errField string
 	}{
 		{"defaults", map[string]string{"SERVICE_NAME": "application"}, config{serviceName: "application", grpcPort: 9090, httpPort: 8080}, ""},
-		{"custom", map[string]string{"SERVICE_NAME": "job-posting", "GRPC_PORT": "19090", "HTTP_PORT": "18080"}, config{serviceName: "job-posting", grpcPort: 19090, httpPort: 18080}, ""},
-		{"boundary ports", map[string]string{"SERVICE_NAME": "test", "GRPC_PORT": "1", "HTTP_PORT": "65535"}, config{serviceName: "test", grpcPort: 1, httpPort: 65535}, ""},
+		{"custom", map[string]string{"SERVICE_NAME": "application", "GRPC_PORT": "19090", "HTTP_PORT": "18080"}, config{serviceName: "application", grpcPort: 19090, httpPort: 18080}, ""},
+		{"boundary ports", map[string]string{"SERVICE_NAME": "application", "GRPC_PORT": "1", "HTTP_PORT": "65535"}, config{serviceName: "application", grpcPort: 1, httpPort: 65535}, ""},
+		// JT-114: auth GetUser allows only caller "application".
+		{"other service name", map[string]string{"SERVICE_NAME": "job-posting"}, config{}, "SERVICE_NAME must be application"},
+		{"missing auth address", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": ""}, config{}, "AUTH_ADDR"},
+		{"auth address without port", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": "auth"}, config{}, "AUTH_ADDR"},
+		{"auth address without host", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": ":9090"}, config{}, "AUTH_ADDR"},
+		{"padded auth host", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": " auth:9090"}, config{}, "AUTH_ADDR"},
+		{"auth port zero", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": "auth:0"}, config{}, "AUTH_ADDR"},
+		{"auth port overflow", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": "auth:65536"}, config{}, "AUTH_ADDR"},
+		{"auth port not a number", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": "auth:private-secret"}, config{}, "AUTH_ADDR"},
+		{"auth port boundaries", map[string]string{"SERVICE_NAME": "application", "AUTH_ADDR": "auth:65535"}, config{serviceName: "application", grpcPort: 9090, httpPort: 8080, authAddr: "auth:65535"}, ""},
+		{"missing internal token", map[string]string{"SERVICE_NAME": "application", "INTERNAL_TOKEN": ""}, config{}, "INTERNAL_TOKEN"},
+		{"internal token with whitespace", map[string]string{"SERVICE_NAME": "application", "INTERNAL_TOKEN": "private-secret token"}, config{}, "INTERNAL_TOKEN"},
+		{"internal token with control character", map[string]string{"SERVICE_NAME": "application", "INTERNAL_TOKEN": "private-secret\n"}, config{}, "INTERNAL_TOKEN"},
 		{"missing job address", map[string]string{"SERVICE_NAME": "application", "JOB_POSTING_ADDR": ""}, config{}, "JOB_POSTING_ADDR"},
 		{"blank resume address", map[string]string{"SERVICE_NAME": "application", "RESUME_ADDR": " \t"}, config{}, "RESUME_ADDR"},
 		{"missing broker URL", map[string]string{"SERVICE_NAME": "application", "RABBITMQ_URL": ""}, config{}, "RABBITMQ_URL"},
@@ -93,6 +106,12 @@ func TestLoadConfig(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := loadConfig(func(key string) string {
+				if value, ok := map[string]string{"AUTH_ADDR": "auth:9090", "INTERNAL_TOKEN": "synthetic-jt114-token"}[key]; ok {
+					if v, set := tt.env[key]; set {
+						return v
+					}
+					return value
+				}
 				if key == "DATABASE_URL" || key == "RABBITMQ_URL" || key == "JOB_POSTING_ADDR" || key == "RESUME_ADDR" {
 					if value, ok := tt.env[key]; ok {
 						return value
@@ -107,6 +126,10 @@ func TestLoadConfig(t *testing.T) {
 				tt.want.jobPostingAddr = "caller-supplied-url"
 				tt.want.resumeAddr = "caller-supplied-url"
 				tt.want.migrationsDir = "services/application/migrations"
+				tt.want.internalToken = "synthetic-jt114-token"
+				if tt.want.authAddr == "" {
+					tt.want.authAddr = "auth:9090"
+				}
 			}
 			if tt.errField != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.errField) || strings.Contains(err.Error(), "private-secret") {
@@ -236,7 +259,7 @@ func TestServe_RegistersHealthAndShutsDownBothServers(t *testing.T) {
 	var logs bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, logging.New("application", &logs), app.NewHealth(), grpcListener, httpListener, app.NewService(nil, nil, nil))
+		done <- serve(ctx, logging.New("application", &logs), app.NewHealth(), grpcListener, httpListener, app.NewService(nil, nil, nil, nil))
 	}()
 	t.Cleanup(func() { cancel() })
 	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}
@@ -395,7 +418,7 @@ func TestLoadConfig_PgxPasswordEnvironmentPreservesReservedCharacters(t *testing
 			password := "synthetic-" + character + "-password"
 			t.Setenv("PGPASSWORD", password)
 			cfg, err := loadConfig(func(key string) string {
-				return map[string]string{"SERVICE_NAME": "application", "JOB_POSTING_ADDR": "job-posting:9090", "RESUME_ADDR": "resume:9090", "RABBITMQ_URL": "amqp://localhost", "DATABASE_URL": "postgres://application@postgres:5432/application?sslmode=disable"}[key]
+				return map[string]string{"SERVICE_NAME": "application", "JOB_POSTING_ADDR": "job-posting:9090", "RESUME_ADDR": "resume:9090", "AUTH_ADDR": "auth:9090", "INTERNAL_TOKEN": "synthetic-jt114-token", "RABBITMQ_URL": "amqp://localhost", "DATABASE_URL": "postgres://application@postgres:5432/application?sslmode=disable"}[key]
 			})
 			if err != nil {
 				t.Fatal("load configuration failed")

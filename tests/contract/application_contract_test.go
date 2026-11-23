@@ -79,7 +79,8 @@ func TestApplicationContract_ResourceAndRequestFields(t *testing.T) {
 		message string
 		fields  []string
 	}{
-		{"Application", []string{"application_id", "applicant_id", "job_id", "resume_id", "employer_id", "withdrawn", "timestamps"}},
+		// applicant_name = 8 is additive (JT-114).
+		{"Application", []string{"application_id", "applicant_id", "job_id", "resume_id", "employer_id", "withdrawn", "timestamps", "applicant_name"}},
 		{"SubmitApplicationRequest", []string{"job_id", "resume_id"}},
 		{"WithdrawApplicationRequest", []string{"application_id"}},
 		{"GetApplicationRequest", []string{"application_id"}},
