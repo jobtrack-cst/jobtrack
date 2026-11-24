@@ -638,6 +638,86 @@ func (x *CloseJobResponse) GetJob() *Job {
 	return nil
 }
 
+type DeleteJobRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteJobRequest) Reset() {
+	*x = DeleteJobRequest{}
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteJobRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteJobRequest) ProtoMessage() {}
+
+func (x *DeleteJobRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteJobRequest.ProtoReflect.Descriptor instead.
+func (*DeleteJobRequest) Descriptor() ([]byte, []int) {
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DeleteJobRequest) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+type DeleteJobResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteJobResponse) Reset() {
+	*x = DeleteJobResponse{}
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteJobResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteJobResponse) ProtoMessage() {}
+
+func (x *DeleteJobResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteJobResponse.ProtoReflect.Descriptor instead.
+func (*DeleteJobResponse) Descriptor() ([]byte, []int) {
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{10}
+}
+
 type GetJobRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -647,7 +727,7 @@ type GetJobRequest struct {
 
 func (x *GetJobRequest) Reset() {
 	*x = GetJobRequest{}
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[9]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -659,7 +739,7 @@ func (x *GetJobRequest) String() string {
 func (*GetJobRequest) ProtoMessage() {}
 
 func (x *GetJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[9]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -672,7 +752,7 @@ func (x *GetJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobRequest.ProtoReflect.Descriptor instead.
 func (*GetJobRequest) Descriptor() ([]byte, []int) {
-	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{9}
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetJobRequest) GetJobId() string {
@@ -691,7 +771,7 @@ type GetJobResponse struct {
 
 func (x *GetJobResponse) Reset() {
 	*x = GetJobResponse{}
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[10]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -703,7 +783,7 @@ func (x *GetJobResponse) String() string {
 func (*GetJobResponse) ProtoMessage() {}
 
 func (x *GetJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[10]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,7 +796,7 @@ func (x *GetJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobResponse.ProtoReflect.Descriptor instead.
 func (*GetJobResponse) Descriptor() ([]byte, []int) {
-	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{10}
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetJobResponse) GetJob() *Job {
@@ -737,7 +817,7 @@ type ListMyJobsRequest struct {
 
 func (x *ListMyJobsRequest) Reset() {
 	*x = ListMyJobsRequest{}
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[11]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -749,7 +829,7 @@ func (x *ListMyJobsRequest) String() string {
 func (*ListMyJobsRequest) ProtoMessage() {}
 
 func (x *ListMyJobsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[11]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -762,7 +842,7 @@ func (x *ListMyJobsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyJobsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyJobsRequest) Descriptor() ([]byte, []int) {
-	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{11}
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ListMyJobsRequest) GetPagination() *v1.PaginationRequest {
@@ -789,7 +869,7 @@ type ListMyJobsResponse struct {
 
 func (x *ListMyJobsResponse) Reset() {
 	*x = ListMyJobsResponse{}
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[12]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -801,7 +881,7 @@ func (x *ListMyJobsResponse) String() string {
 func (*ListMyJobsResponse) ProtoMessage() {}
 
 func (x *ListMyJobsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[12]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -814,7 +894,7 @@ func (x *ListMyJobsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyJobsResponse.ProtoReflect.Descriptor instead.
 func (*ListMyJobsResponse) Descriptor() ([]byte, []int) {
-	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{12}
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListMyJobsResponse) GetJobs() []*Job {
@@ -842,7 +922,7 @@ type ListJobsClosingBetweenRequest struct {
 
 func (x *ListJobsClosingBetweenRequest) Reset() {
 	*x = ListJobsClosingBetweenRequest{}
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[13]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -854,7 +934,7 @@ func (x *ListJobsClosingBetweenRequest) String() string {
 func (*ListJobsClosingBetweenRequest) ProtoMessage() {}
 
 func (x *ListJobsClosingBetweenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[13]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +947,7 @@ func (x *ListJobsClosingBetweenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListJobsClosingBetweenRequest.ProtoReflect.Descriptor instead.
 func (*ListJobsClosingBetweenRequest) Descriptor() ([]byte, []int) {
-	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{13}
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListJobsClosingBetweenRequest) GetStartTime() *timestamppb.Timestamp {
@@ -901,7 +981,7 @@ type ListJobsClosingBetweenResponse struct {
 
 func (x *ListJobsClosingBetweenResponse) Reset() {
 	*x = ListJobsClosingBetweenResponse{}
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[14]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -913,7 +993,7 @@ func (x *ListJobsClosingBetweenResponse) String() string {
 func (*ListJobsClosingBetweenResponse) ProtoMessage() {}
 
 func (x *ListJobsClosingBetweenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[14]
+	mi := &file_jobtrack_job_posting_v1_job_posting_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -926,7 +1006,7 @@ func (x *ListJobsClosingBetweenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListJobsClosingBetweenResponse.ProtoReflect.Descriptor instead.
 func (*ListJobsClosingBetweenResponse) Descriptor() ([]byte, []int) {
-	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{14}
+	return file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListJobsClosingBetweenResponse) GetJobs() []*Job {
@@ -992,7 +1072,10 @@ const file_jobtrack_job_posting_v1_job_posting_proto_rawDesc = "" +
 	"\x0fCloseJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"B\n" +
 	"\x10CloseJobResponse\x12.\n" +
-	"\x03job\x18\x01 \x01(\v2\x1c.jobtrack.job_posting.v1.JobR\x03job\"&\n" +
+	"\x03job\x18\x01 \x01(\v2\x1c.jobtrack.job_posting.v1.JobR\x03job\")\n" +
+	"\x10DeleteJobRequest\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\x13\n" +
+	"\x11DeleteJobResponse\"&\n" +
 	"\rGetJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"@\n" +
 	"\x0eGetJobResponse\x12.\n" +
@@ -1024,7 +1107,7 @@ const file_jobtrack_job_posting_v1_job_posting_proto_rawDesc = "" +
 	"\x10JOB_STATUS_DRAFT\x10\x01\x12\x18\n" +
 	"\x14JOB_STATUS_PUBLISHED\x10\x02\x12\x15\n" +
 	"\x11JOB_STATUS_CLOSED\x10\x03\x12\x16\n" +
-	"\x12JOB_STATUS_REMOVED\x10\x042\x9c\x06\n" +
+	"\x12JOB_STATUS_REMOVED\x10\x042\x9b\a\n" +
 	"\x11JobPostingService\x12w\n" +
 	"\tCreateJob\x12).jobtrack.job_posting.v1.CreateJobRequest\x1a*.jobtrack.job_posting.v1.CreateJobResponse\"\x13\x82\xd3\xe4\x93\x02\r:\x01*\"\b/v1/jobs\x12\x80\x01\n" +
 	"\tUpdateJob\x12).jobtrack.job_posting.v1.UpdateJobRequest\x1a*.jobtrack.job_posting.v1.UpdateJobResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\x1a\x11/v1/jobs/{job_id}\x12\x8b\x01\n" +
@@ -1033,7 +1116,8 @@ const file_jobtrack_job_posting_v1_job_posting_proto_rawDesc = "" +
 	"\bCloseJob\x12(.jobtrack.job_posting.v1.CloseJobRequest\x1a).jobtrack.job_posting.v1.CloseJobResponse\"\"\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/jobs/{job_id}/close\x12t\n" +
 	"\x06GetJob\x12&.jobtrack.job_posting.v1.GetJobRequest\x1a'.jobtrack.job_posting.v1.GetJobResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/jobs/{job_id}\x12\x80\x01\n" +
 	"\n" +
-	"ListMyJobs\x12*.jobtrack.job_posting.v1.ListMyJobsRequest\x1a+.jobtrack.job_posting.v1.ListMyJobsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/employer/jobs2\xa7\x01\n" +
+	"ListMyJobs\x12*.jobtrack.job_posting.v1.ListMyJobsRequest\x1a+.jobtrack.job_posting.v1.ListMyJobsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/employer/jobs\x12}\n" +
+	"\tDeleteJob\x12).jobtrack.job_posting.v1.DeleteJobRequest\x1a*.jobtrack.job_posting.v1.DeleteJobResponse\"\x19\x82\xd3\xe4\x93\x02\x13*\x11/v1/jobs/{job_id}2\xa7\x01\n" +
 	"\x19JobPostingInternalService\x12\x89\x01\n" +
 	"\x16ListJobsClosingBetween\x126.jobtrack.job_posting.v1.ListJobsClosingBetweenRequest\x1a7.jobtrack.job_posting.v1.ListJobsClosingBetweenResponseBNZLgithub.com/jobtrack-cst/jobtrack/gen/go/jobtrack/job_posting/v1;jobpostingv1b\x06proto3"
 
@@ -1050,7 +1134,7 @@ func file_jobtrack_job_posting_v1_job_posting_proto_rawDescGZIP() []byte {
 }
 
 var file_jobtrack_job_posting_v1_job_posting_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_jobtrack_job_posting_v1_job_posting_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_jobtrack_job_posting_v1_job_posting_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_jobtrack_job_posting_v1_job_posting_proto_goTypes = []any{
 	(JobStatus)(0),                         // 0: jobtrack.job_posting.v1.JobStatus
 	(*Job)(nil),                            // 1: jobtrack.job_posting.v1.Job
@@ -1062,53 +1146,57 @@ var file_jobtrack_job_posting_v1_job_posting_proto_goTypes = []any{
 	(*PublishJobResponse)(nil),             // 7: jobtrack.job_posting.v1.PublishJobResponse
 	(*CloseJobRequest)(nil),                // 8: jobtrack.job_posting.v1.CloseJobRequest
 	(*CloseJobResponse)(nil),               // 9: jobtrack.job_posting.v1.CloseJobResponse
-	(*GetJobRequest)(nil),                  // 10: jobtrack.job_posting.v1.GetJobRequest
-	(*GetJobResponse)(nil),                 // 11: jobtrack.job_posting.v1.GetJobResponse
-	(*ListMyJobsRequest)(nil),              // 12: jobtrack.job_posting.v1.ListMyJobsRequest
-	(*ListMyJobsResponse)(nil),             // 13: jobtrack.job_posting.v1.ListMyJobsResponse
-	(*ListJobsClosingBetweenRequest)(nil),  // 14: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest
-	(*ListJobsClosingBetweenResponse)(nil), // 15: jobtrack.job_posting.v1.ListJobsClosingBetweenResponse
-	(*timestamppb.Timestamp)(nil),          // 16: google.protobuf.Timestamp
-	(*v1.ResourceTimestamps)(nil),          // 17: jobtrack.common.v1.ResourceTimestamps
-	(*v1.PaginationRequest)(nil),           // 18: jobtrack.common.v1.PaginationRequest
-	(*v1.PaginationResponse)(nil),          // 19: jobtrack.common.v1.PaginationResponse
+	(*DeleteJobRequest)(nil),               // 10: jobtrack.job_posting.v1.DeleteJobRequest
+	(*DeleteJobResponse)(nil),              // 11: jobtrack.job_posting.v1.DeleteJobResponse
+	(*GetJobRequest)(nil),                  // 12: jobtrack.job_posting.v1.GetJobRequest
+	(*GetJobResponse)(nil),                 // 13: jobtrack.job_posting.v1.GetJobResponse
+	(*ListMyJobsRequest)(nil),              // 14: jobtrack.job_posting.v1.ListMyJobsRequest
+	(*ListMyJobsResponse)(nil),             // 15: jobtrack.job_posting.v1.ListMyJobsResponse
+	(*ListJobsClosingBetweenRequest)(nil),  // 16: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest
+	(*ListJobsClosingBetweenResponse)(nil), // 17: jobtrack.job_posting.v1.ListJobsClosingBetweenResponse
+	(*timestamppb.Timestamp)(nil),          // 18: google.protobuf.Timestamp
+	(*v1.ResourceTimestamps)(nil),          // 19: jobtrack.common.v1.ResourceTimestamps
+	(*v1.PaginationRequest)(nil),           // 20: jobtrack.common.v1.PaginationRequest
+	(*v1.PaginationResponse)(nil),          // 21: jobtrack.common.v1.PaginationResponse
 }
 var file_jobtrack_job_posting_v1_job_posting_proto_depIdxs = []int32{
-	16, // 0: jobtrack.job_posting.v1.Job.deadline:type_name -> google.protobuf.Timestamp
+	18, // 0: jobtrack.job_posting.v1.Job.deadline:type_name -> google.protobuf.Timestamp
 	0,  // 1: jobtrack.job_posting.v1.Job.status:type_name -> jobtrack.job_posting.v1.JobStatus
-	17, // 2: jobtrack.job_posting.v1.Job.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
-	16, // 3: jobtrack.job_posting.v1.CreateJobRequest.deadline:type_name -> google.protobuf.Timestamp
+	19, // 2: jobtrack.job_posting.v1.Job.timestamps:type_name -> jobtrack.common.v1.ResourceTimestamps
+	18, // 3: jobtrack.job_posting.v1.CreateJobRequest.deadline:type_name -> google.protobuf.Timestamp
 	1,  // 4: jobtrack.job_posting.v1.CreateJobResponse.job:type_name -> jobtrack.job_posting.v1.Job
-	16, // 5: jobtrack.job_posting.v1.UpdateJobRequest.deadline:type_name -> google.protobuf.Timestamp
+	18, // 5: jobtrack.job_posting.v1.UpdateJobRequest.deadline:type_name -> google.protobuf.Timestamp
 	1,  // 6: jobtrack.job_posting.v1.UpdateJobResponse.job:type_name -> jobtrack.job_posting.v1.Job
 	1,  // 7: jobtrack.job_posting.v1.PublishJobResponse.job:type_name -> jobtrack.job_posting.v1.Job
 	1,  // 8: jobtrack.job_posting.v1.CloseJobResponse.job:type_name -> jobtrack.job_posting.v1.Job
 	1,  // 9: jobtrack.job_posting.v1.GetJobResponse.job:type_name -> jobtrack.job_posting.v1.Job
-	18, // 10: jobtrack.job_posting.v1.ListMyJobsRequest.pagination:type_name -> jobtrack.common.v1.PaginationRequest
+	20, // 10: jobtrack.job_posting.v1.ListMyJobsRequest.pagination:type_name -> jobtrack.common.v1.PaginationRequest
 	0,  // 11: jobtrack.job_posting.v1.ListMyJobsRequest.status:type_name -> jobtrack.job_posting.v1.JobStatus
 	1,  // 12: jobtrack.job_posting.v1.ListMyJobsResponse.jobs:type_name -> jobtrack.job_posting.v1.Job
-	19, // 13: jobtrack.job_posting.v1.ListMyJobsResponse.pagination:type_name -> jobtrack.common.v1.PaginationResponse
-	16, // 14: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest.start_time:type_name -> google.protobuf.Timestamp
-	16, // 15: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest.end_time:type_name -> google.protobuf.Timestamp
-	18, // 16: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest.pagination:type_name -> jobtrack.common.v1.PaginationRequest
+	21, // 13: jobtrack.job_posting.v1.ListMyJobsResponse.pagination:type_name -> jobtrack.common.v1.PaginationResponse
+	18, // 14: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest.start_time:type_name -> google.protobuf.Timestamp
+	18, // 15: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest.end_time:type_name -> google.protobuf.Timestamp
+	20, // 16: jobtrack.job_posting.v1.ListJobsClosingBetweenRequest.pagination:type_name -> jobtrack.common.v1.PaginationRequest
 	1,  // 17: jobtrack.job_posting.v1.ListJobsClosingBetweenResponse.jobs:type_name -> jobtrack.job_posting.v1.Job
-	19, // 18: jobtrack.job_posting.v1.ListJobsClosingBetweenResponse.pagination:type_name -> jobtrack.common.v1.PaginationResponse
+	21, // 18: jobtrack.job_posting.v1.ListJobsClosingBetweenResponse.pagination:type_name -> jobtrack.common.v1.PaginationResponse
 	2,  // 19: jobtrack.job_posting.v1.JobPostingService.CreateJob:input_type -> jobtrack.job_posting.v1.CreateJobRequest
 	4,  // 20: jobtrack.job_posting.v1.JobPostingService.UpdateJob:input_type -> jobtrack.job_posting.v1.UpdateJobRequest
 	6,  // 21: jobtrack.job_posting.v1.JobPostingService.PublishJob:input_type -> jobtrack.job_posting.v1.PublishJobRequest
 	8,  // 22: jobtrack.job_posting.v1.JobPostingService.CloseJob:input_type -> jobtrack.job_posting.v1.CloseJobRequest
-	10, // 23: jobtrack.job_posting.v1.JobPostingService.GetJob:input_type -> jobtrack.job_posting.v1.GetJobRequest
-	12, // 24: jobtrack.job_posting.v1.JobPostingService.ListMyJobs:input_type -> jobtrack.job_posting.v1.ListMyJobsRequest
-	14, // 25: jobtrack.job_posting.v1.JobPostingInternalService.ListJobsClosingBetween:input_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenRequest
-	3,  // 26: jobtrack.job_posting.v1.JobPostingService.CreateJob:output_type -> jobtrack.job_posting.v1.CreateJobResponse
-	5,  // 27: jobtrack.job_posting.v1.JobPostingService.UpdateJob:output_type -> jobtrack.job_posting.v1.UpdateJobResponse
-	7,  // 28: jobtrack.job_posting.v1.JobPostingService.PublishJob:output_type -> jobtrack.job_posting.v1.PublishJobResponse
-	9,  // 29: jobtrack.job_posting.v1.JobPostingService.CloseJob:output_type -> jobtrack.job_posting.v1.CloseJobResponse
-	11, // 30: jobtrack.job_posting.v1.JobPostingService.GetJob:output_type -> jobtrack.job_posting.v1.GetJobResponse
-	13, // 31: jobtrack.job_posting.v1.JobPostingService.ListMyJobs:output_type -> jobtrack.job_posting.v1.ListMyJobsResponse
-	15, // 32: jobtrack.job_posting.v1.JobPostingInternalService.ListJobsClosingBetween:output_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenResponse
-	26, // [26:33] is the sub-list for method output_type
-	19, // [19:26] is the sub-list for method input_type
+	12, // 23: jobtrack.job_posting.v1.JobPostingService.GetJob:input_type -> jobtrack.job_posting.v1.GetJobRequest
+	14, // 24: jobtrack.job_posting.v1.JobPostingService.ListMyJobs:input_type -> jobtrack.job_posting.v1.ListMyJobsRequest
+	10, // 25: jobtrack.job_posting.v1.JobPostingService.DeleteJob:input_type -> jobtrack.job_posting.v1.DeleteJobRequest
+	16, // 26: jobtrack.job_posting.v1.JobPostingInternalService.ListJobsClosingBetween:input_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenRequest
+	3,  // 27: jobtrack.job_posting.v1.JobPostingService.CreateJob:output_type -> jobtrack.job_posting.v1.CreateJobResponse
+	5,  // 28: jobtrack.job_posting.v1.JobPostingService.UpdateJob:output_type -> jobtrack.job_posting.v1.UpdateJobResponse
+	7,  // 29: jobtrack.job_posting.v1.JobPostingService.PublishJob:output_type -> jobtrack.job_posting.v1.PublishJobResponse
+	9,  // 30: jobtrack.job_posting.v1.JobPostingService.CloseJob:output_type -> jobtrack.job_posting.v1.CloseJobResponse
+	13, // 31: jobtrack.job_posting.v1.JobPostingService.GetJob:output_type -> jobtrack.job_posting.v1.GetJobResponse
+	15, // 32: jobtrack.job_posting.v1.JobPostingService.ListMyJobs:output_type -> jobtrack.job_posting.v1.ListMyJobsResponse
+	11, // 33: jobtrack.job_posting.v1.JobPostingService.DeleteJob:output_type -> jobtrack.job_posting.v1.DeleteJobResponse
+	17, // 34: jobtrack.job_posting.v1.JobPostingInternalService.ListJobsClosingBetween:output_type -> jobtrack.job_posting.v1.ListJobsClosingBetweenResponse
+	27, // [27:35] is the sub-list for method output_type
+	19, // [19:27] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
 	19, // [19:19] is the sub-list for extension extendee
 	0,  // [0:19] is the sub-list for field type_name
@@ -1125,7 +1213,7 @@ func file_jobtrack_job_posting_v1_job_posting_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobtrack_job_posting_v1_job_posting_proto_rawDesc), len(file_jobtrack_job_posting_v1_job_posting_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

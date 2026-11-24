@@ -553,3 +553,98 @@ func TestJobs_ListClosingBetween(t *testing.T) {
 		})
 	}
 }
+
+// Delete checks, in order: role, job ID, missing job, owner, DRAFT (JT-116).
+func TestJobs_Delete(t *testing.T) {
+	tests := []struct {
+		name    string
+		caller  domain.Caller
+		jobID   string
+		setup   func(fixture)
+		wantErr error
+	}{
+		{
+			name: "owner deletes a draft", caller: owner, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				f.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(nil)
+			},
+		},
+		{
+			name: "uppercase job ID is normalized", caller: owner, jobID: "BBBBBBBB-1111-4222-8333-444455556666",
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				f.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(nil)
+			},
+		},
+		{name: "applicant denied before the job ID", caller: applicant, jobID: "x", wantErr: domain.ErrEmployerRoleRequired},
+		{name: "admin denied", caller: admin, jobID: jobID, wantErr: domain.ErrEmployerRoleRequired},
+		{name: "job ID not a UUID", caller: owner, jobID: "x", wantErr: domain.ErrInvalidJobID},
+		{name: "empty job ID", caller: owner, jobID: "", wantErr: domain.ErrInvalidJobID},
+		{
+			name: "job not found", caller: owner, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(domain.Job{}, domain.ErrJobNotFound)
+			},
+			wantErr: domain.ErrJobNotFound,
+		},
+		{
+			name: "other employer denied before the status", caller: otherEmployer, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusPublished), nil)
+			},
+			wantErr: domain.ErrNotJobOwner,
+		},
+		{
+			name: "published job", caller: owner, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusPublished), nil)
+			},
+			wantErr: domain.ErrJobNotDeletable,
+		},
+		{
+			name: "closed job", caller: owner, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusClosed), nil)
+			},
+			wantErr: domain.ErrJobNotDeletable,
+		},
+		{
+			name: "removed job", caller: owner, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusRemoved), nil)
+			},
+			wantErr: domain.ErrJobNotDeletable,
+		},
+		{
+			name: "published concurrently", caller: owner, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				f.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(domain.ErrJobNotDeletable)
+			},
+			wantErr: domain.ErrJobNotDeletable,
+		},
+		{
+			name: "repository error", caller: owner, jobID: jobID,
+			setup: func(f fixture) {
+				f.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				f.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(errDB)
+			},
+			wantErr: errDB,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			if tt.setup != nil {
+				tt.setup(f)
+			}
+			err := f.jobs.Delete(context.Background(), tt.caller, tt.jobID)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}

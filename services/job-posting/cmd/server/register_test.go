@@ -65,6 +65,10 @@ func (stubJobs) UpdateStatus(context.Context, string, domain.Status, domain.Stat
 	return stubJob(), nil
 }
 
+func (stubJobs) Delete(context.Context, string, string) error {
+	return nil
+}
+
 func (stubJobs) ListByEmployer(context.Context, string, domain.Status, domain.Page) ([]domain.Job, int, error) {
 	return []domain.Job{stubJob()}, 1, nil
 }

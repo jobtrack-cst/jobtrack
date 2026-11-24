@@ -25,6 +25,7 @@ const (
 	JobPostingService_CloseJob_FullMethodName   = "/jobtrack.job_posting.v1.JobPostingService/CloseJob"
 	JobPostingService_GetJob_FullMethodName     = "/jobtrack.job_posting.v1.JobPostingService/GetJob"
 	JobPostingService_ListMyJobs_FullMethodName = "/jobtrack.job_posting.v1.JobPostingService/ListMyJobs"
+	JobPostingService_DeleteJob_FullMethodName  = "/jobtrack.job_posting.v1.JobPostingService/DeleteJob"
 )
 
 // JobPostingServiceClient is the client API for JobPostingService service.
@@ -39,7 +40,8 @@ type JobPostingServiceClient interface {
 	// CreateJob creates a DRAFT job for the caller. Employer role only.
 	// Deadline not in the future: INVALID_ARGUMENT.
 	CreateJob(ctx context.Context, in *CreateJobRequest, opts ...grpc.CallOption) (*CreateJobResponse, error)
-	// UpdateJob replaces the editable fields. Owner only.
+	// UpdateJob replaces the editable fields. Owner only. A DRAFT edit
+	// publishes nothing (JT-116).
 	// Allowed in DRAFT or PUBLISHED. If PUBLISHED, publishes job.updated.
 	// CLOSED or REMOVED: FAILED_PRECONDITION.
 	// Deadline not in the future: INVALID_ARGUMENT.
@@ -57,6 +59,12 @@ type JobPostingServiceClient interface {
 	GetJob(ctx context.Context, in *GetJobRequest, opts ...grpc.CallOption) (*GetJobResponse, error)
 	// ListMyJobs lists the caller's jobs, newest first. Employer role only.
 	ListMyJobs(ctx context.Context, in *ListMyJobsRequest, opts ...grpc.CallOption) (*ListMyJobsResponse, error)
+	// DeleteJob deletes the caller's own DRAFT job for good (JT-116). Checked in
+	// this order: role not employer PERMISSION_DENIED, job_id not a UUID
+	// INVALID_ARGUMENT, unknown job NOT_FOUND, another employer's job
+	// PERMISSION_DENIED, job not DRAFT FAILED_PRECONDITION. Publishes no event,
+	// because a draft never leaves job-posting.
+	DeleteJob(ctx context.Context, in *DeleteJobRequest, opts ...grpc.CallOption) (*DeleteJobResponse, error)
 }
 
 type jobPostingServiceClient struct {
@@ -127,6 +135,16 @@ func (c *jobPostingServiceClient) ListMyJobs(ctx context.Context, in *ListMyJobs
 	return out, nil
 }
 
+func (c *jobPostingServiceClient) DeleteJob(ctx context.Context, in *DeleteJobRequest, opts ...grpc.CallOption) (*DeleteJobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteJobResponse)
+	err := c.cc.Invoke(ctx, JobPostingService_DeleteJob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // JobPostingServiceServer is the server API for JobPostingService service.
 // All implementations must embed UnimplementedJobPostingServiceServer
 // for forward compatibility.
@@ -139,7 +157,8 @@ type JobPostingServiceServer interface {
 	// CreateJob creates a DRAFT job for the caller. Employer role only.
 	// Deadline not in the future: INVALID_ARGUMENT.
 	CreateJob(context.Context, *CreateJobRequest) (*CreateJobResponse, error)
-	// UpdateJob replaces the editable fields. Owner only.
+	// UpdateJob replaces the editable fields. Owner only. A DRAFT edit
+	// publishes nothing (JT-116).
 	// Allowed in DRAFT or PUBLISHED. If PUBLISHED, publishes job.updated.
 	// CLOSED or REMOVED: FAILED_PRECONDITION.
 	// Deadline not in the future: INVALID_ARGUMENT.
@@ -157,6 +176,12 @@ type JobPostingServiceServer interface {
 	GetJob(context.Context, *GetJobRequest) (*GetJobResponse, error)
 	// ListMyJobs lists the caller's jobs, newest first. Employer role only.
 	ListMyJobs(context.Context, *ListMyJobsRequest) (*ListMyJobsResponse, error)
+	// DeleteJob deletes the caller's own DRAFT job for good (JT-116). Checked in
+	// this order: role not employer PERMISSION_DENIED, job_id not a UUID
+	// INVALID_ARGUMENT, unknown job NOT_FOUND, another employer's job
+	// PERMISSION_DENIED, job not DRAFT FAILED_PRECONDITION. Publishes no event,
+	// because a draft never leaves job-posting.
+	DeleteJob(context.Context, *DeleteJobRequest) (*DeleteJobResponse, error)
 	mustEmbedUnimplementedJobPostingServiceServer()
 }
 
@@ -184,6 +209,9 @@ func (UnimplementedJobPostingServiceServer) GetJob(context.Context, *GetJobReque
 }
 func (UnimplementedJobPostingServiceServer) ListMyJobs(context.Context, *ListMyJobsRequest) (*ListMyJobsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMyJobs not implemented")
+}
+func (UnimplementedJobPostingServiceServer) DeleteJob(context.Context, *DeleteJobRequest) (*DeleteJobResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteJob not implemented")
 }
 func (UnimplementedJobPostingServiceServer) mustEmbedUnimplementedJobPostingServiceServer() {}
 func (UnimplementedJobPostingServiceServer) testEmbeddedByValue()                           {}
@@ -314,6 +342,24 @@ func _JobPostingService_ListMyJobs_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _JobPostingService_DeleteJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteJobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobPostingServiceServer).DeleteJob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobPostingService_DeleteJob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobPostingServiceServer).DeleteJob(ctx, req.(*DeleteJobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // JobPostingService_ServiceDesc is the grpc.ServiceDesc for JobPostingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -344,6 +390,10 @@ var JobPostingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMyJobs",
 			Handler:    _JobPostingService_ListMyJobs_Handler,
+		},
+		{
+			MethodName: "DeleteJob",
+			Handler:    _JobPostingService_DeleteJob_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

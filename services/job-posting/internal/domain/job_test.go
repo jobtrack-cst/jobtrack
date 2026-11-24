@@ -125,6 +125,10 @@ func TestJob_StatusRules(t *testing.T) {
 		{"close published", domain.StatusPublished, domain.Job.CheckClosable, nil},
 		{"close closed", domain.StatusClosed, domain.Job.CheckClosable, domain.ErrJobNotPublished},
 		{"close removed", domain.StatusRemoved, domain.Job.CheckClosable, domain.ErrJobNotPublished},
+		{"delete draft", domain.StatusDraft, domain.Job.CheckDeletable, nil},
+		{"delete published", domain.StatusPublished, domain.Job.CheckDeletable, domain.ErrJobNotDeletable},
+		{"delete closed", domain.StatusClosed, domain.Job.CheckDeletable, domain.ErrJobNotDeletable},
+		{"delete removed", domain.StatusRemoved, domain.Job.CheckDeletable, domain.ErrJobNotDeletable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

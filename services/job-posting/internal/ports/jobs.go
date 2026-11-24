@@ -16,9 +16,16 @@ type JobRepository interface {
 	// GetByID returns domain.ErrJobNotFound when there is no such job.
 	GetByID(ctx context.Context, jobID string) (domain.Job, error)
 	// UpdateFields writes the editable fields and updated_at only if the
-	// stored status still equals expected. It returns domain.ErrJobNotFound,
-	// or domain.ErrJobStatusChanged after a concurrent status change.
+	// stored status still equals expected. It stores job.updated in the
+	// outbox only when expected is PUBLISHED; a DRAFT edit stores no event
+	// (JT-116). It returns domain.ErrJobNotFound, or
+	// domain.ErrJobStatusChanged after a concurrent status change.
 	UpdateFields(ctx context.Context, job domain.Job, expected domain.Status) (domain.Job, error)
+	// Delete removes the job only if it is a DRAFT of employerID, in one
+	// statement. When nothing is deleted it returns domain.ErrJobNotFound,
+	// domain.ErrNotJobOwner or domain.ErrJobNotDeletable for the row as it
+	// is now. It stores no event (JT-116).
+	Delete(ctx context.Context, jobID, employerID string) error
 	// UpdateStatus moves a job from one status to another in one conditional
 	// update. It returns domain.ErrJobNotFound, or domain.ErrJobStatusChanged
 	// if the job is no longer in the from status.

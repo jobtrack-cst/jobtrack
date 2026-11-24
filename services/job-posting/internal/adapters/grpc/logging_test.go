@@ -118,7 +118,7 @@ func TestJobPosting_PublishEmployerFailureLogsOneSafeWrappedCause(t *testing.T) 
 }
 
 func TestJobPosting_UnexpectedErrorsLogOnceForEveryRPC(t *testing.T) {
-	for _, method := range []string{"CreateJob", "UpdateJob", "PublishJob", "CloseJob", "GetJob", "ListMyJobs", "ListJobsClosingBetween"} {
+	for _, method := range []string{"CreateJob", "UpdateJob", "PublishJob", "CloseJob", "DeleteJob", "GetJob", "ListMyJobs", "ListJobsClosingBetween"} {
 		t.Run(method, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			repo := mocks.NewMockJobRepository(ctrl)
@@ -159,6 +159,9 @@ func TestJobPosting_UnexpectedErrorsLogOnceForEveryRPC(t *testing.T) {
 			case "CloseJob":
 				_, err = h.CloseJob(ctx, &jpv1.CloseJobRequest{JobId: jobID})
 				fullMethod = jpv1.JobPostingService_CloseJob_FullMethodName
+			case "DeleteJob":
+				_, err = h.DeleteJob(ctx, &jpv1.DeleteJobRequest{JobId: jobID})
+				fullMethod = jpv1.JobPostingService_DeleteJob_FullMethodName
 			case "GetJob":
 				_, err = h.GetJob(ctx, &jpv1.GetJobRequest{JobId: jobID})
 				fullMethod = jpv1.JobPostingService_GetJob_FullMethodName

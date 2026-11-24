@@ -74,7 +74,7 @@ func (j *Jobs) Update(ctx context.Context, caller domain.Caller, rawJobID string
 	if err != nil {
 		return domain.Job{}, err
 	}
-	// Sprint 2: publish job.updated when updated.Status is PUBLISHED.
+	// The repository stores job.updated only for a PUBLISHED job (JT-116).
 	return updated, nil
 }
 
@@ -133,6 +133,28 @@ func (j *Jobs) Close(ctx context.Context, caller domain.Caller, rawJobID string)
 	}
 	// Sprint 2: publish job.closed.
 	return closed, nil
+}
+
+// Delete removes the caller's own DRAFT job (JT-116). The read gives the
+// errors in the agreed order; the repository deletes only a draft of this
+// employer, so a publish between the read and the delete is still refused.
+// No event: a draft never leaves job-posting.
+func (j *Jobs) Delete(ctx context.Context, caller domain.Caller, rawJobID string) error {
+	if err := caller.RequireEmployer(); err != nil {
+		return err
+	}
+	jobID, err := domain.NormalizeJobID(rawJobID)
+	if err != nil {
+		return err
+	}
+	existing, err := j.loadOwned(ctx, caller, jobID)
+	if err != nil {
+		return err
+	}
+	if err := existing.CheckDeletable(); err != nil {
+		return err
+	}
+	return j.repo.Delete(ctx, jobID, caller.UserID)
 }
 
 // Get returns one job to any authenticated role. DRAFT and REMOVED jobs look
