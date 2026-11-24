@@ -31,6 +31,7 @@ var (
 	ErrJobNotEditable      = errors.New("only DRAFT or PUBLISHED jobs can be edited")
 	ErrJobNotDraft         = errors.New("only DRAFT jobs can be published")
 	ErrJobNotPublished     = errors.New("only PUBLISHED jobs can be closed")
+	ErrJobNotDeletable     = errors.New("only DRAFT jobs can be deleted")
 	ErrDeadlinePassed      = errors.New("the job deadline has passed")
 	ErrEmployerNotVerified = errors.New("the employer's company profile is not verified")
 	// ErrJobStatusChanged is returned by the repository when a conditional

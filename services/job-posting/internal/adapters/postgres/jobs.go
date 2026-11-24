@@ -34,27 +34,69 @@ func (r *Jobs) Create(ctx context.Context, j domain.Job) (domain.Job, error) {
 	return created, nil
 }
 
+// UpdateFields stores job.updated only for a PUBLISHED job. A draft edit
+// writes no event, so a draft never reaches job-search (JT-116).
 func (r *Jobs) UpdateFields(ctx context.Context, j domain.Job, expected domain.Status) (domain.Job, error) {
+	if expected != domain.StatusPublished {
+		return r.updateFields(ctx, r.pool, j, expected)
+	}
 	return r.write(ctx, "job.updated", func(tx pgx.Tx) (domain.Job, error) {
-		updated, err := scanJob(tx.QueryRow(ctx,
-			`UPDATE jobs
-			 SET title = $3, description = $4, category_id = NULLIF($5, '')::uuid, tag_ids = $6::uuid[],
-			     location = $7, deadline = $8, updated_at = $9
-			 WHERE job_id = $1 AND status = $2
-			 RETURNING `+jobColumns,
-			j.ID, expected.String(), j.Title, j.Description, j.CategoryID, tagIDsParam(j.TagIDs),
-			j.Location, j.Deadline, j.UpdatedAt))
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Job{}, r.missOrConflict(ctx, j.ID)
-		}
-		if err != nil {
-			if isLockTimeout(err) {
-				return domain.Job{}, domain.ErrJobStatusChanged
-			}
-			return domain.Job{}, hideDriverError(ctx, "update job failed")
-		}
-		return updated, nil
+		return r.updateFields(ctx, tx, j, expected)
 	})
+}
+
+// rowQuerier is satisfied by both the pool and a transaction.
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func (r *Jobs) updateFields(ctx context.Context, q rowQuerier, j domain.Job, expected domain.Status) (domain.Job, error) {
+	updated, err := scanJob(q.QueryRow(ctx,
+		`UPDATE jobs
+		 SET title = $3, description = $4, category_id = NULLIF($5, '')::uuid, tag_ids = $6::uuid[],
+		     location = $7, deadline = $8, updated_at = $9
+		 WHERE job_id = $1 AND status = $2
+		 RETURNING `+jobColumns,
+		j.ID, expected.String(), j.Title, j.Description, j.CategoryID, tagIDsParam(j.TagIDs),
+		j.Location, j.Deadline, j.UpdatedAt))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Job{}, r.missOrConflict(ctx, j.ID)
+	}
+	if err != nil {
+		if isLockTimeout(err) {
+			return domain.Job{}, domain.ErrJobStatusChanged
+		}
+		return domain.Job{}, hideDriverError(ctx, "update job failed")
+	}
+	return updated, nil
+}
+
+// Delete removes a DRAFT of this employer in one statement, so a publish
+// or another delete racing with the app's read can never remove a job that
+// is no longer a draft. When nothing is deleted, the row as it is now gives
+// the error. No outbox row: a draft never left job-posting (JT-116).
+func (r *Jobs) Delete(ctx context.Context, jobID, employerID string) error {
+	tag, err := r.pool.Exec(ctx,
+		`DELETE FROM jobs WHERE job_id = $1 AND employer_id = $2 AND status = $3`,
+		jobID, employerID, domain.StatusDraft.String())
+	if err != nil {
+		return hideDriverError(ctx, "delete job failed")
+	}
+	if tag.RowsAffected() == 1 {
+		return nil
+	}
+	var owner, stored string
+	err = r.pool.QueryRow(ctx, `SELECT employer_id, status FROM jobs WHERE job_id = $1`, jobID).Scan(&owner, &stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrJobNotFound
+	}
+	if err != nil {
+		return hideDriverError(ctx, "check job failed")
+	}
+	if owner != employerID {
+		return domain.ErrNotJobOwner
+	}
+	return domain.ErrJobNotDeletable
 }
 
 func (r *Jobs) UpdateStatus(ctx context.Context, jobID string, from, to domain.Status, updatedAt time.Time) (domain.Job, error) {

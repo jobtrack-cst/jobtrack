@@ -13,16 +13,23 @@ import { getJob } from '../application/api';
 import { validId } from '../application/shared';
 import { gatewayMessage } from '../application-status/shared';
 import { useLoad } from '../application-status/useLoad';
-import { closeJob, createJob, publishJob, updateJob, type Job, type JobInput } from './api';
+import { closeJob, createJob, deleteJob, publishJob, updateJob, type Job, type JobInput } from './api';
 import { JobDetails } from './JobDetails';
 import { JobForm } from './JobForm';
-import { editable, jobMessages, publishMessages, useJobReferences } from './shared';
+import { deleteMessages, editable, jobMessages, publishMessages, useJobReferences } from './shared';
+
+type Confirm = 'publish' | 'close' | 'delete' | '';
+const confirmText = {
+  publish: { title: 'Publish this job?', label: 'Confirm publish', body: 'Applicants can find and apply for it until its deadline.' },
+  close: { title: 'Close this job?', label: 'Confirm close', body: 'Applicants can no longer apply. Closing cannot be undone.' },
+  delete: { title: 'Delete this draft?', label: 'Confirm delete', body: 'The draft is deleted for good. This cannot be undone.' },
+};
 
 const back = { to: '/employer/jobs', label: 'Jobs' };
 
 // One job for its owner. /employer/jobs/new opens the editor; an existing job opens
-// read-only with Edit and Publish or Close (JT-109 pattern). Closed and removed jobs
-// are read-only only.
+// read-only with Edit and Publish or Close (JT-109 pattern), and a draft also with
+// Delete draft (JT-116). Closed and removed jobs are read-only only.
 export function JobPage({ create = false }: { create?: boolean }) {
   const { jobId = '' } = useParams();
   if (create) return <NewJob />;
@@ -75,13 +82,14 @@ function JobLoader({ jobId }: { jobId: string }) {
 
 function JobView({ initial }: { initial: Job }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const references = useJobReferences();
   const [job, setJob] = useState(initial);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
-  const [confirm, setConfirm] = useState<'publish' | 'close' | ''>('');
+  const [confirm, setConfirm] = useState<Confirm>('');
   const [transitionError, setTransitionError] = useState('');
   const canEdit = editable(job.status);
   function show(next: Job) { setJob(next); rememberJob(next); }
@@ -95,6 +103,13 @@ function JobView({ initial }: { initial: Job }) {
   async function transition() {
     if (busy || !confirm) return;
     setBusy(true); setTransitionError(''); setNotice('');
+    if (confirm === 'delete') {
+      try {
+        await deleteJob(job.jobId);
+        navigate('/employer/jobs?tab=drafts', { state: { notice: 'Draft deleted.' } });
+      } catch (reason) { setTransitionError(gatewayMessage(reason, deleteMessages)); setBusy(false); }
+      return;
+    }
     try {
       show((await (confirm === 'publish' ? publishJob : closeJob)(job.jobId)).job);
       setNotice(confirm === 'publish' ? 'Job published. Search results may take a moment to update.' : 'Job closed. Search and saved jobs may take a moment to update.');
@@ -102,9 +117,10 @@ function JobView({ initial }: { initial: Job }) {
     } catch (reason) { setTransitionError(gatewayMessage(reason, confirm === 'publish' ? publishMessages : jobMessages)); }
     finally { setBusy(false); }
   }
-  function openConfirm(action: 'publish' | 'close') { setNotice(''); setTransitionError(''); setConfirm(action); }
+  function openConfirm(action: Exclude<Confirm, ''>) { setNotice(''); setTransitionError(''); setConfirm(action); }
   const actions = canEdit && !editing && <>
     <Button variant="outlined" disabled={busy} onClick={() => { setNotice(''); setError(''); setEditing(true); }}>Edit job</Button>
+    {job.status === 'JOB_STATUS_DRAFT' && <Button variant="outlined" color="error" disabled={busy} onClick={() => openConfirm('delete')}>Delete draft</Button>}
     {job.status === 'JOB_STATUS_DRAFT' && <Button variant="contained" disabled={busy} onClick={() => openConfirm('publish')}>Publish job</Button>}
     {job.status === 'JOB_STATUS_PUBLISHED' && <Button variant="outlined" color="error" disabled={busy} onClick={() => openConfirm('close')}>Close job</Button>}
   </>;
@@ -125,13 +141,11 @@ function JobView({ initial }: { initial: Job }) {
         </Stack>
         : <JobDetails job={job} categories={references.data.categories} tags={references.data.tags} />}
     </FormPanel>}
-    <ConfirmDialog open={!!confirm} busy={busy} error={transitionError} destructive={confirm === 'close'}
-      title={confirm === 'publish' ? 'Publish this job?' : 'Close this job?'}
-      confirmLabel={confirm === 'publish' ? 'Confirm publish' : 'Confirm close'}
+    <ConfirmDialog open={!!confirm} busy={busy} error={transitionError} destructive={confirm === 'close' || confirm === 'delete'}
+      title={confirmText[confirm || 'publish'].title}
+      confirmLabel={confirmText[confirm || 'publish'].label}
       onConfirm={() => void transition()} onCancel={() => setConfirm('')}>
-      <Typography>{confirm === 'publish'
-        ? 'Applicants can find and apply for it until its deadline.'
-        : 'Applicants can no longer apply. Closing cannot be undone.'}</Typography>
+      <Typography>{confirmText[confirm || 'publish'].body}</Typography>
     </ConfirmDialog>
   </Stack>;
 }

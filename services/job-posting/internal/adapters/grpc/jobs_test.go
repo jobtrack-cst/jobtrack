@@ -105,6 +105,8 @@ func TestJobPostingHandler_RejectsBadIdentity(t *testing.T) {
 			wantCode(t, err, codes.Unauthenticated)
 			_, err = h.public.ListMyJobs(tt.ctx, &jpv1.ListMyJobsRequest{})
 			wantCode(t, err, codes.Unauthenticated)
+			_, err = h.public.DeleteJob(tt.ctx, &jpv1.DeleteJobRequest{JobId: jobID})
+			wantCode(t, err, codes.Unauthenticated)
 		})
 	}
 }
@@ -127,6 +129,10 @@ func TestJobPostingHandler_EmployerOnlyRPCs(t *testing.T) {
 		},
 		"CloseJob": func(h adapter.JobPostingHandler, c context.Context) error {
 			_, err := h.CloseJob(c, &jpv1.CloseJobRequest{JobId: jobID})
+			return err
+		},
+		"DeleteJob": func(h adapter.JobPostingHandler, c context.Context) error {
+			_, err := h.DeleteJob(c, &jpv1.DeleteJobRequest{JobId: jobID})
 			return err
 		},
 		"ListMyJobs": func(h adapter.JobPostingHandler, c context.Context) error {
@@ -400,4 +406,86 @@ func TestJobPostingHandler_PublishEmployerCheckFailedIsInternalWithFixedMessage(
 	_, err := h.public.PublishJob(asOwner(), &jpv1.PublishJobRequest{JobId: jobID})
 	wantCode(t, err, codes.Internal)
 	assert.Equal(t, domain.ErrEmployerCheckFailed.Error(), status.Convert(err).Message())
+}
+
+// DeleteJob codes in the JT-116 order: role, job ID, missing job, owner, status.
+func TestJobPostingHandler_DeleteJob(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		ctx   context.Context
+		jobID string
+		setup func(handlers)
+		want  codes.Code
+	}{
+		{
+			name: "owner deletes a draft", ctx: asOwner(), jobID: jobID,
+			setup: func(h handlers) {
+				h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				h.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(nil)
+			},
+			want: codes.OK,
+		},
+		{name: "applicant with a bad ID is denied first", ctx: withCaller(otherID, "applicant"), jobID: "bad", want: codes.PermissionDenied},
+		{name: "admin denied", ctx: withCaller(otherID, "admin"), jobID: jobID, want: codes.PermissionDenied},
+		{name: "job ID not a UUID", ctx: asOwner(), jobID: "not-a-uuid", want: codes.InvalidArgument},
+		{
+			name: "unknown job", ctx: asOwner(), jobID: jobID,
+			setup: func(h handlers) {
+				h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(domain.Job{}, domain.ErrJobNotFound)
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "another employer's draft", ctx: withCaller(otherID, "employer"), jobID: jobID,
+			setup: func(h handlers) {
+				h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+			},
+			want: codes.PermissionDenied,
+		},
+		{
+			name: "published job", ctx: asOwner(), jobID: jobID,
+			setup: func(h handlers) {
+				h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusPublished), nil)
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "published between the read and the delete", ctx: asOwner(), jobID: jobID,
+			setup: func(h handlers) {
+				h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				h.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(domain.ErrJobNotDeletable)
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "deleted between the read and the delete", ctx: asOwner(), jobID: jobID,
+			setup: func(h handlers) {
+				h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				h.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(domain.ErrJobNotFound)
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "database error does not leak", ctx: asOwner(), jobID: jobID,
+			setup: func(h handlers) {
+				h.repo.EXPECT().GetByID(gomock.Any(), jobID).Return(storedJob(domain.StatusDraft), nil)
+				h.repo.EXPECT().Delete(gomock.Any(), jobID, ownerID).Return(errDB)
+			},
+			want: codes.Internal,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHandlers(t)
+			if tt.setup != nil {
+				tt.setup(h)
+			}
+			resp, err := h.public.DeleteJob(tt.ctx, &jpv1.DeleteJobRequest{JobId: tt.jobID})
+			wantCode(t, err, tt.want)
+			if tt.want == codes.OK {
+				require.NotNil(t, resp)
+				return
+			}
+			assert.NotContains(t, status.Convert(err).Message(), "secret")
+		})
+	}
 }

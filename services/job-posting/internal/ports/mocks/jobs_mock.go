@@ -57,6 +57,20 @@ func (mr *MockJobRepositoryMockRecorder) Create(ctx, job any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockJobRepository)(nil).Create), ctx, job)
 }
 
+// Delete mocks base method.
+func (m *MockJobRepository) Delete(ctx context.Context, jobID, employerID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, jobID, employerID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockJobRepositoryMockRecorder) Delete(ctx, jobID, employerID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockJobRepository)(nil).Delete), ctx, jobID, employerID)
+}
+
 // GetByID mocks base method.
 func (m *MockJobRepository) GetByID(ctx context.Context, jobID string) (domain.Job, error) {
 	m.ctrl.T.Helper()

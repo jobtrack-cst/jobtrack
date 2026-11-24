@@ -22,7 +22,8 @@ service JobPostingService {
     };
   }
 
-  // UpdateJob replaces the editable fields. Owner only.
+  // UpdateJob replaces the editable fields. Owner only. A DRAFT edit
+  // publishes nothing (JT-116).
   // Allowed in DRAFT or PUBLISHED. If PUBLISHED, publishes job.updated.
   // CLOSED or REMOVED: FAILED_PRECONDITION.
   // Deadline not in the future: INVALID_ARGUMENT.
@@ -62,6 +63,15 @@ service JobPostingService {
   // ListMyJobs lists the caller's jobs, newest first. Employer role only.
   rpc ListMyJobs(ListMyJobsRequest) returns (ListMyJobsResponse) {
     option (google.api.http) = {get: "/v1/employer/jobs"};
+  }
+
+  // DeleteJob deletes the caller's own DRAFT job for good (JT-116). Checked in
+  // this order: role not employer PERMISSION_DENIED, job_id not a UUID
+  // INVALID_ARGUMENT, unknown job NOT_FOUND, another employer's job
+  // PERMISSION_DENIED, job not DRAFT FAILED_PRECONDITION. Publishes no event,
+  // because a draft never leaves job-posting.
+  rpc DeleteJob(DeleteJobRequest) returns (DeleteJobResponse) {
+    option (google.api.http) = {delete: "/v1/jobs/{job_id}"};
   }
 }
 
@@ -140,6 +150,12 @@ message CloseJobRequest {
 message CloseJobResponse {
   Job job = 1;
 }
+
+message DeleteJobRequest {
+  string job_id = 1;
+}
+
+message DeleteJobResponse {}
 
 message GetJobRequest {
   string job_id = 1;

@@ -353,10 +353,11 @@ describe('JT-95 main workflow against the running stack', () => {
     waitForApplicantStatus('Accepted', true);
     const expected = [['None', 'Submitted'], ['Submitted', 'Under review'], ['Under review', 'Shortlisted'],
       ['Shortlisted', 'Interview'], ['Interview', 'Offered'], ['Offered', 'Accepted']];
-    // Applicant page: each row reads "<new status> from <previous status>", oldest first. The
-    // first row still says "from None" there until JT-115 item 3 switches it to StatusHistory.
+    // Applicant page (shared StatusHistory since JT-115): oldest first, each row reads
+    // "<new status> from <previous status>", except the first, which has no "from" part.
     cy.get('ul[aria-label="Status history"] > li').should('have.length', expected.length).each((row, i) => {
-      cy.wrap(row).should('contain', `${expected[i][1]} from ${expected[i][0]}`);
+      if (i === 0) cy.wrap(row).should('contain', 'Submitted').and('not.contain', 'from');
+      else cy.wrap(row).should('contain', `${expected[i][1]} from ${expected[i][0]}`);
     });
     evidence('12-status-history',() => cy.get('ul[aria-label="Status history"]'));
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button, Stack } from '@mui/material';
-import { Link } from 'react-router';
+import { Alert, Button, Stack } from '@mui/material';
+import { Link, useLocation } from 'react-router';
 import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
 import { JobCard } from '../../components/JobCard';
@@ -84,9 +84,14 @@ function ClosedTab() {
 // Jobs: Active, Drafts and Closed tabs (redesign doc Section 5, JT-111).
 export function JobsPage() {
   const [tab, setTab] = useTab(tabs);
+  // A notice from the job page, for example "Draft deleted." (JT-116). Kept in state,
+  // because changing tabs replaces the history entry and drops location.state.
+  const location = useLocation();
+  const [notice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
   return <Stack spacing={4}>
     <PageHeader title="Jobs" description="Your vacancies: open, in preparation and closed."
       action={<Button component={Link} to="/employer/jobs/new" variant="contained">Post a job</Button>} />
+    {notice && <Alert severity="success" role="status">{notice}</Alert>}
     <Stack spacing={3}>
       <TabBar id="jobs" label="Jobs" value={tab} onChange={setTab} tabs={[['active', 'Active'], ['drafts', 'Drafts'], ['closed', 'Closed']]} />
       <TabPanel id="jobs" value={tab}>

@@ -217,3 +217,137 @@ func TestJobs_RecordJobRemoved(t *testing.T) {
 		assert.Len(t, closedEvents(ctx, t, outbox, job.ID), 1)
 	})
 }
+
+const otherEmployerID = "22222222-2222-4222-8222-222222222222"
+
+// updatedEvents counts the unpublished job.updated outbox events for one job.
+func updatedEvents(ctx context.Context, t *testing.T, outbox *postgres.OutboxRepository, jobID string) int {
+	t.Helper()
+	pending, err := outbox.Pending(ctx, 1000)
+	require.NoError(t, err)
+	count := 0
+	for _, e := range pending {
+		if e.Type != "job.updated" {
+			continue
+		}
+		var data eventsv1.JobUpdated
+		require.NoError(t, e.Data.UnmarshalTo(&data))
+		if data.JobId == jobID {
+			count++
+		}
+	}
+	return count
+}
+
+func totalPending(ctx context.Context, t *testing.T, outbox *postgres.OutboxRepository) int {
+	t.Helper()
+	pending, err := outbox.Pending(ctx, 1000)
+	require.NoError(t, err)
+	return len(pending)
+}
+
+// JT-116: a draft edit stores no event; a published edit stores job.updated.
+func TestJobs_UpdateFields_EventOnlyForPublished(t *testing.T) {
+	ctx, outbox, jobs := startPostgres(t)
+
+	t.Run("draft edit stores no event", func(t *testing.T) {
+		draft := createJob(ctx, t, jobs, domain.StatusDraft)
+		before := totalPending(ctx, t, outbox)
+		draft.Title = "Edited draft"
+		draft.UpdatedAt = time.Now().UTC()
+		updated, err := jobs.UpdateFields(ctx, draft, domain.StatusDraft)
+		require.NoError(t, err)
+		assert.Equal(t, "Edited draft", updated.Title)
+		assert.Equal(t, domain.StatusDraft, updated.Status)
+		assert.Equal(t, before, totalPending(ctx, t, outbox))
+		assert.Zero(t, updatedEvents(ctx, t, outbox, draft.ID))
+	})
+
+	t.Run("published edit stores job.updated", func(t *testing.T) {
+		published := createJob(ctx, t, jobs, domain.StatusPublished)
+		published.Title = "Edited published"
+		published.UpdatedAt = time.Now().UTC()
+		_, err := jobs.UpdateFields(ctx, published, domain.StatusPublished)
+		require.NoError(t, err)
+		assert.Equal(t, 1, updatedEvents(ctx, t, outbox, published.ID))
+	})
+
+	t.Run("draft edit after a concurrent publish stores nothing", func(t *testing.T) {
+		job := createJob(ctx, t, jobs, domain.StatusPublished)
+		before := totalPending(ctx, t, outbox)
+		_, err := jobs.UpdateFields(ctx, job, domain.StatusDraft)
+		require.ErrorIs(t, err, domain.ErrJobStatusChanged)
+		assert.Equal(t, before, totalPending(ctx, t, outbox))
+	})
+}
+
+// JT-116: Delete removes only a draft of the given employer, in one statement,
+// and never stores an event.
+func TestJobs_Delete(t *testing.T) {
+	ctx, outbox, jobs := startPostgres(t)
+
+	t.Run("deletes the employer's draft", func(t *testing.T) {
+		draft := createJob(ctx, t, jobs, domain.StatusDraft)
+		before := totalPending(ctx, t, outbox)
+		require.NoError(t, jobs.Delete(ctx, draft.ID, testEmployerID))
+
+		_, err := jobs.GetByID(ctx, draft.ID)
+		require.ErrorIs(t, err, domain.ErrJobNotFound)
+		listed, total, err := jobs.ListByEmployer(ctx, testEmployerID, domain.StatusUnspecified, domain.Page{Limit: 100})
+		require.NoError(t, err)
+		for _, j := range listed {
+			assert.NotEqual(t, draft.ID, j.ID)
+		}
+		assert.Equal(t, len(listed), total)
+		assert.Equal(t, before, totalPending(ctx, t, outbox))
+	})
+
+	t.Run("deleting twice is not found", func(t *testing.T) {
+		draft := createJob(ctx, t, jobs, domain.StatusDraft)
+		require.NoError(t, jobs.Delete(ctx, draft.ID, testEmployerID))
+		require.ErrorIs(t, jobs.Delete(ctx, draft.ID, testEmployerID), domain.ErrJobNotFound)
+	})
+
+	t.Run("unknown job is not found", func(t *testing.T) {
+		require.ErrorIs(t, jobs.Delete(ctx, uuid.NewString(), testEmployerID), domain.ErrJobNotFound)
+	})
+
+	t.Run("refuses another employer's draft", func(t *testing.T) {
+		draft := createJob(ctx, t, jobs, domain.StatusDraft)
+		require.ErrorIs(t, jobs.Delete(ctx, draft.ID, otherEmployerID), domain.ErrNotJobOwner)
+		kept, err := jobs.GetByID(ctx, draft.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StatusDraft, kept.Status)
+	})
+
+	for _, status := range []domain.Status{domain.StatusPublished, domain.StatusClosed, domain.StatusRemoved} {
+		t.Run("refuses a "+status.String()+" job", func(t *testing.T) {
+			job := createJob(ctx, t, jobs, status)
+			before := totalPending(ctx, t, outbox)
+			require.ErrorIs(t, jobs.Delete(ctx, job.ID, testEmployerID), domain.ErrJobNotDeletable)
+			kept, err := jobs.GetByID(ctx, job.ID)
+			require.NoError(t, err)
+			assert.Equal(t, status, kept.Status)
+			assert.Equal(t, before, totalPending(ctx, t, outbox))
+		})
+	}
+
+	t.Run("another employer's published job is not owned", func(t *testing.T) {
+		job := createJob(ctx, t, jobs, domain.StatusPublished)
+		require.ErrorIs(t, jobs.Delete(ctx, job.ID, otherEmployerID), domain.ErrNotJobOwner)
+	})
+
+	// JT-90 rule: an unknown job keeps the claim and changes nothing.
+	t.Run("moderation removal after delete is a no-op", func(t *testing.T) {
+		draft := createJob(ctx, t, jobs, domain.StatusDraft)
+		require.NoError(t, jobs.Delete(ctx, draft.ID, testEmployerID))
+		before := totalPending(ctx, t, outbox)
+		eventID := uuid.NewString()
+		require.NoError(t, jobs.RecordJobRemoved(ctx, eventID, draft.ID))
+		require.NoError(t, jobs.RecordJobRemoved(ctx, eventID, draft.ID))
+		_, err := jobs.GetByID(ctx, draft.ID)
+		require.ErrorIs(t, err, domain.ErrJobNotFound)
+		assert.Empty(t, closedEvents(ctx, t, outbox, draft.ID))
+		assert.Equal(t, before, totalPending(ctx, t, outbox))
+	})
+}

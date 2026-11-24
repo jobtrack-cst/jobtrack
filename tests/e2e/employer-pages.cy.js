@@ -309,6 +309,83 @@ describe('JT-111 jobs (JT-73 rules)', () => {
     for (const label of ['Edit job', 'Close job', 'Save changes']) cy.contains('main button', exact(label)).should('not.exist');
   });
 
+  // JT-116: Delete draft, only on the owner's read-only draft.
+  for (const status of ['JOB_STATUS_PUBLISHED', 'JOB_STATUS_CLOSED', 'JOB_STATUS_REMOVED']) {
+    it(`offers no delete action on a ${status} job`, () => {
+      manage({ ...job, status });
+      cy.contains('main h1', exact(job.title)).should('be.visible');
+      cy.contains('button', exact('Delete draft')).should('not.exist');
+    });
+  }
+
+  it('hides Delete draft while editing a draft and on another employer’s job', () => {
+    manage();
+    cy.contains('main button', exact('Delete draft')).should('be.visible');
+    edit();
+    cy.contains('button', exact('Delete draft')).should('not.exist');
+    cy.contains('button', 'Cancel').click();
+    cy.contains('main button', exact('Delete draft')).should('be.visible');
+  });
+
+  it('does not offer Delete draft on another employer’s draft', () => {
+    manage({ ...job, employerId: categoryId }, 'Job');
+    cy.contains('button', exact('Delete draft')).should('not.exist');
+  });
+
+  it('cancels a delete without a request, then deletes the draft and shows the Drafts tab with a notice', () => {
+    let deletes = 0;
+    cy.intercept('DELETE', `${gateway}/v1/jobs/${jobId}`, req => { deletes++; expect(req.body).to.be.oneOf(['', undefined]); req.reply({ statusCode: 200, body: {} }); }).as('delete');
+    manage();
+    // Registered after manage(), whose Home page lists published jobs, so @jobs sees
+    // only the requests the Jobs page sends after the redirect.
+    cy.intercept('GET', `${gateway}/v1/employer/jobs?*`, { jobs: [], pagination: { totalCount: 0 } }).as('jobs');
+    cy.contains('main button', exact('Delete draft')).click(); dialogReady();
+    cy.get('[role=dialog]').should('contain', 'Delete this draft?').and('contain', 'cannot be undone');
+    cy.get('[role=dialog]').contains('button', 'Cancel').click();
+    cy.get('[role=dialog]').should('not.exist');
+    cy.then(() => expect(deletes).to.eq(0));
+    cy.contains('main h1', exact(job.title)).should('be.visible');
+
+    cy.contains('main button', exact('Delete draft')).click(); dialogReady();
+    cy.get('[role=dialog]').contains('button', 'Confirm delete').click();
+    cy.wait('@delete');
+    cy.location('pathname').should('eq', '/employer/jobs');
+    cy.location('search').should('eq', '?tab=drafts');
+    cy.wait('@jobs').its('request.query.status').should('eq', 'JOB_STATUS_DRAFT');
+    cy.contains('main [role=status]', exact('Draft deleted.')).should('be.visible');
+    cy.contains('[role=tab][aria-selected=true]', exact('Drafts')).should('be.visible');
+    // The Jobs page asks only for the tab in the address: no PUBLISHED request.
+    cy.get('@jobs.all').then(calls => {
+      expect(calls).to.have.length.of.at.least(1);
+      for (const call of calls) expect(call.request.query.status).to.eq('JOB_STATUS_DRAFT');
+    });
+    cy.then(() => expect(deletes).to.eq(1));
+  });
+
+  for (const [statusCode, code, message] of [
+    [404, 5, 'This draft no longer exists.'],
+    [400, 9, 'Only drafts can be deleted.'],
+    [403, 7, 'Only the employer who owns this job can manage it.'],
+    [500, 13, 'The request failed. Please try again.'],
+  ]) {
+    it(`shows a fixed message inside the dialog when delete fails with ${code} and stays on the job`, () => {
+      cy.intercept('DELETE', `${gateway}/v1/jobs/${jobId}`, { statusCode, body: { code, message: 'private-input' } }).as('delete');
+      manage();
+      cy.contains('main button', exact('Delete draft')).click(); dialogReady();
+      cy.get('[role=dialog]').contains('button', 'Confirm delete').click();
+      cy.wait('@delete');
+      cy.get('[role=dialog]').within(() => {
+        cy.get('[role=alert]').should('be.visible').and('contain', message).and('not.contain', 'private-input');
+        cy.contains('button', 'Confirm delete').should('be.enabled');
+        cy.contains('button', 'Cancel').should('be.enabled');
+      });
+      cy.location('pathname').should('eq', `/employer/jobs/${jobId}`);
+      cy.get('[role=dialog]').contains('button', 'Cancel').click();
+      cy.get('[role=dialog]').should('not.exist');
+      cy.contains('main h1', exact(job.title)).should('be.visible');
+    });
+  }
+
   it('handles an address that is not a job ID without calling the gateway', () => {
     let called = false;
     cy.intercept('GET', `${gateway}/v1/jobs/not-a-job`, () => { called = true; });
@@ -1039,6 +1116,10 @@ describe('JT-111 application page', () => {
         : { entries: history, pagination: { nextPageToken: '20', totalCount: 3 } });
     }).as('pages');
     visit(path);
+    // The pages are read one after the other; wait for both before checking the list,
+    // with room for slow machines.
+    cy.wait('@pages', { timeout: 20000 });
+    cy.wait('@pages', { timeout: 20000 });
     cy.get('ul[aria-label="Status history"] > li').should('have.length', 3).last().should('contain', 'Shortlisted from Under review');
     cy.get('@pages.all').should('have.length', 2);
   });

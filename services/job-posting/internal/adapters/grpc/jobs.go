@@ -123,6 +123,19 @@ func (h *JobPostingHandler) ListMyJobs(ctx context.Context, req *jobpostingv1.Li
 	return &jobpostingv1.ListMyJobsResponse{Jobs: jobsToProto(page.Jobs), Pagination: pageToProto(page)}, nil
 }
 
+// DeleteJob deletes the caller's own DRAFT job (JT-116). The role is checked
+// before the job ID, as in the other employer RPCs.
+func (h *JobPostingHandler) DeleteJob(ctx context.Context, req *jobpostingv1.DeleteJobRequest) (*jobpostingv1.DeleteJobResponse, error) {
+	caller, err := employerFrom(ctx)
+	if err != nil {
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_DeleteJob_FullMethodName, err, toStatus(err))
+	}
+	if err := h.jobs.Delete(ctx, caller, req.GetJobId()); err != nil {
+		return nil, logging.GRPCError(ctx, h.logger, jobpostingv1.JobPostingService_DeleteJob_FullMethodName, err, toStatus(err))
+	}
+	return &jobpostingv1.DeleteJobResponse{}, nil
+}
+
 // JobPostingInternalHandler serves JobPostingInternalService. The gateway
 // never registers it, and the internal server interceptor (pkg/authctx) has
 // already checked INTERNAL_TOKEN and that the caller is deadline-reminder, so
@@ -288,7 +301,8 @@ func toStatus(err error) error {
 	case errors.Is(err, domain.ErrJobNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrJobNotEditable), errors.Is(err, domain.ErrJobNotDraft),
-		errors.Is(err, domain.ErrJobNotPublished), errors.Is(err, domain.ErrDeadlinePassed),
+		errors.Is(err, domain.ErrJobNotPublished), errors.Is(err, domain.ErrJobNotDeletable),
+		errors.Is(err, domain.ErrDeadlinePassed),
 		errors.Is(err, domain.ErrEmployerNotVerified), errors.Is(err, domain.ErrJobStatusChanged):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, domain.ErrEmployerCheckFailed):

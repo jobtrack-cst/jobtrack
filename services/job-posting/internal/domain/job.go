@@ -190,6 +190,15 @@ func (j Job) CheckClosable() error {
 	return nil
 }
 
+// CheckDeletable allows DeleteJob only for a DRAFT job (JT-116). A draft was
+// never published, so no other service knows about it.
+func (j Job) CheckDeletable() error {
+	if j.Status != StatusDraft {
+		return ErrJobNotDeletable
+	}
+	return nil
+}
+
 // VisibleTo hides DRAFT and REMOVED jobs from everyone except the owner and admins.
 func (j Job) VisibleTo(c Caller) bool {
 	switch j.Status {

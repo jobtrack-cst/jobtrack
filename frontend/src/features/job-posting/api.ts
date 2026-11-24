@@ -14,3 +14,5 @@ export const createJob = (body: JobInput) => api<{ job: Job }>('/v1/jobs', { met
 export const updateJob = (id: string, body: JobInput) => api<{ job: Job }>(`/v1/jobs/${idPath(id)}`, { method: 'PUT', body });
 export const publishJob = (id: string) => api<{ job: Job }>(`/v1/jobs/${idPath(id)}/publish`, { method: 'POST', body: {} });
 export const closeJob = (id: string) => api<{ job: Job }>(`/v1/jobs/${idPath(id)}/close`, { method: 'POST', body: {} });
+// Drafts only (JT-116); the response is empty.
+export const deleteJob = (id: string) => api<unknown>(`/v1/jobs/${idPath(id)}`, { method: 'DELETE' });

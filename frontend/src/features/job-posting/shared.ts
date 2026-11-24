@@ -7,7 +7,12 @@ export const jobMessages = {
   9: 'This action is no longer allowed. Refresh the job to see its current status.',
 };
 export const publishMessages = { ...jobMessages, 9: 'Cannot publish. Your company must be verified, the job must be a draft, and its deadline must be in the future. Check your Company page, then refresh the job.' };
-export const editable = (status: string) => status === 'JOB_STATUS_DRAFT' || status === 'JOB_STATUS_PUBLISHED';
+export const deleteMessages = {
+  ...jobMessages,
+  5: 'This draft no longer exists. Open Jobs to see your drafts.',
+  9: 'Only drafts can be deleted. Refresh the job to see its current status.',
+};
+export const editable =(status: string) => status === 'JOB_STATUS_DRAFT' || status === 'JOB_STATUS_PUBLISHED';
 
 // Categories, tags and locations (category-tag, every page) for the job form and details.
 export const useJobReferences = () => useLoad(alertReferences, [], jobMessages);
