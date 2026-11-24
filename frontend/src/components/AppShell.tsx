@@ -13,8 +13,8 @@ import { Icon, type IconName } from './Icon';
 // Messages joins both menus with the inbox in Phase 4 (JT-113).
 export const navigation: Record<Role, [path: string, label: string, icon: IconName][]> = {
   ROLE_APPLICANT: [['', 'Home', 'home'], ['jobs', 'Find jobs', 'search'], ['saved', 'Saved', 'bookmark'], ['applications', 'Applications', 'applications'],
-    ['profile', 'Profile', 'profile'], ['job-alerts', 'Job alerts', 'alerts']],
-  ROLE_EMPLOYER: [['', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['applicants', 'Applicants', 'people'], ['company', 'Company', 'company']],
+    ['messages', 'Messages', 'messages'], ['profile', 'Profile', 'profile'], ['job-alerts', 'Job alerts', 'alerts']],
+  ROLE_EMPLOYER: [['', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['applicants', 'Applicants', 'people'], ['messages', 'Messages', 'messages'],['company', 'Company', 'company']],
   ROLE_ADMIN: [['', 'Home', 'home'], ['verification', 'Verification', 'verification'], ['moderation', 'Moderation', 'moderation'],
     ['analytics', 'Analytics', 'analytics'], ['audit-log', 'Audit log', 'audit']],
 };

@@ -22,12 +22,14 @@ interface Props {
   readOnly?: boolean;
   // Bumped by the page's "Refresh messages" button in the section header to read the thread again.
   refreshSignal?: number;
+  // Called with each message this user sends, so the inbox row can show it (JT-113).
+  onSent?: (message: Message) => void;
 }
 
 // The thread and composer for one application (redesign doc Section 6). Messages are
 // stored oldest first, so the newest page is read using totalCount, and earlier
 // pages load on request above it.
-export function Conversation({ applicationId, selfId, otherName, otherAvatar, readOnly, refreshSignal = 0 }: Props) {
+export function Conversation({ applicationId, selfId, otherName, otherAvatar, readOnly, refreshSignal = 0, onSent }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [start, setStart] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -81,8 +83,10 @@ export function Conversation({ applicationId, selfId, otherName, otherAvatar, re
       const { message } = await sendMessage(applicationId, content);
       setDraft('');
       stickToBottom.current = true;
-      if (message?.messageId) setMessages(current => [...current.filter(m => m.messageId !== message.messageId), message]);
-      else setRevision(n => n + 1);
+      if (message?.messageId) {
+        setMessages(current => [...current.filter(m => m.messageId !== message.messageId), message]);
+        onSent?.(message);
+      } else setRevision(n => n + 1);
     } catch (reason) { setSendError(errorMessage(reason)); }
     finally { setBusy(false); }
   }

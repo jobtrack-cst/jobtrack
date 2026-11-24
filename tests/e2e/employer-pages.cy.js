@@ -1011,11 +1011,15 @@ describe('JT-111 application page', () => {
     login();
     stub();
     for (const old of [`/employer/applications/${applicationId}/status`, `/employer/applications/${applicationId}/review`,
-      `/employer/applications/${applicationId}/interviews`, `/employer/messages/${applicationId}`, `/employer/offers/new/${applicationId}`,
+      `/employer/applications/${applicationId}/interviews`, `/employer/offers/new/${applicationId}`,
       `/employer/offers?applicationId=${applicationId}`]) {
       visit(old);
       cy.location('pathname').should('eq', path);
     }
+    // JT-113: the old messages address is now the inbox thread itself.
+    visit(`/employer/messages/${applicationId}`);
+    cy.location('pathname').should('eq', `/employer/messages/${applicationId}`);
+    cy.contains('main h1', /^Messages$/).should('be.visible');
     for (const [old, target] of [['/employer/offers', '/employer/applicants'], ['/employer/report-job', '/employer/jobs'],
       [`/employer/report-job/${jobId}`, '/employer/jobs'], ['/employer/applicants/not-a-uuid', '/employer/applicants/not-a-uuid']]) {
       visit(old);

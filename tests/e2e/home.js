@@ -13,9 +13,9 @@ export function settleHome() {
 export const openApplications = (role = 'ROLE_APPLICANT') =>
   cy.contains('nav a', role === 'ROLE_EMPLOYER' ? /^Applicants$/ : /^Applications$/).click();
 
-// JT-110 main navigation per role (redesign doc Section 3). Messages joins with the inbox in JT-113.
+// JT-110 main navigation per role (redesign doc Section 3), with Messages from the JT-113 inbox.
 export const navigationLinks = {
-  applicant: ['Home', 'Find jobs', 'Saved', 'Applications', 'Profile', 'Job alerts'],
-  employer: ['Home', 'Jobs', 'Applicants', 'Company'],
+  applicant: ['Home', 'Find jobs', 'Saved', 'Applications', 'Messages', 'Profile', 'Job alerts'],
+  employer: ['Home', 'Jobs', 'Applicants', 'Messages', 'Company'],
   admin: ['Home', 'Verification', 'Moderation', 'Analytics', 'Audit log'],
 };

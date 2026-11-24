@@ -5,6 +5,8 @@ AGENTS.md Section 10: end to end and GUI tests with Cypress in `tests/e2e`. The 
 | Folder | What it tests | Backend | Config | Command | In CI |
 |---|---|---|---|---|---|
 | `tests/e2e/*.cy.js` | Pages and requests one by one | Stubbed with `cy.intercept` | `cypress.config.cjs` | `npm test` | Yes |
+
+One stubbed spec can be run on its own, for example `npx cypress run --config-file cypress.config.cjs --spec ../tests/e2e/messages-inbox.cy.js` (the JT-113 Messages inbox). Run stubbed specs with the Compose gateway stopped, so unstubbed requests cannot sign the test user out with a real 401.
 | `tests/e2e/stack/*.cy.js` | The main workflow through the real UI and real services | The running Docker Compose stack, no stubs | `cypress.stack.config.cjs` | `npm run test:stack` | No (CI has no stack) |
 
 Both need the frontend dev server: `npm run dev` in another terminal (http://localhost:5173).
@@ -22,8 +24,9 @@ The spec runs the workflow in order, each step logging in through the UI as the 
 7. Employer opens Applicants, filters by this run's job, opens the card with the applicant's name, and reviews and shortlists on the application page.
 8. Employer schedules an interview on the same page.
 9. Employer makes an offer on the same page.
-10. Applicant accepts it.
-11. The status history shows Submitted, Under review, Shortlisted, Interview, Offered and Accepted on the applicant page (the first row still reads "from None" there until JT-115) and on the employer page (first row without a "from" part), where no actions are left and the conversation is view only.
+10. Employer opens Messages, opens the conversation with the applicant and sends one message; after a reload the row shows it as "You: ...". The applicant then sees the same message in their Messages inbox, under the company's name (JT-113).
+11. Applicant accepts the offer.
+12. The status history shows Submitted, Under review, Shortlisted, Interview, Offered and Accepted on the applicant page (the first row still reads "from None" there until JT-115) and on the employer page (first row without a "from" part), where no actions are left and the conversation is view only.
 
 Services react to events, so the spec waits (refreshing the page, up to about 30 seconds per step) until each change is visible before the next step. All accounts and data are synthetic and unique per run (`jt95-*-<run>@jobtrack.test`), so the spec can run again on the same stack. Data from earlier runs stays in the database.
 

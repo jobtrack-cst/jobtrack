@@ -308,7 +308,35 @@ describe('JT-95 main workflow against the running stack', () => {
     waitForEmployerStatus('Offer');
   });
 
-  it('10 applicant accepts the offer', () => {
+  // JT-113: before the offer is answered (a final application is view only), the employer
+  // sends one message from the Messages inbox and both sides see it there.
+  it('10 employer and applicant see one message in the Messages inbox', () => {
+    const text = `JT-113 hello ${run}`;
+    const conversation = name => cy.contains('ul[aria-label=Conversations] > li', name, { timeout: 15000 });
+    login(employer.email, password, '/employer');
+    nav('Messages');
+    cy.location('pathname').should('eq', '/employer/messages');
+    conversation(applicant.name).find('a').click();
+    cy.location('pathname').should('match', /^\/employer\/messages\/[0-9a-f-]{36}$/);
+    cy.get(`section[aria-label="Conversation with ${applicant.name}"]`).within(() => {
+      field('Message').type(text);
+      cy.contains('button', 'Send message').click();
+      cy.get('[role=log]', { timeout: 15000 }).should('contain', text);
+    });
+    // Read again from messaging, not only the message just sent.
+    cy.reload();
+    conversation(applicant.name).should('contain', `You: ${text}`).and('contain', `JT-95 Developer ${run}`);
+    evidence('10-employer-inbox', () => cy.get('ul[aria-label=Conversations]'));
+
+    logOut();
+    login(applicant.email, password, '/applicant');
+    nav('Messages');
+    conversation(company).should('contain', text).and('not.contain', 'You:').and('contain', `JT-95 Developer ${run}`).find('a').click();
+    cy.get(`section[aria-label="Conversation with ${company}"] [role=log]`, { timeout: 15000 }).should('contain', text).and('contain', company);
+    evidence('10-applicant-inbox', () => cy.get(`section[aria-label="Conversation with ${company}"]`));
+  });
+
+  it('11 applicant accepts the offer', () => {
     login(applicant.email, password, '/applicant');
     // The offer is loaded on the application page with GetOfferByApplication (JT-108).
     cy.then(() => go(`/applicant/applications/${state.applicationId}`));
@@ -320,7 +348,7 @@ describe('JT-95 main workflow against the running stack', () => {
     cy.get('section[aria-label=Offer]').contains('button', 'Accept offer').should('not.exist');
   });
 
-  it('11 status history shows the whole workflow', () => {
+  it('12 status history shows the whole workflow', () => {
     login(applicant.email, password, '/applicant');
     waitForApplicantStatus('Accepted', true);
     const expected = [['None', 'Submitted'], ['Submitted', 'Under review'], ['Under review', 'Shortlisted'],
@@ -330,7 +358,7 @@ describe('JT-95 main workflow against the running stack', () => {
     cy.get('ul[aria-label="Status history"] > li').should('have.length', expected.length).each((row, i) => {
       cy.wrap(row).should('contain', `${expected[i][1]} from ${expected[i][0]}`);
     });
-    evidence('11-status-history', () => cy.get('ul[aria-label="Status history"]'));
+    evidence('12-status-history',() => cy.get('ul[aria-label="Status history"]'));
 
     // Employer page (JT-111): the same history, the first entry without a "from" part, and no actions left.
     logOut();
@@ -345,7 +373,7 @@ describe('JT-95 main workflow against the running stack', () => {
       cy.contains('main button', new RegExp(`^${action}$`)).should('not.exist');
     }
     cy.get('section[aria-label=Conversation]').should('contain', 'view only');
-    evidence('11-employer-history', () => cy.get('ul[aria-label="Status history"]'));
+    evidence('12-employer-history',() => cy.get('ul[aria-label="Status history"]'));
     cy.then(() => cy.log(`job ${state.jobId}, application ${state.applicationId}`));
   });
 });

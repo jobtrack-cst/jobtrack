@@ -512,18 +512,18 @@ describe('JT-88 role-limited routes', () => {
 
   it('gives applicants no employer or admin links or routes', () => {
     login('ROLE_APPLICANT');
-    for (const link of ['Find jobs', 'Saved', 'Applications']) cy.contains('nav a', exact(link)).should('be.visible');
-    for (const link of ['Report a job', 'Messages', 'Company', 'Verification', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
+    for (const link of ['Find jobs', 'Saved', 'Applications', 'Messages']) cy.contains('nav a', exact(link)).should('be.visible');
+    for (const link of ['Report a job', 'Company', 'Verification', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
     visit('/admin/moderation');
     cy.location('pathname').should('eq', '/applicant');
     visit('/employer/company');
     cy.location('pathname').should('eq', '/applicant');
   });
 
-  it('gives employers Home, Jobs, Applicants and Company (with verification) but no admin pages', () => {
+  it('gives employers Home, Jobs, Applicants, Messages and Company (with verification) but no admin pages', () => {
     login('ROLE_EMPLOYER');
-    cy.get('nav[aria-label=Main] a').then($links => expect([...$links].map(a => a.textContent.trim())).to.deep.eq(['Home', 'Jobs', 'Applicants', 'Company']));
-    for (const link of ['Verification', 'Report a job', 'Messages', 'Offers', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
+    cy.get('nav[aria-label=Main] a').then($links => expect([...$links].map(a => a.textContent.trim())).to.deep.eq(['Home', 'Jobs', 'Applicants', 'Messages', 'Company']));
+    for (const link of ['Verification', 'Report a job', 'Offers', ...adminLinks]) cy.contains('nav a', exact(link)).should('not.exist');
     visit('/admin/audit-log');
     cy.location('pathname').should('eq', '/employer');
     visit('/employer/report-job');
@@ -533,7 +533,7 @@ describe('JT-88 role-limited routes', () => {
   it('gives admins the admin pages but no applicant or employer pages', () => {
     login('ROLE_ADMIN');
     for (const link of ['Verification', ...adminLinks]) cy.contains('nav a', exact(link)).should('be.visible');
-    for (const link of ['Report a job', 'Notifications', 'Applications', 'Company']) cy.contains('nav a', exact(link)).should('not.exist');
+    for (const link of ['Report a job', 'Notifications', 'Applications', 'Messages', 'Company']) cy.contains('nav a', exact(link)).should('not.exist');
     visit('/employer/verification');
     cy.location('pathname').should('eq', '/admin');
     visit('/admin/unknown');
