@@ -226,6 +226,29 @@ describe('JT-112 job details', () => {
     cy.contains('Applied').should('be.visible');
   });
 
+  const banners = () => cy.get('main .MuiAlert-root');
+  it('JT-115 item 4: shows exactly one Applied banner after applying and on revisiting the job', () => {
+    cy.intercept('GET', `${gateway}/v1/search/jobs?*`, { jobs: [job], pagination: {} });
+    details();
+    banners().should('have.length', 0);
+    cy.contains('main button', exact('Apply')).click(); cy.wait('@resumes');
+    chooseResume('validated.pdf');
+    cy.intercept('POST', `${gateway}/v1/applications`, { application }).as('submit');
+    cy.intercept('GET', `${gateway}/v1/applications?*`, { applications: [application], pagination: {} }).as('mine');
+    dialog().contains('button', 'Send application').click(); cy.wait('@submit'); cy.wait('@mine');
+    cy.contains('a', 'View application').should('be.visible');
+    banners().should('have.length', 1).first().should('contain', 'Applied').and('contain', 'Application sent.');
+    cy.contains('main', 'You applied').should('not.exist');
+    // Leave and come back: the page reads the existing application and shows its one banner.
+    visit('/applicant/jobs');
+    cy.contains('h1', 'Find jobs').should('be.visible');
+    visit(`/applicant/jobs/${jobId}`);
+    cy.wait('@mine');
+    cy.contains('a', 'View application').should('be.visible');
+    banners().should('have.length', 1).first().should('contain', 'Applied').and('contain', 'You applied').and('not.contain', 'Application sent.');
+    cy.contains('.MuiChip-label', exact('Applied')).should('have.length', 1);
+  });
+
   it('shows the final status and View application for a past application instead of Apply', () => {
     details(job, [{ ...application, withdrawn: true }]);
     cy.contains('a', 'View application').should('be.visible');
@@ -483,11 +506,22 @@ describe('JT-112 application page', () => {
     section('Job').should('contain', 'Druk Tech').and('contain', 'Thimphu').and('contain', job.description);
     section('Status').find('ol[aria-label^="Application progress: Step 3 of 5, Shortlisted"] [aria-current=step]').should('exist');
     // Both history pages are read, oldest first.
-    section('Status').find('ul[aria-label="Status history"] > li').should('have.length', 3).first().should('contain', 'Submitted from None');
+    section('Status').find('ul[aria-label="Status history"] > li').should('have.length', 3).first().should('contain', 'Submitted').and('not.contain', 'from');
     section('Interviews').should('contain', 'Room 2');
     section('Offer').should('contain', 'No offer yet');
     section('Conversation').find('[role=log]').should('contain', 'Druk Tech').and('contain', 'Message 1').and('contain', 'You');
     noUuidOnPage();
+  });
+
+  it('JT-115 item 3: uses the shared history, so no entry says "from None" and later entries name their previous status', () => {
+    openPage();
+    cy.wait('@history');
+    const rows = () => section('Status').find('ul[aria-label="Status history"] > li');
+    rows().should('have.length', 3);
+    rows().eq(0).invoke('text').should('match', /^Submitted/).and('not.contain', 'from');
+    rows().eq(1).should('contain', 'Under review from Submitted');
+    rows().eq(2).should('contain', 'Shortlisted from Under review');
+    cy.get('main').invoke('text').should('not.contain', 'None');
   });
 
   it('withdraws only after confirmation, then shows the application as view only', () => {

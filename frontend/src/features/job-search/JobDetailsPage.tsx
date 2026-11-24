@@ -29,6 +29,7 @@ import { SaveJobButton, useSaveJob } from '../saved-jobs/SaveJobButton';
 
 const back = { to: '/applicant/jobs', label: 'Find jobs' };
 const closedMessage = 'This job is closed, unavailable for applications, or past its deadline.';
+const appliedMessage = 'Application sent. You can follow it on its application page.';
 const reportMessages = {
   [grpcCode.invalidArgument]: 'The report was not accepted. Use a valid job ID and a reason of 1 to 1000 characters.',
   [grpcCode.alreadyExists]: 'You already have an open report for this job. An admin will review it.',
@@ -56,6 +57,9 @@ function JobDetails({ jobId }: { jobId: string }) {
   const [applying, setApplying] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [notice, setNotice] = useState('');
+  // Set after a successful apply. The confirmation then lives in the one Applied banner
+  // instead of a second success alert beside it (JT-115 item 4).
+  const [applied, setApplied] = useState(false);
   const job = resource.data;
   const { company } = useCompany(job?.employerId);
   if (resource.loading) return <Stack spacing={4}><PageHeader back={back} title="Loading job…" /><LoadingRows rows={1} height={240} label="Loading job" /></Stack>;
@@ -72,11 +76,13 @@ function JobDetails({ jobId }: { jobId: string }) {
   return <Stack spacing={4}>
     <PageHeader back={back} title={job.title || 'Untitled job'} description={meta || undefined} action={applyAction} />
     {notice && <Alert severity="success" role="status">{notice}</Alert>}
+    {applied && !mine && <Alert severity="success" role="status">{appliedMessage}</Alert>}
     {!open && <Alert severity="warning">{closedMessage}</Alert>}
-    {mine && <Alert severity="info" icon={false}>
+    {mine && <Alert severity="info" icon={false} role={applied ? 'status' : undefined}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
         {mine.active ? <ToneChip label="Applied" tone="accent" /> : <StatusChip kind="application" status={mine.status} />}
-        <span>You applied{shortDate(mine.app.timestamps?.createdAt) && ` on ${shortDate(mine.app.timestamps?.createdAt)}`}. Follow it on its application page.</span>
+        <span>{applied ? appliedMessage
+          : `You applied${shortDate(mine.app.timestamps?.createdAt) && ` on ${shortDate(mine.app.timestamps?.createdAt)}`}. Follow it on its application page.`}</span>
       </Stack>
     </Alert>}
     {existing.error && <ErrorState message={existing.error} onRetry={existing.refresh} />}
@@ -111,7 +117,7 @@ function JobDetails({ jobId }: { jobId: string }) {
       </Stack>
     </Card>
     {applying && <ApplyDialog job={job} onClose={() => setApplying(false)}
-      onApplied={() => { setApplying(false); setNotice('Application sent. You can follow it on its application page.'); existing.refresh(); }} />}
+      onApplied={() => { setApplying(false); setNotice(''); setApplied(true); existing.refresh(); }} />}
     {reporting && <ReportDialog jobId={jobId} onClose={() => setReporting(false)}
       onSent={() => { setReporting(false); setNotice('Report sent. An admin will review it.'); }} />}
   </Stack>;
