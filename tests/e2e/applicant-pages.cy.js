@@ -616,12 +616,15 @@ describe('JT-112 application page', () => {
     cy.then(() => expect(called).to.eq(false));
   });
 
-  it('sends the old status, interviews, messages and offers addresses to the application page', () => {
+  it('sends the old status, interviews and offers addresses to the application page, and messages to the inbox thread', () => {
     login();
     for (const path of [`/applicant/applications/${applicationId}/status`, `/applicant/applications/${applicationId}/interviews`,
-      `/applicant/messages/${applicationId}`, `/applicant/offers?applicationId=${applicationId}`]) {
+      `/applicant/offers?applicationId=${applicationId}`]) {
       visit(path); cy.location('pathname').should('eq', `/applicant/applications/${applicationId}`);
     }
+    // JT-113: the old messages address is now the inbox thread itself.
+    visit(`/applicant/messages/${applicationId}`); cy.location('pathname').should('eq', `/applicant/messages/${applicationId}`);
+    cy.contains('main h1', /^Messages$/).should('be.visible');
     for (const [path, target] of [[`/applicant/report-job/${jobId}`, `/applicant/jobs/${jobId}`], [`/applicant/apply?jobId=${jobId}`, `/applicant/jobs/${jobId}`],
       ['/applicant/apply', '/applicant/jobs'], ['/applicant/saved-jobs', '/applicant/saved'], ['/applicant/offers?applicationId=bad', '/applicant/applications']]) {
       visit(path); cy.location('pathname').should('eq', target);

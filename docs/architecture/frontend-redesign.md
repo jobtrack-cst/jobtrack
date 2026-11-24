@@ -135,9 +135,8 @@ Plus Jakarta Sans 800: 32px mark and 20px wordmark in the top bar, 38px and
 | Employer | Home, Jobs, Applicants, Messages, Company |
 | Admin | Home, Verification, Moderation, Analytics, Audit log |
 
-Messages is added to the applicant and employer menus (after Applications and
-Applicants) in Phase 4 with the inbox; until then each application keeps its
-own message link and there is no Messages item or placeholder page.
+Messages comes after Applications (applicant) and after Applicants (employer).
+It was added in Phase 4 (JT-113) together with the inbox (Section 6).
 
 Removed from all menus: Apply, Offers, Report a job, Resumes (moved into
 Profile), Verification for employers (moved into Company), Notifications
@@ -288,7 +287,7 @@ or college text anywhere.
 | `/employer/jobs/new`, `/employer/jobs/:jobId` | `/employer/jobs/new` opens straight into the job editor. An existing job opens read-only with every detail (category and tag names, never IDs; a category or tag no longer listed shows as "Unknown category" or "Unknown tag" and is kept when saving); drafts and published jobs have Edit (Save and Cancel return to read-only, JT-109 pattern) with Publish or Close beside it, each with confirmation; closed and removed jobs are read-only with no actions | Same |
 | `/employer/applicants` | Job filter (dropdown of the employer's jobs, using the `ListApplications` `job_id` filter) and small minimal cards in the card grid: applicant photo circle, name, job title, applied date, `StatusChip`, one View button. Applications submitted before JT-114 have no stored name or photo, so their cards show initials and "Applicant" | Job IDs, no filter by job, applicant IDs |
 | `/employer/applicants/:applicationId` | One application page (detail header with a back link): the applicant's profile, photo and resume (JT-114), job summary, `StatusRail` and history, Review (only if not reviewed), Schedule interview (only when Shortlisted or Interview), Make offer (only when Interview and no offer exists), offer status, and the conversation with the applicant embedded at the bottom. Applications submitted before JT-114 show initials and "Applicant", with short empty states ("No profile is available for this application.", "No resume is available for this application.") instead of the profile and resume | Actions shown at every stage, offer ID lookups |
-| `/employer/messages` | Messages inbox (Section 6, Phase 4) with a job filter | Unorganised chats |
+| `/employer/messages` and `/employer/messages/:applicationId` | Messages inbox (Section 6, Phase 4) with a job filter | Unorganised chats |
 | `/employer/company` | Company profile read-only with Edit, Save and Cancel; logo upload; verification status, rejection reason and the request form on the same page | Accidental edits, separate verification page |
 
 Employers have no Report a job page: they only see and manage their own jobs.
@@ -307,23 +306,75 @@ Employers have no Report a job page: they only see and manage their own jobs.
 
 ## 6. Messages inbox (both roles, Phase 4)
 
-A chat-style inbox, like WhatsApp.
+A chat-style inbox (JT-113), built in `frontend/src/features/messaging`
+(`MessagesPage.tsx`, `inbox.ts`) with the shared `Conversation` thread.
 
-- Left column: a list of small conversation rows, one per application (from
-  `ListApplications`), newest activity first. Each row: a circular avatar
-  (the company logo for applicants; the applicant's photo for employers
-  after JT-114; otherwise initials), the other side's name (the company for
-  applicants; the applicant's name after JT-114, "Applicant" until then),
-  the job title, the last message preview and its time (from
-  `ListMessages`). Employers can filter by job.
-- Right column: the thread as message bubbles (own messages on the right in
-  `accent` with `onAccent` text, the other side's on the left on `surface`)
-  with small circular avatars, oldest at the top and newest visible without
-  paging; composer at the bottom (1 to 2000 characters, existing rule).
-- On phones the list and the thread are separate screens.
-- Messages show "You" and the other side's role until JT-114 adds names.
-- The same thread and composer are embedded at the bottom of each
-  application page (Phases 2 and 3).
+Addresses:
+
+- `/applicant/messages` and `/employer/messages` show the list. Opening a
+  conversation goes to `/<role>/messages/:applicationId` (a new history entry), so
+  reload and Back keep it. The employer's job filter is kept in `?job=`, and
+  conversation links and the back link keep it.
+- The older `messages/:applicationId` addresses (JT-112, JT-111 redirects) now
+  open that thread in the inbox.
+- An address that is not an application ID goes to the list. A valid ID that is
+  not one of the caller's applications shows "This conversation is not
+  available" with a link to the list. No ID is ever shown.
+
+List (one conversation per application, final ones included):
+
+- Every page of `ListApplications` is read. For each application, the first page
+  of `ListMessages` is read (oldest first), and only when `totalCount` is above
+  20 a second read at offset `totalCount - 1` returns the last message. That is
+  one or two requests per conversation, accepted for the project's data sizes;
+  a thread-list RPC would be the fix at a larger scale. An open thread needs
+  only the applications, so it does not wait for these reads.
+- `NOT_FOUND` from `ListMessages` (messaging has not processed the application
+  yet) shows "No messages yet". Any other failure shows "Last message
+  unavailable" on that row only.
+- Order: newest activity first, that is the last message's time, or the applied
+  date when there is no message.
+- Each row is one link: a 44px circular avatar, the other side's name with the
+  time on the right (the clock time today, otherwise the short date), the job
+  title and a one-line preview ("You: ..." for one's own message, "No messages
+  yet" without one). The open row is marked with `aria-current` and an accent
+  bar.
+  - Applicants see the company name and logo (`GetCompanyProfile`, then
+    `GetCompanyLogo` when the profile has one, cached for the session), or
+    "Employer" and initials.
+  - Employers see the stored applicant name (JT-114), or "Applicant" when it is
+    empty. The photo comes from `GetApplicantPhotoForApplication` for each
+    visible row, read with no cache and revoked on unmount.
+  - `NOT_FOUND` for a logo or photo shows initials, never an error.
+- Employers filter by job with the same options as the Applicants page
+  (published, closed and removed jobs). The filter and the 20-row pages are
+  applied in the browser to the list already read, so they send no request. A
+  reload or Back returns the list to page 1.
+- After sending, the row shows the new message and moves to the top. Messages
+  from the other side appear on Refresh or reload; there is no polling.
+
+Thread:
+
+- A header with the avatar, name, job title, `StatusChip` (from
+  `GetApplicationStatus`, the only status read on the page) and View
+  application, then the shared `Conversation`. Bubbles: own messages on the
+  right in `accent` with `onAccent` text, the other side's on the left on
+  `surface`, with 32px avatars; oldest at the top and the newest visible
+  without paging; composer at the bottom (1 to 2000 characters).
+- Final applications are view only (Section 8). While the status is loading or
+  failed, the composer shows, as on the application pages.
+- One Refresh button in the page header reads the list and the open thread
+  again.
+
+Layout:
+
+- From 900px (the shell's drawer breakpoint): the list column (280 to 360px)
+  beside the thread, which says "Choose a conversation" until one is open. The
+  employer's job filter spans the full width above both.
+- Below 900px: the list and the thread are separate screens, and only one is
+  rendered. The thread screen has an "All messages" back link.
+- The same thread and composer are embedded at the bottom of each application
+  page (Phases 2 and 3).
 
 ---
 

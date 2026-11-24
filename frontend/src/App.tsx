@@ -27,6 +27,7 @@ import { SearchJobsPage } from './features/job-search/SearchJobsPage';
 import { JobDetailsPage } from './features/job-search/JobDetailsPage';
 import { SavedJobsPage } from './features/saved-jobs/SavedJobsPage';
 import { NotificationsPage } from './features/notification-inbox/NotificationsPage';
+import { MessagesPage } from './features/messaging/MessagesPage';
 
 // Only the signed-in role may see its workspace; anyone else is sent to their own.
 function Workspace({ role }: { role: Role }) {
@@ -76,6 +77,8 @@ export default function App() {
         <Route path="notifications" element={<NotificationsPage key="applicant-notifications" />} />
         <Route path="applications" element={<MyApplicationsPage />} />
         <Route path="applications/:applicationId" element={<ApplicationPage />} />
+        {/* JT-113 inbox; the older messages/:applicationId address now opens its thread here. */}
+        <Route path="messages/:applicationId?" element={<MessagesPage />} />
         <Route path="job-alerts" element={<JobAlertsPage />} />
         <Route path="profile" element={<ProfilePage />} />
         {/* JT-112: addresses of the pages that the redesign merged into others. */}
@@ -85,7 +88,6 @@ export default function App() {
         <Route path="report-job" element={<Navigate to="/applicant/jobs" replace />} />
         <Route path="report-job/:jobId" element={<ToJob />} />
         <Route path="offers" element={<ToApplication query="applicationId" />} />
-        <Route path="messages/:applicationId" element={<ToApplication />} />
         <Route path="applications/:applicationId/status" element={<ToApplication />} />
         <Route path="applications/:applicationId/interviews" element={<ToApplication />} />
         <Route path="*" element={<Navigate to="/applicant" replace />} />
@@ -94,6 +96,7 @@ export default function App() {
         <Route index element={<EmployerHome />} />
         <Route path="applicants" element={<ApplicantsPage />} />
         <Route path="applicants/:applicationId" element={<EmployerApplicationPage />} />
+        <Route path="messages/:applicationId?" element={<MessagesPage />} />
         <Route path="jobs" element={<JobsPage />} />
         <Route path="jobs/new" element={<JobPage key="create-job" create />} />
         <Route path="jobs/:jobId" element={<JobPage key="manage-job" />} />
@@ -106,7 +109,6 @@ export default function App() {
         <Route path="applications/:applicationId/status" element={<ToApplication list={employerList} />} />
         <Route path="applications/:applicationId/review" element={<ToApplication list={employerList} />} />
         <Route path="applications/:applicationId/interviews" element={<ToApplication list={employerList} />} />
-        <Route path="messages/:applicationId" element={<ToApplication list={employerList} />} />
         <Route path="offers" element={<ToApplication query="applicationId" list={employerList} />} />
         <Route path="offers/new/:applicationId" element={<ToApplication list={employerList} />} />
         <Route path="report-job" element={<Navigate to="/employer/jobs" replace />} />

@@ -75,7 +75,7 @@ it('JT-101 mobile drawer supports touch, focus trapping, Escape and focus return
   cy.get('[role=dialog] nav a, [role=dialog] button, header a[aria-label="JobTrack home"]').each($control => {
     expect($control[0].getBoundingClientRect().height).to.be.at.least(44);
   });
-  cy.get('[role=dialog] nav a').should('have.length', 6).last().focus();
+  cy.get('[role=dialog] nav a').should('have.length', 7).last().focus();
   cy.press(Cypress.Keyboard.Keys.TAB);
   cy.focused().should('have.attr', 'aria-label', 'JobTrack home');
   cy.press(Cypress.Keyboard.Keys.ESC);

@@ -27,12 +27,14 @@ export function ListPanel({ children, label }: { children: ReactNode; label?: st
 const rowSx = { display: 'block', px: { xs: 2, sm: 3 }, py: 2.5, minWidth: 0, overflowWrap: 'anywhere', color: 'text.primary', textDecoration: 'none' } as const;
 
 // One row; with `to` the whole row is one link, so put no other controls in it then.
-export function ListRow({ children, to, sx }: { children: ReactNode; to?: string; sx?: SxProps<Theme> }) {
+// `current` marks the linked row that is open beside the list (for example a conversation).
+export function ListRow({ children, to, sx, current }: { children: ReactNode; to?: string; sx?: SxProps<Theme>; current?: boolean }) {
   const extra = Array.isArray(sx) ? sx : [sx];
   return <Box component="li" sx={{ minWidth: 0 }}>
     {to
-      ? <Box component={Link} to={to} sx={[rowSx, { transition: 'background-color 180ms ease', '&:hover': { bgcolor: tokens.surfaceRaised },
-        '&:focus-visible': { outline: `3px solid ${tokens.accent}`, outlineOffset: -3 } }, ...extra]}>{children}</Box>
+      ? <Box component={Link} to={to} aria-current={current ? 'true' : undefined} sx={[rowSx, { transition: 'background-color 180ms ease', '&:hover': { bgcolor: tokens.surfaceRaised },
+        '&:focus-visible': { outline: `3px solid ${tokens.accent}`, outlineOffset: -3 } },
+        current ? { bgcolor: tokens.surfaceRaised, boxShadow: `inset 4px 0 0 ${tokens.accent}` } : {}, ...extra]}>{children}</Box>
       : <Box sx={[rowSx, ...extra]}>{children}</Box>}
   </Box>;
 }
