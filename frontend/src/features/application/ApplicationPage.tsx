@@ -17,7 +17,8 @@ import { isFinalStatus, StatusRail } from '../../components/StatusRail';
 import { jobName, useJob } from '../../components/useJob';
 import { tokens } from '../../theme';
 import { listHistory, type HistoryEntry } from '../application-status/api';
-import { formatTime, grpcCode, isNotFound, statusLabel } from '../application-status/shared';
+import { formatTime, grpcCode, isNotFound } from '../application-status/shared';
+import { StatusHistory } from '../application-status/StatusHistory';
 import { readMessages } from '../application-status/messages';
 import { useLoad } from '../application-status/useLoad';
 import { useAuth } from '../auth/AuthProvider';
@@ -132,15 +133,7 @@ function ApplicationView({ initial }: { initial: Application }) {
         {history.loading && !history.data && <LoadingRows rows={2} label="Loading history" />}
         {history.error && !status.error && <ErrorState message={history.error} onRetry={refreshSoon} />}
         {history.data && !history.data.length && <Typography color="text.secondary">No changes yet. The first entry appears shortly after you apply.</Typography>}
-        {!!history.data?.length && <ListPanel label="Status history">
-          {history.data.map((e, i) => <ListRow key={i} sx={{ py: 1.75 }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.25, sm: 2 }} sx={{ justifyContent: 'space-between' }}>
-              <Typography><Box component="strong">{statusLabel(e.newStatus)}</Box>
-                <Typography component="span" color="text.secondary">{` from ${statusLabel(e.previousStatus)}`}</Typography></Typography>
-              <Typography variant="body2" color="text.secondary">{formatTime(e.occurredAt)}</Typography>
-            </Stack>
-          </ListRow>)}
-        </ListPanel>}
+        {!!history.data?.length && <StatusHistory entries={history.data} />}
       </Box>
     </Section>
 
