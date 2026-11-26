@@ -46,15 +46,17 @@ export function AuthPage({ registration = false }: { registration?: boolean }) {
     } finally { setBusy(false); }
   }
   // Both columns stay vertically centred in the space under the logo (about 116px with the main padding).
-  return <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
-    columnGap: 'clamp(32px, 5vw, 64px)', rowGap: 4, minHeight: { md: 'calc(100dvh - 116px)' } }}>
-    <Box sx={{ flex: '1 1 420px', minWidth: 0 }}>
-      {/* clamp(44px, 4.6vw, 68px), capped at 11vw below 400px so the longest word never scrolls sideways. */}
-      <Typography component="p" sx={{ fontSize: 'min(clamp(44px, 4.6vw, 68px), 11vw)', fontWeight: 800, letterSpacing: '-0.045em', lineHeight: 1.04, color: tokens.text,
+  // Centred as a pair with a fixed gap, so the headline and the form stay close on wide screens.
+  return <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
+    columnGap: 'clamp(80px, 10vw, 160px)', rowGap: 4, minHeight: { md: 'calc(100dvh - 116px)' } }}>
+    {/* Capped so the headline keeps short lines on very wide screens. */}
+    <Box sx={{ flex: '1 1 420px', minWidth: 0, maxWidth: 720 }}>
+      {/* clamp(48px, 5vw, 76px), capped at 11vw below 440px so the longest word never scrolls sideways. */}
+      <Typography component="p" sx={{ fontSize: 'min(clamp(48px, 5vw, 76px), 11vw)', fontWeight: 800, letterSpacing: '-0.045em', lineHeight: 1.04, color: tokens.text,
         textWrap: 'balance' }}>
         Jobs and internships, without the guesswork.
       </Typography>
-      <Typography sx={{ mt: 2.5, fontSize: '1.125rem', lineHeight: 1.6, color: tokens.textSecondary, maxWidth: '44ch' }}>
+      <Typography sx={{ mt: 2.5, fontSize: '1.25rem', lineHeight: 1.6, color: tokens.textSecondary, maxWidth: '44ch' }}>
         Search open roles, apply with a checked resume and follow every application from submitted to offer.
       </Typography>
     </Box>

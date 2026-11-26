@@ -20,8 +20,9 @@ export const navigation: Record<Role, [path: string, label: string, icon: IconNa
 };
 
 export const contentWidth = 1180;
-// Signed-out pages: one wider container, so the logo lines up with the content.
-const publicContainer = { width: '100%', maxWidth: 1440, mx: 'auto', px: 'clamp(24px, 5vw, 96px)', boxSizing: 'border-box' } as const;
+// Signed-out pages: full width with a small gutter, so the logo sits near the top-left
+// corner and lines up with the content instead of floating inside a capped column.
+const publicContainer = { width: '100%', px: 'clamp(16px, 3vw, 48px)', boxSizing: 'border-box' } as const;
 
 // Nav links are pills: 15px, 600, radius 12; the active one is filled white.
 const pillSx = {
